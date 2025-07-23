@@ -154,7 +154,7 @@ def fix_dataset_issues(data_dir, problematic_files):
 
 def main():
     """Main function"""
-    data_dir = "/Users/ozgewhiting/Documents/EQLabs/datasets_serial/CCA_train_db1"
+    data_dir = "/Users/ozgewhiting/Documents/EQLabs/datasets_serial/CCA_val_db1"
     
     if not os.path.exists(data_dir):
         print(f"❌ Dataset directory not found: {data_dir}")

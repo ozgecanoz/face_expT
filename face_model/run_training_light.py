@@ -14,14 +14,22 @@ from data.dataset import create_face_dataloader
 def main():
     """Run lightweight Face ID Model training"""
     
-    # Memory optimization for CPU training
-    torch.set_num_threads(2)  # Very limited CPU threads
-    torch.backends.cudnn.benchmark = False
+    # Device detection
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
+    # Memory optimization based on device
+    if device.type == "cpu":
+        torch.set_num_threads(4)  # Very limited CPU threads
+        torch.backends.cudnn.benchmark = False
+    else:
+        # GPU optimizations
+        torch.backends.cudnn.benchmark = True  # Enable for GPU
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()  # Clear GPU cache
     
     # Lightweight configuration
     config = {
         'training': {
-            'data_dir': "/Users/ozgewhiting/Documents/EQLabs/datasets_serial/CCA_train_db1",
             'log_dir': "./logs",
             'checkpoint_dir': "./checkpoints",
             'learning_rate': 1e-4,
@@ -48,7 +56,8 @@ def main():
     }
     
     print("🚀 Starting Lightweight Face ID Model Training")
-    print(f"📊 Dataset: {config['training']['data_dir']}")
+    print(f"🖥️  Device: {device}")
+    print(f"📊 Dataset: {config['training']['train_data_dir']}")
     print(f"📈 Logs: {config['training']['log_dir']}")
     print(f"🎯 Learning rate: {config['training']['learning_rate']}")
     print(f"📦 Batch size: {config['training']['batch_size']}")

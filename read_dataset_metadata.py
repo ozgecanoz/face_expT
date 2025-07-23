@@ -17,18 +17,8 @@ def read_dataset_metadata(metadata_file):
     with open(metadata_file, 'r') as f:
         metadata = json.load(f)
     
-    print("=== Dataset Metadata ===")
-    print(f"Dataset folder: {metadata['dataset_folder']}")
-    print(f"Output directory: {metadata['output_directory']}")
-    print(f"Total videos processed: {metadata['total_videos_processed']}")
-    print(f"Failed videos: {metadata['failed_videos']}")
-    print(f"Total clips extracted: {metadata['total_clips_extracted']}")
-    print(f"Clips per video: {metadata['clips_per_video']}")
-    
     if 'dataset_stats' in metadata:
         stats = metadata['dataset_stats']
-        print(f"\n=== Subject Statistics ===")
-        print(f"Number of subjects: {stats['num_subjects']}")
         
         print(f"\n=== Subject Details ===")
         for subject_id, subject_data in stats['subjects'].items():
@@ -51,6 +41,17 @@ def read_dataset_metadata(metadata_file):
                     print(f"    {i+1}. {os.path.basename(clip['hdf5_file'])} (t={clip['timestamp']:.2f}s)")
                 if len(subject_data['clip_files']) > 3:
                     print(f"    ... and {len(subject_data['clip_files']) - 3} more")
+        
+        print("=== Dataset Metadata ===")
+        print(f"Dataset folder: {metadata['dataset_folder']}")
+        print(f"Output directory: {metadata['output_directory']}")
+        print(f"Total videos processed: {metadata['total_videos_processed']}")
+        print(f"Failed videos: {metadata['failed_videos']}")
+        print(f"Total clips extracted: {metadata['total_clips_extracted']}")
+        print(f"Clips per video: {metadata['clips_per_video']}")
+
+        print(f"\n=== Subject Statistics ===")
+        print(f"Number of subjects: {stats['num_subjects']}")
 
 def main():
     """Main function"""

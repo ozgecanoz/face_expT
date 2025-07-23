@@ -14,9 +14,18 @@ from data.dataset import create_face_dataloader
 def main():
     """Run Face ID Model training"""
     
-    # Memory optimization for CPU training
-    torch.set_num_threads(4)  # Limit CPU threads
-    torch.backends.cudnn.benchmark = False  # Disable for CPU
+    # Device detection
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
+    # Memory optimization based on device
+    if device.type == "cpu":
+        torch.set_num_threads(4)  # Limit CPU threads
+        torch.backends.cudnn.benchmark = False  # Disable for CPU
+    else:
+        # GPU optimizations
+        torch.backends.cudnn.benchmark = True  # Enable for GPU
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()  # Clear GPU cache
     
     # Configuration - Optimized for CPU training
     config = {
@@ -46,7 +55,8 @@ def main():
     }
     
     print("🚀 Starting Face ID Model Training")
-    print(f"📊 Dataset: {config['training']['data_dir']}")
+    print(f"🖥️  Device: {device}")
+    print(f"📊 Dataset: {config['training']['train_data_dir']}")
     print(f"📈 Logs: {config['training']['log_dir']}")
     print(f"🎯 Learning rate: {config['training']['learning_rate']}")
     print(f"📦 Batch size: {config['training']['batch_size']}")

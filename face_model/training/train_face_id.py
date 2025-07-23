@@ -112,7 +112,7 @@ class FaceIDTrainer:
         self.config = config
         
         # Load dataset metadata
-        self.dataset_metadata = load_dataset_metadata(config['training']['data_dir'])
+        self.dataset_metadata = load_dataset_metadata(config['training']['train_data_dir'])
         
         # Initialize models
         self.dinov2_tokenizer = DINOv2Tokenizer()
