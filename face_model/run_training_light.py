@@ -32,7 +32,12 @@ def main():
             'contrastive_margin': 1.0,
             'consistency_weight': 1.0,
             'contrastive_weight': 0.1,  # Reduced to balance with consistency loss
-            'use_consistency_loss': True  # Set to False to test only contrastive loss
+            'use_consistency_loss': True,  # Set to False to test only contrastive loss
+            # Validation configuration
+            'train_data_dir': "/Users/ozgewhiting/Documents/EQLabs/datasets_serial/CCA_train_db1",
+            'val_data_dir': "/Users/ozgewhiting/Documents/EQLabs/datasets_serial/CCA_val_db1",  # Set to validation dataset path if available
+            'max_train_samples': 50,  # Limit to 50 samples for testing
+            'max_val_samples': 20   # Limit validation samples for testing
         },
         'face_id_model': {
             'embed_dim': 384,
@@ -53,18 +58,28 @@ def main():
     # Create trainer
     trainer = FaceIDTrainer(config)
     
-    # Create dataloader with limited samples for testing
-    dataloader = create_face_dataloader(
-        data_dir=config['training']['data_dir'],
+    # Create training dataloader
+    train_dataloader = create_face_dataloader(
+        data_dir=config['training']['train_data_dir'],
         batch_size=config['training']['batch_size'],
-        max_samples=50  # Limit to 50 samples for testing
+        max_samples=config['training']['max_train_samples']
     )
     
-    print(f"\n📋 Dataset loaded: {len(dataloader)} batches per epoch (limited to 50 samples)")
+    # Create validation dataloader if validation data is provided
+    val_dataloader = None
+    if config['training']['val_data_dir'] is not None:
+        val_dataloader = create_face_dataloader(
+            data_dir=config['training']['val_data_dir'],
+            batch_size=config['training']['batch_size'],
+            max_samples=config['training']['max_val_samples']
+        )
+        print(f"📊 Validation dataset loaded: {len(val_dataloader)} batches per epoch")
+    
+    print(f"\n📋 Training dataset loaded: {len(train_dataloader)} batches per epoch")
     
     # Start training
     print("\n🎯 Starting lightweight training...")
-    trainer.train(dataloader, config['training']['num_epochs'])
+    trainer.train(train_dataloader, val_dataloader, config['training']['num_epochs'])
     
     print("\n✅ Lightweight training completed!")
     print(f"📊 Check TensorBoard logs at: {config['training']['log_dir']}/face_id_training")
