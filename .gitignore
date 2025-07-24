@@ -85,3 +85,9 @@ face_model/evaluation_results/
 *.bmp
 *.tiff
 *.svg 
+# Google Cloud SDK
+/bin/zsh/google-cloud-sdk/
+google-cloud-sdk/
+
+# Google Cloud Service Account Key
+dataset-uploader-key.json
