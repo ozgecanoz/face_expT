@@ -49,6 +49,11 @@ def check_gcloud_installation():
 
 def authenticate_gcloud(key_file_path):
     """Authenticate gcloud with service account key"""
+    if key_file_path is None:
+        # VM uses built-in service account - no authentication needed
+        logger.info("✅ Using VM's built-in service account")
+        return True
+    
     try:
         run_command(f"gcloud auth activate-service-account --key-file={key_file_path}")
         logger.info("✅ Authenticated with service account")

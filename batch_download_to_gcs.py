@@ -59,7 +59,6 @@ def main():
     """Main batch download function"""
     parser = argparse.ArgumentParser(description='Batch download datasets from URLs and upload to Google Cloud Storage')
     parser.add_argument('--dataset-config', default='CC_dataset_urls.json', help='Dataset configuration file')
-    parser.add_argument('--key-file', default='dataset-uploader-key.json', help='Service account key file')
     parser.add_argument('--config', default='gcp_config.json', help='GCP configuration file')
     parser.add_argument('--bucket-name', help='GCS bucket name (overrides config)')
     parser.add_argument('--create-sample', action='store_true', help='Create a sample dataset configuration file')
@@ -91,7 +90,6 @@ def main():
         return False
     
     # Use command line args or config
-    key_file = args.key_file if os.path.exists(args.key_file) else gcp_config.get('key_file', args.key_file)
     bucket_name = args.bucket_name or gcp_config.get('bucket_name', 'face-training-datasets')
     project_id = gcp_config.get('project_id')
     
@@ -100,9 +98,7 @@ def main():
         return False
     
     try:
-        # Authenticate
-        if not authenticate_gcloud(key_file):
-            return False
+        # VM will use its built-in service account - no authentication needed
         
         # Set project
         if not set_project(project_id):
@@ -120,7 +116,7 @@ def main():
                     dataset['url'], 
                     bucket_name, 
                     dataset['remote_path'], 
-                    key_file, 
+                    None,  # No key file needed - VM uses built-in service account
                     project_id
                 ):
                     successful += 1
