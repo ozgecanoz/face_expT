@@ -32,6 +32,10 @@ def setup_firefox_driver():
     # Add user agent to mimic real browser
     options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:128.0) Gecko/20100101 Firefox/128.0')
     
+    # Enable network logging
+    options.set_preference('devtools.console.stdout.content', True)
+    options.set_preference('devtools.netmonitor.enabled', True)
+    
     try:
         driver = webdriver.Firefox(options=options)
         logger.info("✅ Firefox driver created successfully")
@@ -48,75 +52,234 @@ def extract_download_links(driver, url):
         driver.get(url)
         
         # Wait for page to load
-        time.sleep(3)
+        time.sleep(5)
         
         # Wait for content to be present
-        wait = WebDriverWait(driver, 10)
+        wait = WebDriverWait(driver, 15)
         
-        # Try to find download links - Meta AI might have different structures
-        download_links = []
-        
-        # Method 1: Look for links with zip files
-        logger.info("🔍 Searching for download links...")
-        
-        # Find all links on the page
-        all_links = driver.find_elements(By.TAG_NAME, "a")
-        logger.info(f"Found {len(all_links)} total links on the page")
-        
-        for link in all_links:
-            try:
-                href = link.get_attribute('href')
-                text = link.text.strip()
-                
-                if href and text:
-                    # Check if it's a download link
-                    if any(keyword in text.lower() for keyword in ['download', 'zip', 'part', 'cc_']):
-                        logger.info(f"📦 Found potential download link: {text} -> {href}")
-                        download_links.append({
-                            'text': text,
-                            'url': href,
-                            'filename': text if text.endswith('.zip') else f"{text}.zip"
-                        })
-                    
-                    # Also check for zip files in href
-                    elif href and ('.zip' in href.lower() or 'download' in href.lower()):
-                        filename = text if text else href.split('/')[-1]
-                        logger.info(f"📦 Found zip link: {filename} -> {href}")
-                        download_links.append({
-                            'text': text,
-                            'url': href,
-                            'filename': filename
-                        })
-                        
-            except Exception as e:
-                logger.warning(f"Error processing link: {e}")
-                continue
-        
-        # Method 2: Look for buttons that might trigger downloads
-        buttons = driver.find_elements(By.TAG_NAME, "button")
-        logger.info(f"Found {len(buttons)} buttons on the page")
-        
-        for button in buttons:
-            try:
-                text = button.text.strip()
-                if any(keyword in text.lower() for keyword in ['download', 'zip', 'part']):
-                    logger.info(f"🔘 Found download button: {text}")
-                    # Note: We can't get direct URLs from buttons, but we can log them
-            except Exception as e:
-                continue
-        
-        # Method 3: Look for any text that might indicate download sections
-        page_text = driver.page_source.lower()
-        if 'casual conversations' in page_text:
-            logger.info("✅ Found 'Casual Conversations' content on page")
-        
-        if 'download' in page_text:
-            logger.info("✅ Found download-related content on page")
-        
-        # Save page source for inspection
+        # Save initial page source for inspection
         with open('meta_ai_page_source.html', 'w', encoding='utf-8') as f:
             f.write(driver.page_source)
-        logger.info("💾 Saved page source to meta_ai_page_source.html for inspection")
+        logger.info("💾 Saved initial page source to meta_ai_page_source.html")
+        
+        download_links = []
+        
+        # Method 1: Look for clickable elements with zip file names
+        logger.info("🔍 Searching for clickable download elements...")
+        
+        # Find all clickable elements (links, buttons, divs, spans)
+        clickable_elements = []
+        
+        # Look for links
+        links = driver.find_elements(By.TAG_NAME, "a")
+        clickable_elements.extend(links)
+        
+        # Look for buttons
+        buttons = driver.find_elements(By.TAG_NAME, "button")
+        clickable_elements.extend(buttons)
+        
+        # Look for divs and spans that might be clickable
+        divs = driver.find_elements(By.TAG_NAME, "div")
+        spans = driver.find_elements(By.TAG_NAME, "span")
+        
+        # Filter divs and spans that might be clickable (have onclick, cursor pointer, etc.)
+        for div in divs:
+            try:
+                onclick = div.get_attribute('onclick')
+                style = div.get_attribute('style')
+                class_name = div.get_attribute('class')
+                
+                if (onclick or 
+                    (style and 'cursor: pointer' in style) or
+                    (class_name and any(keyword in class_name.lower() for keyword in ['click', 'download', 'link']))):
+                    clickable_elements.append(div)
+            except:
+                continue
+        
+        for span in spans:
+            try:
+                onclick = span.get_attribute('onclick')
+                style = span.get_attribute('style')
+                class_name = span.get_attribute('class')
+                
+                if (onclick or 
+                    (style and 'cursor: pointer' in style) or
+                    (class_name and any(keyword in class_name.lower() for keyword in ['click', 'download', 'link']))):
+                    clickable_elements.append(span)
+            except:
+                continue
+        
+        logger.info(f"Found {len(clickable_elements)} potentially clickable elements")
+        
+        # Look for elements with zip file names
+        zip_patterns = [
+            r'CC_part_\d+_\d+\.zip',
+            r'CC_annotations\.zip',
+            r'CC_\w+\.zip',
+            r'part_\d+_\d+\.zip',
+            r'annotations\.zip'
+        ]
+        
+        for element in clickable_elements:
+            try:
+                text = element.text.strip()
+                if not text:
+                    continue
+                
+                # Check if text matches zip file patterns
+                for pattern in zip_patterns:
+                    if re.search(pattern, text, re.IGNORECASE):
+                        logger.info(f"📦 Found clickable element with zip name: {text}")
+                        
+                        # Try to click and capture the generated URL
+                        try:
+                            # Store current URL
+                            current_url = driver.current_url
+                            
+                            # Click the element
+                            logger.info(f"🖱️ Clicking on: {text}")
+                            element.click()
+                            
+                            # Wait a moment for any redirect or new window
+                            time.sleep(2)
+                            
+                            # Check if URL changed
+                            new_url = driver.current_url
+                            if new_url != current_url:
+                                logger.info(f"✅ URL changed after click: {new_url}")
+                                download_links.append({
+                                    'text': text,
+                                    'url': new_url,
+                                    'filename': text
+                                })
+                            else:
+                                # Check if a new window/tab opened
+                                if len(driver.window_handles) > 1:
+                                    # Switch to new window
+                                    driver.switch_to.window(driver.window_handles[-1])
+                                    new_url = driver.current_url
+                                    logger.info(f"✅ New window opened with URL: {new_url}")
+                                    download_links.append({
+                                        'text': text,
+                                        'url': new_url,
+                                        'filename': text
+                                    })
+                                    # Close new window and switch back
+                                    driver.close()
+                                    driver.switch_to.window(driver.window_handles[0])
+                                else:
+                                    logger.warning(f"⚠️ Click on {text} didn't generate a new URL")
+                            
+                        except Exception as click_error:
+                            logger.warning(f"⚠️ Error clicking on {text}: {click_error}")
+                            continue
+                        
+                        break  # Found a match, move to next element
+                        
+            except Exception as e:
+                logger.warning(f"Error processing element: {e}")
+                continue
+        
+        # Method 2: Look for any text that contains zip file names
+        page_text = driver.page_source
+        for pattern in zip_patterns:
+            matches = re.findall(pattern, page_text, re.IGNORECASE)
+            for match in matches:
+                logger.info(f"📄 Found zip filename in page text: {match}")
+        
+        # Method 3: Try to execute JavaScript to find clickable elements
+        logger.info("🔍 Trying JavaScript approach to find download elements...")
+        try:
+            # Execute JavaScript to find elements with zip file names
+            js_script = """
+            function findDownloadElements() {
+                const elements = [];
+                const zipPatterns = [
+                    /CC_part_\\d+_\\d+\\.zip/i,
+                    /CC_annotations\\.zip/i,
+                    /CC_\\w+\\.zip/i,
+                    /part_\\d+_\\d+\\.zip/i,
+                    /annotations\\.zip/i
+                ];
+                
+                // Find all elements with text content
+                const allElements = document.querySelectorAll('*');
+                
+                for (let element of allElements) {
+                    const text = element.textContent.trim();
+                    if (!text) continue;
+                    
+                    for (let pattern of zipPatterns) {
+                        if (pattern.test(text)) {
+                            elements.push({
+                                text: text,
+                                tagName: element.tagName,
+                                className: element.className,
+                                id: element.id,
+                                onclick: element.onclick,
+                                href: element.href
+                            });
+                        }
+                    }
+                }
+                
+                return elements;
+            }
+            return findDownloadElements();
+            """
+            
+            js_results = driver.execute_script(js_script)
+            logger.info(f"🔍 JavaScript found {len(js_results)} elements with zip names")
+            
+            for result in js_results:
+                logger.info(f"📦 JS found: {result['text']} (tag: {result['tagName']}, class: {result['className']})")
+                
+                # Try to click this element
+                try:
+                    # Find the element by text content
+                    element = driver.find_element(By.XPATH, f"//*[contains(text(), '{result['text']}')]")
+                    
+                    # Store current URL
+                    current_url = driver.current_url
+                    
+                    # Click the element
+                    logger.info(f"🖱️ Clicking on JS-found element: {result['text']}")
+                    element.click()
+                    
+                    # Wait for any changes
+                    time.sleep(3)
+                    
+                    # Check if URL changed
+                    new_url = driver.current_url
+                    if new_url != current_url:
+                        logger.info(f"✅ URL changed after JS click: {new_url}")
+                        download_links.append({
+                            'text': result['text'],
+                            'url': new_url,
+                            'filename': result['text']
+                        })
+                    else:
+                        # Check for new windows
+                        if len(driver.window_handles) > 1:
+                            driver.switch_to.window(driver.window_handles[-1])
+                            new_url = driver.current_url
+                            logger.info(f"✅ New window opened with URL: {new_url}")
+                            download_links.append({
+                                'text': result['text'],
+                                'url': new_url,
+                                'filename': result['text']
+                            })
+                            driver.close()
+                            driver.switch_to.window(driver.window_handles[0])
+                        else:
+                            logger.warning(f"⚠️ JS click on {result['text']} didn't generate a new URL")
+                            
+                except Exception as click_error:
+                    logger.warning(f"⚠️ Error clicking JS-found element {result['text']}: {click_error}")
+                    continue
+                    
+        except Exception as js_error:
+            logger.warning(f"⚠️ JavaScript approach failed: {js_error}")
         
         return download_links
         
