@@ -76,7 +76,23 @@ def download_file(url, local_path):
     """Download a file from URL with progress tracking"""
     try:
         logger.info(f"📥 Downloading: {url}")
-        response = requests.get(url, stream=True)
+        
+        # Enhanced headers to mimic a real browser
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'DNT': '1',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Cache-Control': 'max-age=0'
+        }
+        
+        response = requests.get(url, stream=True, headers=headers, timeout=30)
         response.raise_for_status()
         
         total_size = int(response.headers.get('content-length', 0))
@@ -93,6 +109,13 @@ def download_file(url, local_path):
         
         logger.info(f"✅ Download completed: {local_path}")
         return True
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 403:
+            logger.error(f"❌ Download failed: 403 Forbidden - URL may have expired or require authentication")
+            logger.info("💡 These Facebook CDN URLs may have expired. Try getting fresh URLs from the website.")
+        else:
+            logger.error(f"❌ Download failed: {e}")
+        return False
     except Exception as e:
         logger.error(f"❌ Download failed: {e}")
         return False
