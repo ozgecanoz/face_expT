@@ -1,0 +1,369 @@
+{
+  "datasets": [
+    {
+      "name": "CC_annotations.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An8tkhlumA_LF0z6YELhIoUyPcSu5gCYPM7TMLmXsbDgMMk9jfD6ozDMK87a09GnqUbrMYGQ2rRVX7O91VsURkp0fFML1bSL6423lx6dedp2P6xyktvQQ2FABYDZ.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_1_1.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An8rs6HsYk_KAd-NY8hQpmkYjmc0Fb1bufVxbeaOZDH9HeLjHOQZ_bW__9MgVD2H8hSCZRJJMc9NR41oB-zP20R-LUmfqxLhOmJmyXnvhcYb8AacR2gV-a5VFnjY.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_1_2.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An90mx96Uu0CQWhzjTHuom6QWMPSPUxeYmnvpB9Hij4yHcQjzjSSbrJxqsR_ho7GlIMttiAaVUbDsvoQnzMnUEWWa0Pzdz5ZV-c-uF4WFt66Eq5pI43jybc88t4j.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_1_3.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An8tkhlumA_LF0z6YELhIoUyPcSu5gCYPM7TMLmXsbDgMMk9jfD6ozDMK87a09GnqUbrMYGQ2rRVX7O91VsURkp0fFML1bSL6423lx6dedp2P6xyktvQQ2FABYDZ.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_1_4.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An9PLeqZ9j9q1Ehq1LYlQiyGMH7cz3xZZW1eRCGDeJklQyh4LerUzCvSK7Y2204abz-tzTzI5QxTec9lVDeRxJ91THph7xY9zy8VodaS_lCC3Wy5FicrjbzCSKfg.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_2_1.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An88mdcrnBEbq_ccdQBEyWGmUAroMaIFHJWFcueTqTYE673SIRY1DE6OZz7KArAoNAqG8Eu5pgvsYMU2js6WLn_i_IJdY5GymDiowDgwdnk67fxU_fGsIAiRGg0h.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_2_2.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An_gxS6SyIY0Qb_FDgqnWjDq2NcJg2KvDLuVIDNqilPY5-Xoj35QHpXX6ESx2mJyXgb-BxJPY6RePZRHZy5mjhCEZR3ORxvJ3GzwV1TU4vR-U_XUvkUTqicDP6Kh.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_2_3.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An-WOQVCTHdtOyFSvfig9lfqo5WGSxAJe57QOwuUDN3NWy5AZ_RLyN_uT7gkB9s_7pBODQuR_yfV9tpYK0M0zoW1uxI_zux6yJ3L1h4JdNegAtcZZSvBa412rw0c.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_2_4.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An-J9-Nnanw_wbu4oOQmCidAbN1AcHPBTS8w-HTmAvswALga5YsFJ1IcdVV0hdnEwhmXiSqyKdmPAqISncD1qIq66KrIOMz-XXL6Yz_MAvs-iIp2WxqQcydNGs8R.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_3_1.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An8SFjiiPFVFEbdfA8JlmUfFOK5VNNuYOp_D1CiyRaDaTtuy1v49N-UrnNufgBk8wXRcetnqzJ0byMDCDuOGBWL7x5wVocSqY4mZXkS_I3QVR4WQbYuVzQrE8dib.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_3_2.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An8WGQHQ1wOle0CNPhALO9TL4VdDIsWjJhJE__w3I9IGX9KaqenoAIffaZ8OQnZ9mfbgWJ1048ocDmveDbO0kCOUzCqqYNuyPT___PbwzeuozF3QsNwwLgutyct9.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_3_3.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An-OUAOY7XkG3Ey_cb1NV5l7qd5IxaXsG81uyRFe_fnEpWRNkw-yHSrBWN2uSkxKMIw7Lpw39JEWW3imliiMdSedItZ59CLKDSYckZ2rCbCpoU8OjY9Sm4t679mz.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_3_4.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An_X5WzOye976WUoWznF8GLzNDV2HNoDxJR3NKNgeVOMLp1ZPp11b83oUw5FIO56u004qB-f5BsirP3ydU3p6j5vL1QWauLtW8ooKFEDt55FZoOUQcoayn4uHZNC.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_4_1.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An8_DXH-He3kiQkIBZ2p-y7mc6_W2IG7hpWB1djUwKw9dnz2M_-LhCRCH0yCBWfRh5dGZ1OUKJ7REFXaSmDTwh8U16XWEMBZtw-HTo778v11Hy29uGTcoatZyGOs.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_4_2.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An95rtU0R7tI_eVpIdn7REMbMjBR_2XP75F6iAVuKHciPHkgGamBM0Tl9p5Me308tthITUMRNlaBo2BWaSHZ8DvfvlNSy0ZumtMhuhpEUllhv5zVMQgs8xgpV2IQ.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_4_3.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An8uISRfDt2ozpt4ZNb3L4d6TqqspbBLnPYg-2WYuYiH3UN5L7mRHSXweYxW9PNA-BXlrD1LMEKxZOxrgaFPjGEO1YEM65mH_uX6Oo2zU6aT2ckBh0AKPIAQTin0.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_4_4.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An_ZOhNsbnYwr22C6h-EX2KjrTaIf0Wf45HNW--IY7v3Xhod0UrfQ5S_FvAc9XeiMw54hjat6fub-A12zSFvG6p4vXrSVfqGhKsJ3A_wn11mgP9G3BWOrXvqC1uI.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_5_1.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An8cXJeN59ztPWTskb35jFvaP5i9Ey7d2na58qQ8w4tFbIjLBVzAIeS2cX_b2A0Zv-NLcHDxDYblYW59BcdVeyTTSovJ_0sY_X97Pl0jTOPmVf95UWM_kDQfIt6b.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_5_2.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An8xNXRFEcY7wn8NEirmtYJyIpZsDUmPkfNvT48P5UX3-fYe5bvVcZWwCUTzFMqHo2WwHCIG7K8f1fqj5JlSIB8D1lxfcFJv2hnpPQOmFSZgWenFjxQt2xxTtY01.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_5_3.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An8_DKjE_VhKyJ7kRX4l4is8sELvqvxeKD_mJ2uXwVS4E7BV3H-sBv6e3nWFpHq9CZbKg45euN0VAkYcfDPQ6SN2BryZg7AOrVO0tOSVtkHkoNgGcbc7e9wJAHBL.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_5_4.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An9S2UQwM6BQHVt24XBx4eH9Q0JsCnToushh5GbTvz4_Iku_b5AqjJaOYZHwTIMQHnnrPiVaay1RVYR7MP3kH3WWHXFrC0xnbmLPg9COfWYwGwWcL_bx1TeRycvX.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_6_1.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An-02MV2UnD8zvkJgwiSCm3T5_9-wKH5XJVElZgO3QeaIMhy7Fyaz9buJb2NsYF056D2pO625mRJ3b3OTyJvtYEcgbBSQ-XVc2lzIVwMSK2Yg6TYeicS12hhlYih.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_6_2.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An8Wk4-HwwPAjzrmb4AyMQL5wvRK06bnbs-IItH6ZZdbJppYMnYEf8RiUovmeZS8CInwr_whv4eDUdD3yCQ4WIewpxfRs2bv34xZ8R6j4trtk-k3HyLI2h-2FDmV.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_6_3.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An-KW13RcKfNaeuirSoWW2n_8Z2AETlnya-VUIuTVQvY9NZJlKgqPTemUMB4j6c8LjcomeNjb2lRWND7i6C_NgIQbQMuZhoByEmnGr0JmTH7ONXLsDEq67yWftbs.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_6_4.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An-CXy24UndHUKWbVII2W1jdAKzapku0gjtA3p7idHxYaLch6M2sPRhcLxKw6hHGcSj8wMGFPVLj2qMMRxm1zIawjh3rIdnRDDQT9n5fHPzl0sWfecHJI1AFMuUd.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_7_1.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An8PXawskvoLsnhqIRgSVCQzxuQjt9PRgcKDEnAVQ8adkVOJvH2dLD0hswUzQUNMghCb_KRbLDagvo5dM05f966vs2ppYAWdLhmp1lha3Go5BlaMj52V5Bjcg_pW.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_7_2.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An8jV_wQs_JvPHWU7OtlBDXkHv6z0wAXvXMdmZk_7J9t-W6jEZknLEzjLlwWGXhOLDGCIivFcveW6OrmKGbrZ7lZwSVoJt58Z1KL0tD7cCmjpqn_eaTc_ixFk6NN.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_7_3.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An8OMubPTXuCxjC3h1pZelhsPXX6YFfUwVP9n-KX5FvuTYqrDsg2a1btqMFF4x_R8OizZNlz2heuZgrOEjInmzeCHCvvX7DUQah1-BZ8mv-sCGBvcDVZhn4EIpaf.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_8_1.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An8I8Dz7LmQQCa2sdG4Uhm74GIJIKM0ZUTJ7LJttESds3iMyV6pG-Go5gLBdyVts1jl3fifjhl15cvJyPMVqukOjEGWdD99o5WJbwzPqBl7WgHn2ACU0_j-MebRh.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_8_2.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An-WAhR508Ckjw7Z1K-7nkzYWKr8sEEeoehzojZ8UizOjSPNF3qAMm5CM5bYuZbF0ajLF9UsN0uGR_5xnyd1wjJYj0VIo0pQq_iQjIjn-fLFFQIlWcW7DQrUw_nP.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_8_3.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An-pqtzZmTVJkub09wro5pJnp_bFCIJLiFpYQzNkvt4K3wJmhbtGRvoH4_3ZgZStK5P7-qjQ8mXkR4TzNzMIA41hwOOLRz7al4j7uORJdjcD0nHjT1KLitVDLq1s.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_8_4.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An8Mozl9i1EdncI-OJ3CGvszRKqvg5krFP6qrHXYAzx1H__sCXaFGJZnPNZKS3WK-ZiGNbHKLeKo16hEw3upcZQnq2MPSnid6a2yUgIecPlt5pFpfzOLb3f24M8W.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_9_1.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An-y6njG9ciYuQqRuRRzsF2BdjXFA4QHFwkzsqKY-axnfZ1OS_qiNFPe5eymH5soaVQk3RyxicGbAJwERqYg5bxdZtHddHvegYtTJ4nlQex0IyE2TWEYgGs_6N60.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_9_2.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An9wQ5rZGhpETOPe4NRTtzGl-yGKWLhGn0roF05-446_MHz__JtF1jLy4RQwDQTemxlhJOPcEDQ9ZhdwvWOThZ-L5-lC0RGlpx-5lIx6tOQ9Hvw_gByWydT2usR6.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_9_3.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An9ieGuDeGwwj9I2TQ7gIy4s2VtcZcDgvnyVD0g8WJySnRyvCYWkIenW5aQwNrcA55YMXzScjZ2q6ymwSxBVUeG5lnmpYDgQ2QPDvZdGU5aTJJyPqIQcGgakl6LP.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_9_4.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An8-ZPItexuRfj7t2eItn3ncWWU8xmLEX63VS03GPvIiK5WfY1wBykqYmjOnsSsY4DbkI0w_bDEi3td7CLM1wnQ8XoJu7NQVEajAO8AvM5yE7UgWvufHCoDxSxE1.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_10_1.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An97_ZAjx_RCoOBwumHpbYsg-3GUB4b6PLblMDGGzDoWD8yH3jTjISE1MTta-hb2LlnK35qHgNCuZKOL_VJgZ5mmhd0b_Svujn8PxdM1H5RUWCcEGMt6F24-kG8w4Q.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_10_2.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An95S88ISv5fK_9qFK0UT1TWuI_mBQ-nrr_aC6VtAu40wD5Fwb0Di4tjwcAlAJkyQzeVSXkg2YQyUjTNXe4C4K-DPKOpadll0V0dcnn-j-RJPms2Z2eBFMtWzwjI6A.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_10_3.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An8Y1Qj85vYEcRHEXeV46vu7iEFZnTO806LqxjrVye2bCdkCSIFswsdTIsovphVqtIkt30ZdcOodBssOhrKllfhfxHIaI1J6wmSRydtGmWX1B7NaLkbL0HpeVUo2rA.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_11_1.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An9C7jjMJLUXb8v3fmcJMPadWBbZbSylcC-wPwTGf8hJw5kVvEO1mczpE2FS3Ifu_rtU8Hi4NJjUDPTo0MXmdizzIMpmJWlqJ9ZDKaDD5gyF35nqxVEEQvYGdpVb5w.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_11_2.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An8zBHFc-Ik5NPupeD5Eh5rqsbfdbNVEtlqBuANjT1aLHutPAbeeERIKLKtSoqqNm28qxm_1dMPIMPafJXa2-CCMWgL7GlX3neEK-LmMuFcsaRt-o3cvoifTjoddeg.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_11_3.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An_21btc_EXfnCwj8OThKnieKr4dHF6-U7NgdLanO5Ozz6dqYzHx7ajZm9oFfV_c00NYp1ICRJTJYTlF9p_7LCd_8wZijA10pW1M8mmfJw2nzWnLQGV724z4IZFmzQ.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_11_4.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An8JD9Ow-nPN1n0k8Osh9rcVgP2eB_3yo28ZDm5GCvfsd_UhqL3Br3YEU1H1pkGP7HZ0FJgRt7osZtlbt3eBSRGdXuzm620Ya-7YudRyKtHoGefFFhO5KiLdOcsFFQ.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_12_1.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An-_Lz1ppBE0BAo5XgZTZsbJJ3t356shX3na67nobfyWrtD9rqjosk9dbuj6ZjQ2y5AA6q4y7PzKVviajuCAZRKLxqCBkwu3vs1iccg7QQN5LYFfnzkdR6OR2VNtrg.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_12_2.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An-YsVhk3HoMe85H5cVFxY07VD-bRKGkfEjD7e9zxtAuf0QrExVJgIEXGL5V0FR0cv6NnlMcctyRoxUM7xwoK-CyF2dXcpFzD4gtWKqX5wd5iRNKZu-owiwIWA_Gjg.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_12_3.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An_cRJ104J-mHz41f0y-DhzauVKzcJVoz0LGCM9p9kNnBFO5h-cbj1uo3I9ojko4YY-CZJjLu8E9RMqTPZdK9YPd8q-dXyMI_d1gZIA-yt2FLm9prMYp2_k6T5M1xw.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_12_4.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An-sIfIPo5CY8nPY-KQ3gnuGZ6fpI9uL3IJexrXqYg_EFAiruI2REzmch-IB00KOjYqXaxoD6PON_H46lC3RNfVjNu2Zq76yGHpJdEzgde1URGRXOUon4FHKdJJ-cQ.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_13_1.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An_WJ2m-tBgIdLJF6Lgrrx7RFFvx2f6aq-GMrwF3-dBnM2QlcUi-cMsjNw-gLm_YJs4sD2RNY0SP9G4n6nXR95C5iH6qYf-dGeojOpm66SXTOwYV2fLUMcLqao2JmQ.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_13_2.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An89WldxDJdU20E3UvhcWrr9qADeLc5nmwdmbs1q3FeGIdLJKOzmvc10vFtBSHR1ySs2LtWjBWwjfi9J4v-J-VF_hWod0QekS0rsWtdB72YLr_3NHQK3v4-UcKY_hg.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_13_3.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An8R_isKrvF6fC2pesYTps8cqsde_Cvt7NE-6kcll7UOjB2hDbHlYIaJJrqMG0ua2exgeCGnsVCXI5qwu_OZhKuJtzg5skhES8pZmvqOltj39EeLJD9qEK14aHVhHQ.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_13_4.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An8bukvsSlUgSH2QrteCZ9CBLPRh6daT9geVK4pYR9HNUH5-LpxX1RZxVs_9dbwcBvRkA0q8wUDIqbQFGLylkCCD0JH0GKOdHlV-RQfoOC-8Y08PrrlZtv45RtUx-A.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_14_1.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An-1DvUyEag8DeuHo-tKXYwKb38EFJFO284aH7ERv-ivUYqMPVA7scMT7FJZVXyROSPM8Y4t23v4lWZDCZegEGbza3ppDC964mZmHzjENk-8lteidL8AymS2AA77-A.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_14_2.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An-vWhNNmchtedGp-xkuRgs2F8IZYPjux8WMEp4qB1iR9iSk3dzIpnI1bzJx5WKRBUveIkAvVeMU7LCp8a2926xELlnlKN5vAeRty-ydVIEmNnSVwehFaY-5CT9HDw.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_14_3.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An_bBV3w4aD2QAqCtwYyFEMbFf37ba1F1sp8vm3RmtCuKPCrTh3QE45QBYZhU9g3S5dx2uA_QQUp3u-xq0Y8rb-8LPEHrLhZIo-hD0NzfNsNlgBbkV1PcAuXRdqR1w.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_14_4.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An_RlLUqq8Xi0ZIsrzYDHRJqWa-roju16TzYPHpo347sjNV7MB_Mxe8UOhjFiwZ7LiyRsTkK6t1uDJnj_mGW7x48o4oq4UkY2PznU_vWDJ56gcB2vRGzukcKNQprDQ.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_15_1.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An9DvdWzXH7sADhA1OJfDkX5JnZdCmRY7SGNhNpr9nXYCRr0Bj1It_mj3NAChyunBcV7mFZFmmvLNjrzfYs0mh_8WC6Vy649NeHVHOe4S9POzu2rIh26GbEf4O8hQQ.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_15_2.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An8hIsAvPg128SkLWY3eLKE5ndE51JbqcEntUd0qj3D5Q3vsLYzMv57Brw5XH_uQtabiyndUTuyBLL501joh0flVbfKpS9CALfALN9Cp7Xd2SXb6O2_PjUWVJEhwzw.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_15_3.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An_EGXvEgfSfyhgs0FNFFY6hNoxzS_mnMtjR5zhvc1CcAztIlfzQIDYrTCzvo61m_I2lZ7js91ueKuK3teTdQxo2IRmkrl1sXT_MXHuhaYMpP-D3mUdmaABBpGdodg.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_15_4.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An_Oi0y6Nr_LhsK9BzWBiyRbegHDBELAoWjxVaAJSawM5IdNow9yI-41mywUtbvOX9746dEkA5yvHv15ZuIyj9FUYgQtF1czjBUa_X_rE4C5QbIdjQ22ivziHnAcCg.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_16_1.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An-QIrMPuVSPsp9qK32wGbglCOEpgUwgqPZ-98biTZS0e_MStOeMzZANQ_QHew2WjgyR-gV0GBpmmQ1CK-BuyPwC9vNuGbZJM9yzugXW3DRg8k4WkAncJPa0DkNPrQ.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_16_2.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An_ta1f6gxeY_bjphGeOvm2HRBg_l020P5K_Y9A-yi7GoW_SoBNpKumCI9lbVrago7mvABgJ_v1x-IYmQdGY9p0Dj4PUlKi0nE-ClJBWKL_kji-DBfXll_vSXJ-AJA.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_16_3.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An-FSZ-vCREjGs9qe7dk63MDPCFg53RmKJ6PLq7TOdE14OgMkEStto_UzzBIqxCy1PWW8cKbNoL51dxl_Gj5ehduh2N-anP2vtzD6gfv5FWc-tRWNjk9DKwIaZ4XdA.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_16_4.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An8sJamfCYh_62gynOgaRJceq7MBrPrL2SKr08qElyYfsBOKaqXk8uqqshyU91WemnbKm54crCNqF2UrFt6ma-A4DyXQ4YIsdBtzacbiHLc1peTDynvYuAecYn1rSw.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_17_1.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An8wzhibG-gG-NonOiagkuPxk0eZumIc-W4fnZ-AUAJgAoVwJs19t3To8G40to7tc369TZMkEPm2hSJbXtrH4_G9_hYfs_qlhvujylcZmRpLCEZ25XGrhwD6gfRweA.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_17_2.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An8fvOcxFqNQAgNzqArgBiQPMDTqfSHqvZbbvKRBZAuHDbmF9XBtQjFBSip-6dyU-ajQkAMp5GMB6gBVaUing9hS2rhjkrJK14M27mx02PUVoN3Q3N0DznuXx4dG2A.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_17_3.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An96sM4PWaMUQtRE8b5OOyWMMdR1BooXl3cCr2kuAI_6cj5FVtM6wys3lD5NIvkezoTTHwOHoWeFuI-YqAnyuo64SMwOP6zslyxvlgPsEu65XonmaijToC93jeE10w.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_17_4.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An_iO6WXmIs8chg7MDPI15oO6Ens7jTs3DfOdF_SAD0oCrs7zlRvXZjurUKq6ApzpGz5KUyxMHdYWLQLU5UbilawNlUjkr-IFFR1yv_k-ikeRVkWgZyJeOqVkGMocA.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_18_1.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An9M8wuBSR-UTn9PV7zs24I1rz6sinIamAK6wWrZ4V4lAhL87J9MQAyON2so3iwdIh2XkpvdH01_vxu3rQzJovb469Mj3X1dTw4d9ecxzsNaQpDKPyjz7aVhW6I68Q.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_18_2.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An__mzBwbtKDrERpPXdC80XgUNyChiQW4RPTsEOiO7_ZP_OvtSimU2W-2rxIRs1a9vV_bOHSm_lrqA91zQ0E_9FtnIleYvQMkzNLpqm_k8YDd9-10cRIS2acXXhbLw.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_18_3.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An_ONqsU44kPesg-ljWUnuLgfig53Y685GxTnRuaENnC_pDsHCO7-kGSFKkZF17mL98py-15uKTyGnOZPps2BompuzsLBwGNBY2UwHT-1mj2MQlv04TZZo6MQBNm6g.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_19_1.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An9SjEE0FrIt069pIwWf-9lLYU0n9m-tyaXSBHa94TGs8jBCMZODooBr_OZKW-835ZLYdXqJw2aTCnT4-x337TdUad4NVZixTK5XUnrZscNaa1d6Ev_0n16LwicyAw.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_19_2.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An9caF7Al00UvghAq6PRGEtJdxb53n2jsJn0jvpws3Hsd2Dl7vvuiPviipsHIMXbZWKdNTtKR14q5latcCyiE4DtP7xqJ6o1jL86w3JN4FeA8FtadbllfC1SBLezJA.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    },
+    {
+      "name": "CC_part_19_3.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An-C8DzFliE3xM12oUX2Bwp961_pz4BqtMnHUnKyRbvVs8PEAvjZFO-4bxpbFuEpWQoJVY7Uv62eWrZJOZNBsUBB9QHqki_QlODVSfLPeeHOkEEogN5tK3IHdgXRKg.zip",
+      "remote_path": "face_training_datasets/casual_conversations"
+    }
+  ]
+}

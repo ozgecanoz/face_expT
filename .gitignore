@@ -91,3 +91,6 @@ google-cloud-sdk/
 
 # Google Cloud Service Account Key
 dataset-uploader-key.json
+
+# Google Cloud Configuration
+gcp_config.json

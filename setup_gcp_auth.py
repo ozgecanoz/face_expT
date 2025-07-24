@@ -58,16 +58,18 @@ def get_project_id():
 
 def create_service_account(project_id, service_account_name="dataset-uploader"):
     """Create a service account for dataset upload"""
+    email = f"{service_account_name}@{project_id}.iam.gserviceaccount.com"
+    
     try:
         # Create service account
-        email = f"{service_account_name}@{project_id}.iam.gserviceaccount.com"
         run_command(f"gcloud iam service-accounts create {service_account_name} --display-name='Dataset Uploader' --description='Service account for uploading datasets to GCS'")
         logger.info(f"✅ Created service account: {email}")
         return email
     except subprocess.CalledProcessError as e:
-        if "already exists" in str(e):
-            logger.info(f"✅ Service account already exists: {service_account_name}")
-            return f"{service_account_name}@{project_id}.iam.gserviceaccount.com"
+        error_msg = str(e.stderr) if e.stderr else str(e)
+        if "already exists" in error_msg:
+            logger.info(f"✅ Service account already exists: {email}")
+            return email
         else:
             logger.error(f"❌ Failed to create service account: {e}")
             raise
@@ -75,6 +77,11 @@ def create_service_account(project_id, service_account_name="dataset-uploader"):
 def create_key_file(service_account_email, key_file_path="dataset-uploader-key.json"):
     """Create a key file for the service account"""
     try:
+        # Check if key file already exists
+        if os.path.exists(key_file_path):
+            logger.info(f"✅ Key file already exists: {key_file_path}")
+            return key_file_path
+        
         run_command(f"gcloud iam service-accounts keys create {key_file_path} --iam-account={service_account_email}")
         logger.info(f"✅ Created key file: {key_file_path}")
         return key_file_path
