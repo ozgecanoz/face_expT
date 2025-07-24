@@ -23,14 +23,19 @@ logger = logging.getLogger(__name__)
 def run_command(command, check=True):
     """Run a shell command and return the result"""
     try:
+        logger.debug(f"Running command: {command}")
         result = subprocess.run(command, shell=True, capture_output=True, text=True)
         if check and result.returncode != 0:
             logger.error(f"Command failed: {command}")
-            logger.error(f"Error: {result.stderr}")
-            raise subprocess.CalledProcessError(result.returncode, command)
+            logger.error(f"Return code: {result.returncode}")
+            logger.error(f"Stdout: {result.stdout}")
+            logger.error(f"Stderr: {result.stderr}")
+            raise subprocess.CalledProcessError(result.returncode, command, result.stdout, result.stderr)
         return result
     except subprocess.CalledProcessError as e:
         logger.error(f"Command failed: {e}")
+        if hasattr(e, 'stderr'):
+            logger.error(f"Command stderr: {e.stderr}")
         raise
 
 def check_gcloud_installation():
@@ -142,13 +147,19 @@ def upload_to_gcs(local_path, bucket_name, remote_path):
         gs_path = f"gs://{bucket_name}/{remote_path}"
         logger.info(f"📤 Uploading {local_path} to {gs_path}")
         
-        # Use rsync for efficient upload
-        run_command(f"gsutil -m rsync -r {local_path} {gs_path}")
+        # Check if local_path is a directory or file
+        if os.path.isdir(local_path):
+            # Upload directory contents to the remote path
+            run_command(f"gsutil -m rsync -r {local_path}/ {gs_path}")
+        else:
+            # Upload single file
+            run_command(f"gsutil cp {local_path} {gs_path}")
         
         logger.info(f"✅ Upload completed: {gs_path}")
         return True
     except subprocess.CalledProcessError as e:
         logger.error(f"❌ Upload failed: {e}")
+        logger.error(f"Command output: {e.stderr if hasattr(e, 'stderr') else 'No stderr'}")
         return False
 
 def verify_upload(bucket_name, remote_path):
