@@ -144,10 +144,43 @@ def upload_with_progress(local_path, bucket_name, remote_path, thread_id, tracke
         logger.error(f"🧵 Thread {thread_id} - {filename}: Upload failed - {e}")
         return False
 
+def check_disk_space():
+    """Check available disk space and warn if low"""
+    import shutil
+    
+    # Check /mnt/dataset-storage disk space
+    try:
+        total, used, free = shutil.disk_usage("/mnt/dataset-storage")
+        free_gb = free / (1024**3)
+        
+        if free_gb < 10:  # Less than 10GB free
+            logger.warning(f"⚠️ Low disk space: {free_gb:.1f}GB free on /mnt/dataset-storage")
+            return False
+        else:
+            logger.info(f"💾 Disk space OK: {free_gb:.1f}GB free on /mnt/dataset-storage")
+            return True
+    except Exception as e:
+        logger.error(f"❌ Could not check disk space: {e}")
+        return False
+
 def ensure_tmp_directory():
     """Ensure the tmp directory exists and clean up old files"""
     tmp_dir = "/mnt/dataset-storage/tmp"
     os.makedirs(tmp_dir, exist_ok=True)
+    
+    # Check disk space first
+    if not check_disk_space():
+        logger.warning("⚠️ Low disk space detected - cleaning up aggressively")
+        # Clean up all files in tmp directory
+        for filename in os.listdir(tmp_dir):
+            file_path = os.path.join(tmp_dir, filename)
+            if os.path.isfile(file_path):
+                try:
+                    os.remove(file_path)
+                    logger.info(f"🧹 Cleaned up file due to low disk space: {filename}")
+                except:
+                    pass
+        return
     
     # Clean up any existing files older than 1 hour
     import time
@@ -175,6 +208,12 @@ def process_single_dataset(dataset, bucket_name, key_file, project_id, tracker, 
         
         # Ensure tmp directory exists and clean
         ensure_tmp_directory()
+        
+        # Check disk space before downloading
+        if not check_disk_space():
+            logger.error(f"🧵 Thread {thread_id} - {filename}: Insufficient disk space, skipping")
+            tracker.increment_failed()
+            return False
         
         # Extract filename from URL for local storage
         url = dataset['url']
