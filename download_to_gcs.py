@@ -60,6 +60,11 @@ def authenticate_gcloud(key_file_path):
         return True
     
     try:
+        # Check if key file exists
+        if not os.path.exists(key_file_path):
+            logger.error(f"❌ Key file not found: {key_file_path}")
+            return False
+        
         run_command(f"gcloud auth activate-service-account --key-file={key_file_path}")
         logger.info("✅ Authenticated with service account")
         return True

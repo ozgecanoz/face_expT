@@ -16,6 +16,39 @@ def test_gcs_access():
     """Test basic GCS access"""
     logger.info("🔍 Testing GCS access...")
     
+    # Load config to get key file
+    try:
+        import json
+        with open('gcp_config.json', 'r') as f:
+            config = json.load(f)
+        key_file = config.get('key_file')
+        project_id = config.get('project_id')
+        
+        if key_file:
+            logger.info(f"🔑 Using service account key: {key_file}")
+            # Authenticate with service account
+            auth_result = subprocess.run(
+                f"gcloud auth activate-service-account --key-file={key_file}",
+                shell=True, capture_output=True, text=True
+            )
+            if auth_result.returncode != 0:
+                logger.error(f"❌ Authentication failed: {auth_result.stderr}")
+                return False
+            logger.info("✅ Authenticated with service account")
+        
+        if project_id:
+            # Set project
+            project_result = subprocess.run(
+                f"gcloud config set project {project_id}",
+                shell=True, capture_output=True, text=True
+            )
+            if project_result.returncode == 0:
+                logger.info(f"✅ Set project to: {project_id}")
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to load config: {e}")
+        return False
+    
     # Test 1: List buckets
     try:
         result = subprocess.run("gsutil ls", shell=True, capture_output=True, text=True)

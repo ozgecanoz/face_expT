@@ -97,12 +97,20 @@ def main():
         logger.error("No project ID found in config")
         return False
     
-    try:
-        # VM will use its built-in service account - no authentication needed
-        
-        # Set project
-        if not set_project(project_id):
-            return False
+            try:
+            # Load config to get key file
+            key_file = gcp_config.get('key_file')
+            
+            # Authenticate if key file is provided
+            if key_file:
+                if not authenticate_gcloud(key_file):
+                    return False
+            else:
+                logger.info("✅ Using VM's built-in service account")
+            
+            # Set project
+            if not set_project(project_id):
+                return False
         
         # Process each dataset
         successful = 0
@@ -116,7 +124,7 @@ def main():
                     dataset['url'], 
                     bucket_name, 
                     dataset['remote_path'], 
-                    None,  # No key file needed - VM uses built-in service account
+                    key_file,  # Pass the key file for authentication
                     project_id
                 ):
                     successful += 1
