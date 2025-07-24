@@ -120,11 +120,15 @@ def main():
                     project_id
                 ):
                     successful += 1
-                    logger.info(f"✅ Successfully processed: {dataset['name']}")
+                    logger.info(f"✅ Successfully processed: {dataset['name']} ({i}/{total})")
                 else:
-                    logger.error(f"❌ Failed to process: {dataset['name']}")
+                    logger.error(f"❌ Failed to process: {dataset['name']} ({i}/{total})")
             except Exception as e:
-                logger.error(f"❌ Error processing {dataset['name']}: {e}")
+                logger.error(f"❌ Error processing {dataset['name']} ({i}/{total}): {e}")
+            
+            # Add a summary every 10 datasets
+            if i % 10 == 0:
+                logger.info(f"📊 Progress summary: {i}/{total} datasets processed, {successful} successful")
         
         logger.info(f"🎉 Batch processing completed!")
         logger.info(f"✅ Successful: {successful}/{total}")

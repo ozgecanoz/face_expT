@@ -99,13 +99,17 @@ def download_file(url, local_path):
         downloaded = 0
         
         with open(local_path, 'wb') as f:
+            last_log_percent = -1
             for chunk in response.iter_content(chunk_size=8192):
                 if chunk:
                     f.write(chunk)
                     downloaded += len(chunk)
                     if total_size > 0:
                         percent = (downloaded / total_size) * 100
-                        logger.info(f"   Progress: {percent:.1f}% ({downloaded}/{total_size} bytes)")
+                        # Only log every 10% progress to reduce spam
+                        if int(percent) // 10 > last_log_percent // 10:
+                            logger.info(f"   Progress: {percent:.1f}% ({downloaded}/{total_size} bytes)")
+                            last_log_percent = int(percent)
         
         logger.info(f"✅ Download completed: {local_path}")
         return True
