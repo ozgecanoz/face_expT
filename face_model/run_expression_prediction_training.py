@@ -35,14 +35,14 @@ def main():
             'face_id_checkpoint_path': "/Users/ozgewhiting/Documents/projects/dataset_utils/face_model/checkpoints/face_id_epoch_1.pth",
             'expression_transformer_checkpoint_path': None,  # Set to path if you want to load expression transformer
             'transformer_decoder_checkpoint_path': None,  # Set to path if you want to load transformer decoder
-            'log_dir': "./logs",
+            'log_dir': "/Users/ozgewhiting/Documents/projects/dataset_utils/face_model/logs",
             'checkpoint_dir': "/Users/ozgewhiting/Documents/projects/dataset_utils/face_model/checkpoints",
             'learning_rate': 1e-4,
             'batch_size': 2,  # Reduced for CPU memory
             'num_epochs': 2,
             'save_every_epochs': 1,   # Save checkpoint every epoch
-            'max_train_samples': 50,  # pass None to use all samples for full training
-            'max_val_samples': 20   # Limit validation samples for testing
+            'max_train_samples': 10,  # pass None to use all samples for full training
+            'max_val_samples': 10   # Limit validation samples for testing
         },
         'expression_transformer': {
             'embed_dim': 384,
@@ -123,7 +123,8 @@ def main():
     )
     
     print("\n✅ Training completed!")
-    print(f"📊 Check TensorBoard logs at: {config['training']['log_dir']}/expression_prediction_training")
+    print(f"📊 TensorBoard logs will be saved with unique job ID (exp_pred_training_<id>)")
+    print(f"📊 Check TensorBoard logs at: {config['training']['log_dir']}/exp_pred_training_*")
 
 if __name__ == "__main__":
     main() 

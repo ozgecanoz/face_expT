@@ -6,6 +6,7 @@ Includes contrastive loss for better identity separation
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 import os
@@ -13,6 +14,8 @@ import logging
 import json
 from tqdm import tqdm
 import time
+import uuid
+from datetime import datetime
 
 # Import our components
 import sys
@@ -27,16 +30,43 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 
+def contrastive_loss_with_pairs(positive_pairs, negative_pairs, temperature=0.5):
+    """
+    Contrastive loss using explicit positive and negative pairs.
+    """
+    if len(positive_pairs) == 0 and len(negative_pairs) == 0:
+        return torch.tensor(0.0, device=positive_pairs[0][0].device if positive_pairs else torch.device('cpu'), requires_grad=True)
+    
+    # Combine all pairs
+    all_pairs = positive_pairs + negative_pairs
+    labels = torch.cat([torch.ones(len(positive_pairs)), torch.zeros(len(negative_pairs))])
+    
+    # Create embeddings
+    z_i = torch.stack([pair[0] for pair in all_pairs])
+    z_j = torch.stack([pair[1] for pair in all_pairs])
+    
+    # Normalize
+    z_i = F.normalize(z_i, dim=1)
+    z_j = F.normalize(z_j, dim=1)
+    
+    # Compute similarities
+    similarities = torch.sum(z_i * z_j, dim=1) / temperature
+    
+    # Binary cross entropy loss
+    loss = F.binary_cross_entropy_with_logits(similarities, labels)
+    
+    return loss
+
+
 class ContrastiveLoss(nn.Module):
     """
-    Contrastive loss for face ID tokens
-    Pushes different subjects apart and pulls same subjects together
+    Contrastive loss for face ID tokens using NT-Xent loss
+    Creates positive pairs from same subject and negative pairs from different subjects
     """
     
-    def __init__(self, temperature=0.1, margin=1.0):
+    def __init__(self, temperature=0.5):
         super().__init__()
         self.temperature = temperature
-        self.margin = margin
         
     def forward(self, identity_tokens, subject_ids):
         """
@@ -48,42 +78,55 @@ class ContrastiveLoss(nn.Module):
             contrastive_loss: Scalar loss value
         """
         # Normalize identity tokens
-        identity_tokens = nn.functional.normalize(identity_tokens, dim=1)
+        identity_tokens = F.normalize(identity_tokens, dim=1)
         
-        # Compute similarity matrix
-        similarity_matrix = torch.matmul(identity_tokens, identity_tokens.T) / self.temperature
+        # Convert subject_ids to tensor if it's a list
+        if isinstance(subject_ids, list):
+            # Convert string subject IDs to integers
+            subject_ids = [int(sid) if isinstance(sid, str) else sid for sid in subject_ids]
+            subject_ids = torch.tensor(subject_ids, device=identity_tokens.device)
         
-        # Create labels for positive/negative pairs
-        B = len(subject_ids)
-        labels = torch.zeros(B, B, device=identity_tokens.device)
+        # Group tokens by subject ID
+        unique_subjects = torch.unique(subject_ids)
+        if len(unique_subjects) < 1:
+            # Need at least 1 subject
+            return torch.tensor(0.0, device=identity_tokens.device, requires_grad=True)
         
-        for i in range(B):
-            for j in range(B):
-                if i != j and subject_ids[i] == subject_ids[j]:
-                    labels[i, j] = 1  # Positive pair (same subject)
+        # Create positive pairs (same subject) and negative pairs (different subjects)
+        positive_pairs = []
+        negative_pairs = []
         
-        # Compute contrastive loss using InfoNCE formulation
-        positive_mask = labels == 1
-        negative_mask = labels == 0
+        for subject_id in unique_subjects:
+            # Get all tokens for this subject
+            subject_mask = subject_ids == subject_id
+            subject_tokens = identity_tokens[subject_mask]
+            
+            if len(subject_tokens) >= 2:
+                # Create positive pairs from same subject (different frames)
+                for i in range(len(subject_tokens)):
+                    for j in range(i + 1, len(subject_tokens)):
+                        positive_pairs.append((subject_tokens[i], subject_tokens[j]))
+            
+            # Create negative pairs with other subjects (if multiple subjects)
+            other_subjects = unique_subjects[unique_subjects != subject_id]
+            for other_subject_id in other_subjects:
+                other_mask = subject_ids == other_subject_id
+                other_tokens = identity_tokens[other_mask]
+                
+                for i in range(len(subject_tokens)):
+                    for j in range(len(other_tokens)):
+                        negative_pairs.append((subject_tokens[i], other_tokens[j]))
         
-        # Positive loss (pull same subjects together)
-        positive_loss = 0
-        if positive_mask.sum() > 0:
-            positive_similarities = similarity_matrix[positive_mask]
-            # Use log-sum-exp trick for numerical stability
-            positive_loss = -positive_similarities.mean()
+        # Sample pairs to avoid memory issues
+        max_pairs = 50
+        if len(positive_pairs) > max_pairs:
+            positive_pairs = positive_pairs[:max_pairs]
+        if len(negative_pairs) > max_pairs:
+            negative_pairs = negative_pairs[:max_pairs]
         
-        # Negative loss (push different subjects apart)
-        negative_loss = 0
-        if negative_mask.sum() > 0:
-            negative_similarities = similarity_matrix[negative_mask]
-            # Use margin-based loss to push different subjects apart
-            negative_loss = torch.clamp(self.margin - negative_similarities, min=0).mean()
-        
-        # Scale the loss to be in a reasonable range (similar to consistency loss)
-        total_loss = (positive_loss + negative_loss) * 0.1  # Increased scale factor from 0.01 to 0.1
-        
-        return total_loss
+        # Compute contrastive loss using both positive and negative pairs
+        loss = contrastive_loss_with_pairs(positive_pairs, negative_pairs, self.temperature)
+        return loss
 
 
 def load_dataset_metadata(data_dir):
@@ -116,13 +159,47 @@ class FaceIDTrainer:
         
         # Initialize models
         self.dinov2_tokenizer = DINOv2Tokenizer()
-        self.face_id_model = FaceIDModel(**config['face_id_model'])
+        
+        # Load checkpoint if provided
+        checkpoint_path = config['training'].get('checkpoint_path')
+        if checkpoint_path is not None:
+            logger.info(f"Loading Face ID Model from checkpoint: {checkpoint_path}")
+            try:
+                # Load checkpoint
+                checkpoint = torch.load(checkpoint_path, map_location='cpu')
+                
+                # Get architecture from checkpoint config
+                if 'config' in checkpoint and 'face_id_model' in checkpoint['config']:
+                    face_id_config = checkpoint['config']['face_id_model']
+                    logger.info(f"Using architecture from checkpoint: {face_id_config.get('num_layers', '?')} layers, {face_id_config.get('num_heads', '?')} heads")
+                else:
+                    # Fallback to config architecture
+                    face_id_config = config['face_id_model']
+                    logger.warning("No architecture config found in checkpoint, using config defaults")
+                
+                # Initialize model with checkpoint architecture
+                self.face_id_model = FaceIDModel(**face_id_config)
+                
+                # Load state dict
+                if 'face_id_model_state_dict' in checkpoint:
+                    self.face_id_model.load_state_dict(checkpoint['face_id_model_state_dict'])
+                    logger.info(f"Loaded Face ID Model from epoch {checkpoint.get('epoch', 'unknown')}")
+                else:
+                    # Try loading the entire checkpoint as state dict (for compatibility)
+                    self.face_id_model.load_state_dict(checkpoint)
+                    logger.info("Loaded Face ID Model state dict directly")
+                
+            except Exception as e:
+                raise RuntimeError(f"Failed to load Face ID Model checkpoint: {str(e)}")
+        else:
+            # Train from scratch
+            logger.info("Training Face ID Model from scratch")
+            self.face_id_model = FaceIDModel(**config['face_id_model'])
         
         # Initialize loss functions
         self.consistency_loss = nn.MSELoss()  # For consistency within clips
         self.contrastive_loss = ContrastiveLoss(
-            temperature=config['training'].get('contrastive_temperature', 0.1),
-            margin=config['training'].get('contrastive_margin', 1.0)
+            temperature=config['training'].get('contrastive_temperature', 0.5)
         )
         
         # Loss weights
@@ -142,13 +219,22 @@ class FaceIDTrainer:
             lr=config['training']['learning_rate']
         )
         
-        # Initialize TensorBoard
-        log_dir = os.path.join(config['training']['log_dir'], 'face_id_training')
+        # Initialize TensorBoard with unique job ID
+        job_id = str(uuid.uuid4())[:8]  # Short unique ID
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_dir = os.path.join(config['training']['log_dir'], f'face_id_training_{job_id}_{timestamp}')
         self.writer = SummaryWriter(log_dir)
+        
+        logger.info(f"📊 TensorBoard logging to: {log_dir}")
+        logger.info(f"🆔 Job ID: face_id_training_{job_id}")
         
         # Training state
         self.epoch = 0
         self.global_step = 0
+        
+        # Track losses for plotting
+        self.train_losses = []
+        self.val_losses = []
         
         # Log dataset information
         if self.dataset_metadata:
@@ -290,6 +376,30 @@ class FaceIDTrainer:
         
         return avg_loss
     
+    def _create_loss_vs_epoch_plot(self):
+        """Create a custom plot showing train and validation loss vs epoch"""
+        import matplotlib.pyplot as plt
+        import matplotlib
+        matplotlib.use('Agg')  # Use non-interactive backend
+        
+        fig, ax = plt.subplots(figsize=(10, 6))
+        
+        epochs = list(range(len(self.train_losses)))
+        
+        if self.train_losses:
+            ax.plot(epochs, self.train_losses, 'b-', label='Training Loss', linewidth=2)
+        
+        if self.val_losses:
+            ax.plot(epochs, self.val_losses, 'r-', label='Validation Loss', linewidth=2)
+        
+        ax.set_xlabel('Epoch')
+        ax.set_ylabel('Loss')
+        ax.set_title('Training and Validation Loss vs Epoch')
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+        
+        return fig
+    
     def validate_epoch(self, dataloader):
         """Validate for one epoch"""
         self.face_id_model.eval()
@@ -383,12 +493,18 @@ class FaceIDTrainer:
             # Train one epoch
             train_loss = self.train_epoch(train_dataloader)
             
+            # Track training loss
+            self.train_losses.append(train_loss)
+            
             # Log training epoch metrics
             self.writer.add_scalar('Epoch/Train_Loss', train_loss, epoch)
             
             # Validate if validation dataloader is provided
             if val_dataloader is not None:
                 val_loss = self.validate_epoch(val_dataloader)
+                
+                # Track validation loss
+                self.val_losses.append(val_loss)
                 
                 # Log validation epoch metrics
                 self.writer.add_scalar('Epoch/Val_Loss', val_loss, epoch)
@@ -401,6 +517,14 @@ class FaceIDTrainer:
                 logger.info(f"Epoch {epoch}: Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}")
             else:
                 logger.info(f"Epoch {epoch}: Train Loss: {train_loss:.4f}")
+            
+            # Create and log loss vs epoch plot
+            if len(self.train_losses) > 0:
+                fig = self._create_loss_vs_epoch_plot()
+                self.writer.add_figure('Loss/Loss_vs_Epoch', 
+                                     fig, 
+                                     global_step=epoch,
+                                     close=True)
             
             # Save checkpoint
             if (epoch + 1) % self.config['training']['save_every'] == 0:
@@ -447,7 +571,7 @@ def main():
             'save_every': 2,
             'log_dir': './logs',
             'checkpoint_dir': './checkpoints',
-            'train_data_dir': '../test_output',  # Training data directory
+            'train_data_dir': '/Users/ozgewhiting/Documents/EQLabs/datasets_serial/CCA_train_db1',  # Training data directory
             'val_data_dir': None,  # Validation data directory (optional)
             'max_train_samples': 20,  # For debugging, remove for full training
             'max_val_samples': 10,  # For debugging, remove for full training

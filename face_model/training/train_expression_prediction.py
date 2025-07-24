@@ -7,10 +7,13 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 import os
 import logging
 import sys
+import uuid
+from datetime import datetime
 sys.path.append('.')
 
 from models.expression_transformer import ExpressionTransformer
@@ -399,6 +402,15 @@ def train_expression_prediction(
     
     logger.info("Expression transformer and transformer decoder parameters will be trained")
     
+    # Initialize TensorBoard with unique job ID
+    job_id = str(uuid.uuid4())[:8]  # Short unique ID
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_dir = f"./logs/exp_pred_training_{job_id}_{timestamp}"
+    writer = SummaryWriter(log_dir)
+    
+    logger.info(f"📊 TensorBoard logging to: {log_dir}")
+    logger.info(f"🆔 Job ID: exp_pred_training_{job_id}")
+    
     # Training loop
     joint_model.train()
     total_steps = 0
@@ -447,14 +459,23 @@ def train_expression_prediction(
             epoch_loss += loss.item()
             num_batches += 1
             
+            # Log to TensorBoard
+            writer.add_scalar('Training/Batch_Loss', loss.item(), total_steps)
+            writer.add_scalar('Training/Avg_Loss', epoch_loss / num_batches, total_steps)
+            
             # Update progress bar
             progress_bar.set_postfix({
                 'Loss': f'{loss.item():.4f}',
                 'Avg Loss': f'{epoch_loss / num_batches:.4f}'
             })
+            
+            total_steps += 1
         
         avg_loss = epoch_loss / num_batches
         logger.info(f"Epoch {epoch+1}/{num_epochs} - Avg Loss: {avg_loss:.4f}")
+        
+        # Log epoch metrics to TensorBoard
+        writer.add_scalar('Training/Epoch_Loss', avg_loss, epoch + 1)
         
         # Validate if validation dataloader is provided
         if val_dataloader is not None:
@@ -462,6 +483,9 @@ def train_expression_prediction(
                 joint_model, face_id_model, val_dataloader, criterion, dinov2_tokenizer, device
             )
             logger.info(f"Epoch {epoch+1}/{num_epochs} - Train Loss: {avg_loss:.4f}, Val Loss: {val_loss:.4f}")
+            
+            # Log validation metrics to TensorBoard
+            writer.add_scalar('Validation/Epoch_Loss', val_loss, epoch + 1)
         
         # Save epoch checkpoints
         if (epoch + 1) % save_every_epochs == 0:
@@ -511,7 +535,16 @@ def train_expression_prediction(
             
             logger.info(f"Saved epoch checkpoints: {joint_epoch_path}, {expr_epoch_path}, {decoder_epoch_path}")
     
+    # Log model parameters to TensorBoard
+    for name, param in joint_model.named_parameters():
+        if param.requires_grad:
+            writer.add_histogram(f'Parameters/{name}', param.data, 0)
+    
+    # Close TensorBoard writer
+    writer.close()
+    
     logger.info("Training completed!")
+    logger.info(f"📊 TensorBoard logs saved to: {log_dir}")
     return joint_model
 
 

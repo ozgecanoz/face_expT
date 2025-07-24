@@ -30,8 +30,8 @@ def main():
     # Lightweight configuration
     config = {
         'training': {
-            'log_dir': "./logs",
-            'checkpoint_dir': "./checkpoints",
+            'log_dir': "/Users/ozgewhiting/Documents/projects/dataset_utils/face_model/logs",
+            'checkpoint_dir': "/Users/ozgewhiting/Documents/projects/dataset_utils/face_model/checkpoints",
             'learning_rate': 1e-4,
             'batch_size': 4,  # Increased to ensure multiple subjects per batch for contrastive loss
             'num_epochs': 2,  # Fewer epochs for testing

@@ -30,20 +30,20 @@ def main():
     # Configuration - Optimized for CPU training
     config = {
         'training': {
-            'log_dir': "./logs",
-            'checkpoint_dir': "./checkpoints",
+            'log_dir': "/Users/ozgewhiting/Documents/projects/dataset_utils/face_model/logs",
+            'checkpoint_dir': "/Users/ozgewhiting/Documents/projects/dataset_utils/face_model/checkpoints",
+            'checkpoint_path': "/Users/ozgewhiting/Documents/projects/dataset_utils/face_model/checkpoints/face_id_epoch_1.pth",  # Set to path if you want to load from existing checkpoint
             'learning_rate': 1e-4,
             'batch_size': 4,  # Increased to ensure multiple subjects per batch for contrastive loss
-            'num_epochs': 10,
-            'save_every': 2,   # Save checkpoint every 2 epochs
-            'contrastive_temperature': 0.1,
-            'contrastive_margin': 1.0,
+            'num_epochs': 2,
+            'save_every': 1,   # Save checkpoint every 2 epochs
+            'contrastive_temperature': 0.5,  # Temperature for NT-Xent loss
             'consistency_weight': 1.0,
             'contrastive_weight': 1.0,  # Default weight for contrastive loss
             # Validation configuration
             'train_data_dir': "/Users/ozgewhiting/Documents/EQLabs/datasets_serial/CCA_train_db1",
             'val_data_dir': "/Users/ozgewhiting/Documents/EQLabs/datasets_serial/CCA_val_db1",  # Set to validation dataset path if available
-            'max_train_samples': None,  # if None, Use all samples for full training
+            'max_train_samples': 20,  # if None, Use all samples for full training
             'max_val_samples': 20   # if None, Use all validation samples
         },
         'face_id_model': {
@@ -61,6 +61,22 @@ def main():
     print(f"🎯 Learning rate: {config['training']['learning_rate']}")
     print(f"📦 Batch size: {config['training']['batch_size']}")
     print(f"🔄 Epochs: {config['training']['num_epochs']}")
+    
+    # Log checkpoint status
+    if config['training']['checkpoint_path'] is not None:
+        print(f"🔒 Face ID Model: Will load from {config['training']['checkpoint_path']}")
+        # Try to load and display architecture info
+        try:
+            checkpoint = torch.load(config['training']['checkpoint_path'], map_location='cpu')
+            if 'config' in checkpoint and 'face_id_model' in checkpoint['config']:
+                face_id_config = checkpoint['config']['face_id_model']
+                print(f"   📐 Architecture: {face_id_config.get('num_layers', '?')} layers, {face_id_config.get('num_heads', '?')} heads")
+            else:
+                print(f"   ⚠️  No architecture info in checkpoint")
+        except Exception as e:
+            print(f"   ⚠️  Could not read checkpoint info: {str(e)}")
+    else:
+        print(f"🎓 Face ID Model: Will train from scratch")
     
     # Create trainer
     trainer = FaceIDTrainer(config)
@@ -89,7 +105,8 @@ def main():
     trainer.train(train_dataloader, val_dataloader, config['training']['num_epochs'])
     
     print("\n✅ Training completed!")
-    print(f"📊 Check TensorBoard logs at: {config['training']['log_dir']}/face_id_training")
+    print(f"📊 TensorBoard logs will be saved with unique job ID (face_id_training_<id>)")
+    print(f"📊 Check TensorBoard logs at: {config['training']['log_dir']}/face_id_training_*")
 
 if __name__ == "__main__":
     main() 
