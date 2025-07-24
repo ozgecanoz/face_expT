@@ -144,6 +144,25 @@ def upload_with_progress(local_path, bucket_name, remote_path, thread_id, tracke
         logger.error(f"🧵 Thread {thread_id} - {filename}: Upload failed - {e}")
         return False
 
+def ensure_tmp_directory():
+    """Ensure the tmp directory exists and clean up old files"""
+    tmp_dir = "/mnt/dataset-storage/tmp"
+    os.makedirs(tmp_dir, exist_ok=True)
+    
+    # Clean up any existing files older than 1 hour
+    import time
+    current_time = time.time()
+    for filename in os.listdir(tmp_dir):
+        file_path = os.path.join(tmp_dir, filename)
+        if os.path.isfile(file_path):
+            file_age = current_time - os.path.getmtime(file_path)
+            if file_age > 3600:  # 1 hour
+                try:
+                    os.remove(file_path)
+                    logger.info(f"🧹 Cleaned up old file: {filename}")
+                except:
+                    pass
+
 def process_single_dataset(dataset, bucket_name, key_file, project_id, tracker, dataset_index, total_datasets):
     """Process a single dataset (thread worker function)"""
     thread_id = threading.current_thread().ident
@@ -154,10 +173,13 @@ def process_single_dataset(dataset, bucket_name, key_file, project_id, tracker, 
         
         start_time = time.time()
         
+        # Ensure tmp directory exists and clean
+        ensure_tmp_directory()
+        
         # Extract filename from URL for local storage
         url = dataset['url']
         local_filename = url.split('/')[-1]
-        local_path = f"/tmp/{local_filename}"
+        local_path = f"/mnt/dataset-storage/tmp/{local_filename}"
         
         # Download with progress tracking
         tracker.update_thread_status(thread_id, filename, "INITIALIZING", 0)
@@ -279,6 +301,10 @@ def main():
     
     logger.info("🚀 Starting multithreaded batch download and upload to Google Cloud Storage")
     logger.info(f"🔧 Using {args.max_workers} worker threads")
+    
+    # Clean up tmp directory at startup
+    logger.info("🧹 Cleaning up temporary directory...")
+    ensure_tmp_directory()
     
     # Check prerequisites
     if not check_gcloud_installation():
