@@ -34,8 +34,8 @@ def convert_ccv2_links_to_json():
                         file_name = parts[0].strip()
                         cdn_link = parts[1].strip()
                         
-                        # Clean the URL by removing query parameters
-                        clean_url = cdn_link.split('?')[0]
+                        # Keep the full URL with query parameters (they're essential for Facebook CDN)
+                        clean_url = cdn_link
                         
                         dataset_entry = {
                             "name": file_name,
@@ -59,6 +59,7 @@ def convert_ccv2_links_to_json():
         logger.info(f"📊 Summary:")
         logger.info(f"   - Total files: {len(datasets)}")
         logger.info(f"   - Remote path: face_training_datasets/casual_conversations_v2")
+        logger.info(f"   - URLs: Full Facebook CDN URLs with authentication parameters")
         
         # Show some examples
         logger.info(f"📋 Sample entries:")
