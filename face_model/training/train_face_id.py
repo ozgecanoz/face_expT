@@ -81,7 +81,7 @@ class ContrastiveLoss(nn.Module):
             negative_loss = torch.clamp(self.margin - negative_similarities, min=0).mean()
         
         # Scale the loss to be in a reasonable range (similar to consistency loss)
-        total_loss = (positive_loss + negative_loss) * 0.01  # Scale factor
+        total_loss = (positive_loss + negative_loss) * 0.1  # Increased scale factor from 0.01 to 0.1
         
         return total_loss
 
@@ -127,8 +127,8 @@ class FaceIDTrainer:
         
         # Loss weights
         self.consistency_weight = config['training'].get('consistency_weight', 1.0)
-        self.contrastive_weight = config['training'].get('contrastive_weight', 1.0)
         self.use_consistency_loss = config['training'].get('use_consistency_loss', True)
+        self.contrastive_weight = config['training'].get('contrastive_weight', 1.0)
         
         # Log configuration
         logger.info(f"Training Configuration:")
@@ -255,7 +255,7 @@ class FaceIDTrainer:
             progress_bar.set_postfix({
                 'total_loss': f'{total_loss.item():.4f}',
                 'consistency': f'{consistency_loss.item():.4f}',
-                'contrastive': f'{contrastive_loss.item():.4f}',
+                'contrastive': f'{contrastive_loss.item():.6f}',  # More decimal places for small values
                 'avg_loss': f'{epoch_loss / num_batches:.4f}'
             })
             

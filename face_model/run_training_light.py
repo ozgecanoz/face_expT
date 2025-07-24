@@ -39,7 +39,7 @@ def main():
             'contrastive_temperature': 0.1,
             'contrastive_margin': 1.0,
             'consistency_weight': 1.0,
-            'contrastive_weight': 0.1,  # Reduced to balance with consistency loss
+            'contrastive_weight': 1.0,  # Default weight for contrastive loss
             'use_consistency_loss': True,  # Set to False to test only contrastive loss
             # Validation configuration
             'train_data_dir': "/Users/ozgewhiting/Documents/EQLabs/datasets_serial/CCA_train_db1",

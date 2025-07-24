@@ -124,6 +124,7 @@ class JointLoss(nn.Module):
 def train_expression_reconstruction(
     dataset_path,
     face_id_checkpoint_path,
+    expression_transformer_checkpoint_path=None,  # New parameter for expression transformer checkpoint
     checkpoint_dir="checkpoints",
     save_every_epochs=2,
     batch_size=8,
@@ -158,8 +159,46 @@ def train_expression_reconstruction(
     
     logger.info(f"Training dataset loaded with {len(dataloader)} batches")
     
-    # Initialize models
-    joint_model = JointExpressionReconstructionModel().to(device)
+    # Initialize DINOv2 tokenizer for face ID token extraction
+    dinov2_tokenizer = DINOv2Tokenizer()
+    
+    # Determine expression transformer architecture
+    expr_embed_dim, expr_num_heads, expr_num_layers, expr_dropout = 384, 8, 2, 0.1  # Defaults
+    
+    # Load expression transformer checkpoint if provided to get architecture
+    if expression_transformer_checkpoint_path is not None:
+        if not os.path.exists(expression_transformer_checkpoint_path):
+            raise FileNotFoundError(
+                f"Expression transformer checkpoint not found: {expression_transformer_checkpoint_path}\n"
+                f"Please train the expression transformer first or set this parameter to None"
+            )
+        
+        logger.info(f"Loading expression transformer architecture from checkpoint: {expression_transformer_checkpoint_path}")
+        try:
+            # Load checkpoint to get architecture
+            expr_checkpoint = torch.load(expression_transformer_checkpoint_path, map_location=device)
+            
+            # Get architecture from checkpoint config
+            if 'config' in expr_checkpoint and 'expression_model' in expr_checkpoint['config']:
+                expr_config = expr_checkpoint['config']['expression_model']
+                expr_embed_dim = expr_config.get('embed_dim', 384)
+                expr_num_heads = expr_config.get('num_heads', 8)
+                expr_num_layers = expr_config.get('num_layers', 2)
+                expr_dropout = expr_config.get('dropout', 0.1)
+                logger.info(f"Using expression transformer architecture from checkpoint: {expr_num_layers} layers, {expr_num_heads} heads")
+            else:
+                logger.warning("No architecture config found in expression transformer checkpoint, using defaults")
+                
+        except Exception as e:
+            logger.warning(f"Failed to load expression transformer checkpoint for architecture: {str(e)}, using defaults")
+    
+    # Initialize joint model with correct architecture
+    joint_model = JointExpressionReconstructionModel(
+        embed_dim=expr_embed_dim,
+        num_heads=expr_num_heads,
+        num_layers=expr_num_layers,
+        dropout=expr_dropout
+    ).to(device)
     
     # Initialize face ID model and load pre-trained checkpoint
     # First, load checkpoint to get the architecture
@@ -212,14 +251,50 @@ def train_expression_reconstruction(
     
     logger.info("Face ID model loaded and frozen successfully")
     
+    # Load expression transformer weights if checkpoint provided
+    if expression_transformer_checkpoint_path is not None:
+        logger.info(f"Loading expression transformer weights from checkpoint: {expression_transformer_checkpoint_path}")
+        try:
+            # Load the expression transformer state dict
+            if 'expression_transformer_state_dict' in expr_checkpoint:
+                joint_model.expression_transformer.load_state_dict(expr_checkpoint['expression_transformer_state_dict'])
+                logger.info(f"Loaded expression transformer from epoch {expr_checkpoint.get('epoch', 'unknown')}")
+            else:
+                # Try loading the entire checkpoint as state dict (for compatibility)
+                joint_model.expression_transformer.load_state_dict(expr_checkpoint)
+                logger.info("Loaded expression transformer state dict directly")
+            
+            # Freeze expression transformer parameters
+            for param in joint_model.expression_transformer.parameters():
+                param.requires_grad = False
+            
+            logger.info("Expression transformer loaded and frozen successfully")
+            
+        except Exception as e:
+            raise RuntimeError(f"Failed to load expression transformer checkpoint: {str(e)}")
+    else:
+        logger.info("No expression transformer checkpoint provided - training from scratch")
+    
     # Initialize loss function
     criterion = JointLoss(
         reconstruction_weight=reconstruction_weight,
         identity_weight=identity_weight
     ).to(device)
     
-    # Initialize optimizer (only train Components C and E)
-    trainable_params = list(joint_model.expression_transformer.parameters()) + list(joint_model.reconstruction_model.parameters())
+    # Initialize optimizer (only train Components C and E, but C might be frozen)
+    trainable_params = []
+    
+    # Add expression transformer parameters only if not frozen
+    if expression_transformer_checkpoint_path is None:
+        trainable_params.extend(list(joint_model.expression_transformer.parameters()))
+        logger.info("Expression transformer parameters will be trained")
+    else:
+        logger.info("Expression transformer parameters are frozen")
+    
+    # Always add reconstruction model parameters
+    trainable_params.extend(list(joint_model.reconstruction_model.parameters()))
+    logger.info("Reconstruction model parameters will be trained")
+    
     optimizer = optim.Adam(trainable_params, lr=learning_rate)
     
     # Training loop
@@ -253,7 +328,7 @@ def train_expression_reconstruction(
                 first_frame = frames[0:1]  # (1, 3, 518, 518) - keep on CPU initially
                 
                 with torch.no_grad():
-                    first_frame_patches, first_frame_pos = face_id_model.tokenizer(first_frame)
+                    first_frame_patches, first_frame_pos = dinov2_tokenizer(first_frame)
                     first_frame_face_id = face_id_model(first_frame_patches, first_frame_pos)  # (1, 1, 384)
                 
                 # Repeat face ID token for all frames in this clip
@@ -265,11 +340,11 @@ def train_expression_reconstruction(
             face_id_tokens = torch.cat(face_id_tokens, dim=0).to(device)  # (total_frames, 1, 384)
             
             # Forward pass with pre-computed face ID tokens
-            reconstructed_faces, expression_tokens = joint_model(face_images, face_id_tokens, face_id_model.tokenizer)
+            reconstructed_faces, expression_tokens = joint_model(face_images, face_id_tokens, dinov2_tokenizer)
             
             # Get face ID tokens from reconstructed images for identity preservation
             with torch.no_grad():
-                patch_tokens_recon, pos_embeddings_recon = face_id_model.tokenizer(reconstructed_faces)
+                patch_tokens_recon, pos_embeddings_recon = dinov2_tokenizer(reconstructed_faces)
                 face_id_tokens_recon = face_id_model(patch_tokens_recon, pos_embeddings_recon).to(device)
                 
                 # Explicitly delete intermediate tensors to free memory
@@ -330,7 +405,7 @@ def train_expression_reconstruction(
         # Validate if validation dataloader is provided
         if val_dataloader is not None:
             val_loss, val_recon_loss, val_identity_loss = validate_expression_reconstruction(
-                joint_model, face_id_model, val_dataloader, criterion, device
+                joint_model, face_id_model, val_dataloader, criterion, dinov2_tokenizer, device
             )
             logger.info(f"Epoch {epoch+1}/{num_epochs} - "
                        f"Train Loss: {avg_loss:.4f}, Val Loss: {val_loss:.4f}")
@@ -381,6 +456,7 @@ def validate_expression_reconstruction(
     face_id_model,
     val_dataloader,
     criterion,
+    dinov2_tokenizer,
     device="cpu"
 ):
     """
@@ -409,7 +485,7 @@ def validate_expression_reconstruction(
                 first_frame = frames[0:1]  # (1, 3, 518, 518)
                 
                 # Get DINOv2 tokens for first frame
-                patch_tokens, pos_emb = face_id_model.tokenizer(first_frame)
+                patch_tokens, pos_emb = dinov2_tokenizer(first_frame)
                 
                 # Get face ID token for first frame
                 face_id_token = face_id_model(patch_tokens, pos_emb)  # (1, 1, 384)
@@ -423,11 +499,11 @@ def validate_expression_reconstruction(
             face_id_tokens = torch.cat(face_id_tokens, dim=0).to(device)  # (total_frames, 1, 384)
             
             # Forward pass through joint model
-            reconstructed_faces, expression_tokens = joint_model(all_frames, face_id_tokens, face_id_model.tokenizer)
+            reconstructed_faces, expression_tokens = joint_model(all_frames, face_id_tokens, dinov2_tokenizer)
             
             # Get face ID tokens from reconstructed images for identity preservation
             with torch.no_grad():
-                patch_tokens_recon, pos_embeddings_recon = face_id_model.tokenizer(reconstructed_faces)
+                patch_tokens_recon, pos_embeddings_recon = dinov2_tokenizer(reconstructed_faces)
                 face_id_tokens_recon = face_id_model(patch_tokens_recon, pos_embeddings_recon)
             
             # Compute loss
@@ -479,7 +555,7 @@ def test_joint_model():
         
         # Extract face ID token from first frame
         with torch.no_grad():
-            first_frame_patches, first_frame_pos = face_id_model.tokenizer(first_frame)
+            first_frame_patches, first_frame_pos = dinov2_tokenizer(first_frame)
             first_frame_face_id = face_id_model(first_frame_patches, first_frame_pos)  # (1, 1, 384)
         
         # Repeat face ID token for all frames in this clip
@@ -492,7 +568,7 @@ def test_joint_model():
     face_id_tokens = torch.cat(face_id_tokens, dim=0)  # (5, 1, 384)
     
     # Forward pass with pre-computed face ID tokens
-    reconstructed_faces, expression_tokens = joint_model(face_images, face_id_tokens, face_id_model.tokenizer)
+    reconstructed_faces, expression_tokens = joint_model(face_images, face_id_tokens, dinov2_tokenizer)
     
     print(f"Input face images shape: {face_images.shape}")
     print(f"Clip lengths: {clip_lengths}")
