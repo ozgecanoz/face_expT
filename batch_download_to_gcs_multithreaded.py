@@ -13,7 +13,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from queue import Queue
 import time
 import requests
-from tqdm import tqdm
 from download_to_gcs import process_dataset_url, load_config, authenticate_gcloud, set_project, check_gcloud_installation
 
 # Set up logging
