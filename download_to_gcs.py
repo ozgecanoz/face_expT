@@ -198,8 +198,9 @@ def load_config(config_file="gcp_config.json"):
 
 def process_dataset_url(url, bucket_name, remote_path, key_file, project_id):
     """Process a single dataset URL"""
-    # Create temporary directory
-    with tempfile.TemporaryDirectory() as temp_dir:
+    # Create temporary directory on the larger disk
+    temp_dir = tempfile.mkdtemp(dir='/mnt/dataset-storage')
+    try:
         logger.info(f"📁 Using temporary directory: {temp_dir}")
         
         # Download the file
@@ -230,6 +231,14 @@ def process_dataset_url(url, bucket_name, remote_path, key_file, project_id):
             return False
         
         return True
+    finally:
+        # Clean up temporary directory
+        import shutil
+        try:
+            shutil.rmtree(temp_dir)
+            logger.info(f"🧹 Cleaned up temporary directory: {temp_dir}")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to clean up temp directory: {e}")
 
 def main():
     """Main download and upload function"""
