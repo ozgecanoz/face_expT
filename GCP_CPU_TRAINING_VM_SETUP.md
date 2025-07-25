@@ -108,6 +108,9 @@ pip install torch torchvision torchaudio
 # Install other dependencies
 pip install tensorboard matplotlib tqdm pillow
 pip install google-cloud-storage google-auth
+
+# Install requirements from dataset_utils repo
+pip install -r requirements.txt
 ```
 
 ## 📁 Project Setup
@@ -177,7 +180,7 @@ config = {
 
 ### **1. Start Training with tmux:**
 ```bash
-# Create persistent session
+# Create persistent session --> protects from ssh disconnect. training keeps running on the machine
 tmux new-session -d -s training
 
 # Attach to session
@@ -271,14 +274,21 @@ source face_training_env/bin/activate
 pip install torch torchvision torchaudio
 pip install tensorboard matplotlib tqdm pillow google-cloud-storage
 
+# 5. Install requirements from dataset_utils repo
+pip install -r requirements.txt
+
 # 5. Clone code from GitHub
 cd /mnt/dataset-storage
-git clone git@github.com:yourusername/your-repo-name.git face_model
+git clone git@github.com:ozgecanoz/dataset_utils.git face_model
 
-# 6. Download datasets
+# 6. Install requirements from cloned repo
+cd face_model
+pip install -r requirements.txt
+
+# 7. Download datasets
 gsutil -m cp -r gs://your-bucket/datasets/CCv2/* /mnt/dataset-storage/datasets/
 
-# 7. Start training
+# 8. Start training
 cd /mnt/dataset-storage/face_model
 python3 run_training.py
 ```
