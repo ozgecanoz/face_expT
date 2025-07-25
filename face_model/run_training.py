@@ -45,8 +45,8 @@ def main():
             'persistent_workers': False,  # Not applicable with num_workers=0
             'drop_last': True,  # Consistent batch sizes
             # Dataset configuration
-            'train_data_dir': "/mnt/dataset-storage/dbs/CCA_train_db1",
-            'val_data_dir': "/mnt/dataset-storage/dbs/CCA_val_db1/CCA_val_db1/",  # validation set for now
+            'train_data_dir': "/mnt/dataset-storage/dbs/CCA_train_db2/",
+            'val_data_dir': "/mnt/dataset-storage/dbs/CCA_val_db2/",  # validation set for now
             'max_train_samples': None,  # Use all available samples
             'max_val_samples': 100    # set to None to use all available samples
         },

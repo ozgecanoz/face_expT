@@ -430,9 +430,15 @@ def extract_face_sequence(
     start_frame = int(timestamp * fps)
     frame_interval = frame_skip + 1  # Skip 1 frame for 30fps = every 2nd frame
     
-    # Validate timestamp
+    # Validate timestamp and ensure enough frames are available
     if start_frame >= total_frames:
         raise ValueError(f"Timestamp {timestamp}s is beyond video duration")
+    
+    # Check if we have enough frames from this timestamp
+    end_frame = start_frame + (num_frames * frame_interval)
+    if end_frame > total_frames:
+        logger.warning(f"Not enough frames available from timestamp {timestamp}s. Need {num_frames} frames but only {total_frames - start_frame} frames remaining")
+        return None
     
     # Prepare data structures
     face_sequences = []
@@ -488,10 +494,13 @@ def extract_face_sequence(
             if results.detections:
                 # Check if more than one face is detected
                 if len(results.detections) > 1:
-                    logger.warning(f"Multiple faces detected in frame {frame_number} ({len(results.detections)} faces), skipping this frame")
-                    # Add empty frame to maintain sequence length
-                    face_sequences.append([])
-                    continue
+                    logger.warning(f"Multiple faces detected in frame {frame_number} ({len(results.detections)} faces), discarding entire clip")
+                    # Clean up any created files and return None
+                    if os.path.exists(hdf5_path):
+                        os.remove(hdf5_path)
+                    if os.path.exists(mp4_path):
+                        os.remove(mp4_path)
+                    return None
                 
                 # Process the single detected face
                 detection = results.detections[0]  # Take the first (and only) face
@@ -533,6 +542,15 @@ def extract_face_sequence(
                         
                         # Add to video writer
                         face_video_writer.write(face_resized)
+            else:
+                # No faces detected in this frame, discard entire clip
+                logger.warning(f"No faces detected in frame {frame_number}, discarding entire clip")
+                # Clean up any created files and return None
+                if os.path.exists(hdf5_path):
+                    os.remove(hdf5_path)
+                if os.path.exists(mp4_path):
+                    os.remove(mp4_path)
+                return None
             
             face_sequences.append(frame_faces)
             
