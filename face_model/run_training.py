@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Run Face ID Model training
+Run Face ID Model training - Optimized for n2-standard-16 VM
 """
 
 import torch
@@ -19,7 +19,7 @@ def main():
     
     # Memory optimization based on device
     if device.type == "cpu":
-        torch.set_num_threads(4)  # Limit CPU threads
+        torch.set_num_threads(16)  # Use all 16 CPU cores
         torch.backends.cudnn.benchmark = False  # Disable for CPU
     else:
         # GPU optimizations
@@ -27,40 +27,50 @@ def main():
         if torch.cuda.is_available():
             torch.cuda.empty_cache()  # Clear GPU cache
     
-    # Configuration - Optimized for CPU training
+    # Configuration - Optimized for n2-standard-16 VM with CCA_train_db1
     config = {
         'training': {
-            'log_dir': "/Users/ozgewhiting/Documents/projects/dataset_utils/face_model/logs",
-            'checkpoint_dir': "/Users/ozgewhiting/Documents/projects/dataset_utils/face_model/checkpoints",
-            'checkpoint_path': "/Users/ozgewhiting/Documents/projects/dataset_utils/face_model/checkpoints/face_id_epoch_1.pth",  # Set to path if you want to load from existing checkpoint
+            'log_dir': "/mnt/dataset-storage/face_model/logs",
+            'checkpoint_dir': "/mnt/dataset-storage/face_model/checkpoints",
+            'checkpoint_path': None,  # Start from scratch
             'learning_rate': 1e-4,
-            'batch_size': 4,  # Increased to ensure multiple subjects per batch for contrastive loss
-            'num_epochs': 2,
-            'save_every': 1,   # Save checkpoint every 2 epochs
+            'batch_size': 16,  # Optimized for 64GB RAM
+            'num_epochs': 5,  # 20 : More epochs for large dataset
+            'save_every': 1,   # 3, Save checkpoint every 3 epochs
             'contrastive_temperature': 0.5,  # Temperature for NT-Xent loss
             'consistency_weight': 1.0,
             'contrastive_weight': 1.0,  # Default weight for contrastive loss
-            # Validation configuration
-            'train_data_dir': "/Users/ozgewhiting/Documents/EQLabs/datasets_serial/CCA_train_db1",
-            'val_data_dir': "/Users/ozgewhiting/Documents/EQLabs/datasets_serial/CCA_val_db1",  # Set to validation dataset path if available
-            'max_train_samples': 20,  # if None, Use all samples for full training
-            'max_val_samples': 20   # if None, Use all validation samples
+            'num_workers': 8,  # Parallel data loading with 16 vCPUs
+            'pin_memory': False,  # Not needed for CPU
+            'persistent_workers': True,  # Keep workers alive
+            'drop_last': True,  # Consistent batch sizes
+            # Dataset configuration
+            'train_data_dir': "/mnt/dataset-storage/dbs/CCA_train_db1",
+            'val_data_dir': "/mnt/dataset-storage/dbs/CCA_val_db1/CCA_val_db1/",  # validation set for now
+            'max_train_samples': None,  # Use all available samples
+            'max_val_samples': 100    # set to None to use all available samples
         },
         'face_id_model': {
             'embed_dim': 384,
-            'num_heads': 4,  # Updated to optimized architecture
-            'num_layers': 1,  # Updated to optimized architecture
+            'num_heads': 4,  # Optimized for CPU
+            'num_layers': 2,  # Can handle more layers with 64GB RAM
             'dropout': 0.1
         }
     }
     
-    print("🚀 Starting Face ID Model Training")
+    print("🚀 Starting Face ID Model Training on n2-standard-16 VM")
     print(f"🖥️  Device: {device}")
     print(f"📊 Dataset: {config['training']['train_data_dir']}")
     print(f"📈 Logs: {config['training']['log_dir']}")
     print(f"🎯 Learning rate: {config['training']['learning_rate']}")
     print(f"📦 Batch size: {config['training']['batch_size']}")
     print(f"🔄 Epochs: {config['training']['num_epochs']}")
+    print(f"🧵 Num workers: {config['training']['num_workers']}")
+    print(f"💾 Memory optimization: CPU threads set to 16")
+    
+    # Create directories if they don't exist
+    os.makedirs(config['training']['log_dir'], exist_ok=True)
+    os.makedirs(config['training']['checkpoint_dir'], exist_ok=True)
     
     # Log checkpoint status
     if config['training']['checkpoint_path'] is not None:
@@ -85,7 +95,11 @@ def main():
     train_dataloader = create_face_dataloader(
         data_dir=config['training']['train_data_dir'],
         batch_size=config['training']['batch_size'],
-        max_samples=config['training']['max_train_samples']
+        max_samples=config['training']['max_train_samples'],
+        num_workers=config['training']['num_workers'],
+        pin_memory=config['training']['pin_memory'],
+        persistent_workers=config['training']['persistent_workers'],
+        drop_last=config['training']['drop_last']
     )
     
     # Create validation dataloader if validation data is provided
@@ -94,11 +108,22 @@ def main():
         val_dataloader = create_face_dataloader(
             data_dir=config['training']['val_data_dir'],
             batch_size=config['training']['batch_size'],
-            max_samples=config['training']['max_val_samples']
+            max_samples=config['training']['max_val_samples'],
+            num_workers=config['training']['num_workers'],
+            pin_memory=config['training']['pin_memory'],
+            persistent_workers=config['training']['persistent_workers'],
+            drop_last=config['training']['drop_last']
         )
         print(f"📊 Validation dataset loaded: {len(val_dataloader)} batches per epoch")
     
     print(f"\n📋 Training dataset loaded: {len(train_dataloader)} batches per epoch")
+    
+    # Estimate training time
+    estimated_time_per_epoch = len(train_dataloader) * 0.5  # Rough estimate: 30 seconds per batch
+    total_estimated_time = estimated_time_per_epoch * config['training']['num_epochs'] / 3600  # Convert to hours
+    
+    print(f"⏱️  Estimated training time: {total_estimated_time:.1f} hours ({total_estimated_time/24:.1f} days)")
+    print(f"💰 Estimated cost: ${total_estimated_time * 0.38:.1f} (at $0.38/hour)")
     
     # Start training
     print("\n🎯 Starting training...")
@@ -107,6 +132,7 @@ def main():
     print("\n✅ Training completed!")
     print(f"📊 TensorBoard logs will be saved with unique job ID (face_id_training_<id>)")
     print(f"📊 Check TensorBoard logs at: {config['training']['log_dir']}/face_id_training_*")
+    print(f"💾 Checkpoints saved at: {config['training']['checkpoint_dir']}")
 
 if __name__ == "__main__":
     main() 

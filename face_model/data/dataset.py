@@ -117,7 +117,9 @@ class FaceDataset(Dataset):
             }
 
 
-def create_face_dataloader(data_dir: str, batch_size: int = 2, max_samples: int = None):
+def create_face_dataloader(data_dir: str, batch_size: int = 2, max_samples: int = None, 
+                          num_workers: int = 0, pin_memory: bool = False, 
+                          persistent_workers: bool = False, drop_last: bool = False):
     """
     Create a DataLoader for face data
     
@@ -125,6 +127,10 @@ def create_face_dataloader(data_dir: str, batch_size: int = 2, max_samples: int 
         data_dir: Directory containing HDF5 files
         batch_size: Batch size for training
         max_samples: Maximum samples to load (for debugging)
+        num_workers: Number of worker processes for data loading
+        pin_memory: Whether to pin memory (use False for CPU)
+        persistent_workers: Whether to keep workers alive between epochs
+        drop_last: Whether to drop the last incomplete batch
     
     Returns:
         DataLoader
@@ -135,8 +141,10 @@ def create_face_dataloader(data_dir: str, batch_size: int = 2, max_samples: int 
         dataset,
         batch_size=batch_size,
         shuffle=True,
-        num_workers=0,  # Use 0 for debugging
-        pin_memory=False  # Use False for CPU
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+        persistent_workers=persistent_workers,
+        drop_last=drop_last
     )
     
     return dataloader
