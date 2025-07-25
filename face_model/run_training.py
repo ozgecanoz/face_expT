@@ -40,9 +40,9 @@ def main():
             'contrastive_temperature': 0.5,  # Temperature for NT-Xent loss
             'consistency_weight': 1.0,
             'contrastive_weight': 1.0,  # Default weight for contrastive loss
-            'num_workers': 4,  # Parallel data loading with 16 vCPUs
+            'num_workers': 0,  # Single-threaded data loading for stability
             'pin_memory': False,  # Not needed for CPU
-            'persistent_workers': False,  # Restart workers each epoch for stability
+            'persistent_workers': False,  # Not applicable with num_workers=0
             'drop_last': True,  # Consistent batch sizes
             # Dataset configuration
             'train_data_dir': "/mnt/dataset-storage/dbs/CCA_train_db1",
@@ -119,7 +119,7 @@ def main():
     print(f"\n📋 Training dataset loaded: {len(train_dataloader)} batches per epoch")
     
     # Estimate training time (more realistic for CPU training)
-    estimated_time_per_epoch = len(train_dataloader) * 30  # More realistic: 30 seconds per batch
+    estimated_time_per_epoch = len(train_dataloader) * 120  # More realistic: 30 seconds per batch
     total_estimated_time = estimated_time_per_epoch * config['training']['num_epochs'] / 3600  # Convert to hours
     
     print(f"⏱️  Estimated training time: {total_estimated_time:.1f} hours ({total_estimated_time/24:.1f} days)")
