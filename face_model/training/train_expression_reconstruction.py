@@ -1,6 +1,6 @@
 """
 Joint Training Script for Components C and E
-Trains Expression Transformer and Face Reconstruction Model together
+Trains Expression Transformer and Face Reconstruction Model together or only the reconstruction model
 """
 
 import torch
@@ -36,26 +36,30 @@ class JointExpressionReconstructionModel(nn.Module):
     Takes pre-computed face ID tokens as input
     """
     
-    def __init__(self, embed_dim=384, num_heads=8, num_layers=2, dropout=0.1):
+    def __init__(self, 
+                 expr_embed_dim=384, expr_num_heads=8, expr_num_layers=2, expr_dropout=0.1,
+                 recon_embed_dim=384, recon_num_heads=8, recon_num_layers=2, recon_dropout=0.1):
         super().__init__()
         
         # Component C: Expression Transformer (trainable)
         self.expression_transformer = ExpressionTransformer(
-            embed_dim=embed_dim, 
-            num_heads=num_heads, 
-            num_layers=num_layers, 
-            dropout=dropout
+            embed_dim=expr_embed_dim, 
+            num_heads=expr_num_heads, 
+            num_layers=expr_num_layers, 
+            dropout=expr_dropout
         )
         
         # Component E: Face Reconstruction Model (trainable)
         self.reconstruction_model = FaceReconstructionModel(
-            embed_dim=embed_dim,
-            num_heads=num_heads,
-            num_layers=num_layers,
-            dropout=dropout
+            embed_dim=recon_embed_dim,
+            num_heads=recon_num_heads,
+            num_layers=recon_num_layers,
+            dropout=recon_dropout
         )
         
         logger.info("Joint Expression-Reconstruction Model initialized")
+        logger.info(f"Expression Transformer: {expr_num_layers} layers, {expr_num_heads} heads")
+        logger.info(f"Reconstruction Model: {recon_num_layers} layers, {recon_num_heads} heads")
         
     def forward(self, face_images, face_id_tokens, tokenizer):
         """
@@ -124,7 +128,9 @@ class JointLoss(nn.Module):
 def train_expression_reconstruction(
     dataset_path,
     face_id_checkpoint_path,
-    expression_transformer_checkpoint_path=None,  # New parameter for expression transformer checkpoint
+    expression_transformer_checkpoint_path,  # Required parameter for expression transformer checkpoint
+    reconstruction_model_checkpoint_path=None,  # Optional parameter for reconstruction model checkpoint
+    reconstruction_model_config=None,  # Configuration for reconstruction model architecture
     checkpoint_dir="checkpoints",
     save_every_epochs=2,
     batch_size=8,
@@ -139,7 +145,10 @@ def train_expression_reconstruction(
 ):
     """
     Train the joint expression reconstruction model
-    Requires a pre-trained face ID model checkpoint
+    Requires:
+    - A pre-trained face ID model checkpoint
+    - A pre-trained expression transformer checkpoint
+    - Optional: A pre-trained reconstruction model checkpoint (will train from scratch if not provided)
     """
     logger.info(f"Starting joint training on device: {device}")
     
@@ -161,44 +170,6 @@ def train_expression_reconstruction(
     
     # Initialize DINOv2 tokenizer for face ID token extraction
     dinov2_tokenizer = DINOv2Tokenizer()
-    
-    # Determine expression transformer architecture
-    expr_embed_dim, expr_num_heads, expr_num_layers, expr_dropout = 384, 8, 2, 0.1  # Defaults
-    
-    # Load expression transformer checkpoint if provided to get architecture
-    if expression_transformer_checkpoint_path is not None:
-        if not os.path.exists(expression_transformer_checkpoint_path):
-            raise FileNotFoundError(
-                f"Expression transformer checkpoint not found: {expression_transformer_checkpoint_path}\n"
-                f"Please train the expression transformer first or set this parameter to None"
-            )
-        
-        logger.info(f"Loading expression transformer architecture from checkpoint: {expression_transformer_checkpoint_path}")
-        try:
-            # Load checkpoint to get architecture
-            expr_checkpoint = torch.load(expression_transformer_checkpoint_path, map_location=device)
-            
-            # Get architecture from checkpoint config
-            if 'config' in expr_checkpoint and 'expression_model' in expr_checkpoint['config']:
-                expr_config = expr_checkpoint['config']['expression_model']
-                expr_embed_dim = expr_config.get('embed_dim', 384)
-                expr_num_heads = expr_config.get('num_heads', 8)
-                expr_num_layers = expr_config.get('num_layers', 2)
-                expr_dropout = expr_config.get('dropout', 0.1)
-                logger.info(f"Using expression transformer architecture from checkpoint: {expr_num_layers} layers, {expr_num_heads} heads")
-            else:
-                logger.warning("No architecture config found in expression transformer checkpoint, using defaults")
-                
-        except Exception as e:
-            logger.warning(f"Failed to load expression transformer checkpoint for architecture: {str(e)}, using defaults")
-    
-    # Initialize joint model with correct architecture
-    joint_model = JointExpressionReconstructionModel(
-        embed_dim=expr_embed_dim,
-        num_heads=expr_num_heads,
-        num_layers=expr_num_layers,
-        dropout=expr_dropout
-    ).to(device)
     
     # Initialize face ID model and load pre-trained checkpoint
     # First, load checkpoint to get the architecture
@@ -251,29 +222,167 @@ def train_expression_reconstruction(
     
     logger.info("Face ID model loaded and frozen successfully")
     
-    # Load expression transformer weights if checkpoint provided
-    if expression_transformer_checkpoint_path is not None:
+    # Load expression transformer weights (required)
+    if expression_transformer_checkpoint_path is None:
+        raise ValueError("expression_transformer_checkpoint_path is required. Please provide a checkpoint path.")
+    
+    if not os.path.exists(expression_transformer_checkpoint_path):
+        raise FileNotFoundError(f"Expression transformer checkpoint not found: {expression_transformer_checkpoint_path}")
+    
+    # Load the expression transformer checkpoint for architecture info
+    expr_checkpoint = torch.load(expression_transformer_checkpoint_path, map_location=device)
+    
+    # Load reconstruction model weights if checkpoint provided
+    if reconstruction_model_checkpoint_path is not None:
+        if not os.path.exists(reconstruction_model_checkpoint_path):
+            raise FileNotFoundError(f"Reconstruction model checkpoint not found: {reconstruction_model_checkpoint_path}")
+        
+        logger.info(f"Loading reconstruction model weights from checkpoint: {reconstruction_model_checkpoint_path}")
+        try:
+            recon_checkpoint = torch.load(reconstruction_model_checkpoint_path, map_location=device)
+            
+            # Get architecture from checkpoint config
+            recon_embed_dim, recon_num_heads, recon_num_layers, recon_dropout = 384, 4, 2, 0.1  # Defaults
+            if 'config' in recon_checkpoint and 'reconstruction_model' in recon_checkpoint['config']:
+                recon_config = recon_checkpoint['config']['reconstruction_model']
+                recon_embed_dim = recon_config.get('embed_dim', 384)
+                recon_num_heads = recon_config.get('num_heads', 4)
+                recon_num_layers = recon_config.get('num_layers', 2)
+                recon_dropout = recon_config.get('dropout', 0.1)
+                logger.info(f"Using reconstruction model architecture from checkpoint: {recon_num_layers} layers, {recon_num_heads} heads")
+                print(f"📐 Reconstruction Model Architecture from checkpoint: {recon_num_layers} layers, {recon_num_heads} heads")
+            else:
+                logger.warning("No architecture config found in reconstruction model checkpoint, using defaults")
+                print(f"⚠️  No architecture config found in reconstruction model checkpoint, using defaults")
+            
+            # Get expression transformer architecture from checkpoint
+            expr_embed_dim, expr_num_heads, expr_num_layers, expr_dropout = 384, 4, 2, 0.1  # Defaults
+            if 'config' in expr_checkpoint and 'expression_model' in expr_checkpoint['config']:
+                expr_config = expr_checkpoint['config']['expression_model']
+                expr_embed_dim = expr_config.get('embed_dim', 384)
+                expr_num_heads = expr_config.get('num_heads', 4)
+                expr_num_layers = expr_config.get('num_layers', 2)
+                expr_dropout = expr_config.get('dropout', 0.1)
+                logger.info(f"Using expression transformer architecture from checkpoint: {expr_num_layers} layers, {expr_num_heads} heads")
+                print(f"📐 Expression Transformer Architecture from checkpoint: {expr_num_layers} layers, {expr_num_heads} heads")
+            else:
+                logger.warning("No architecture config found in expression transformer checkpoint, using defaults")
+                print(f"⚠️  No architecture config found in expression transformer checkpoint, using defaults")
+            
+            # Initialize joint model with both architectures from checkpoints
+            joint_model = JointExpressionReconstructionModel(
+                expr_embed_dim=expr_embed_dim,
+                expr_num_heads=expr_num_heads,
+                expr_num_layers=expr_num_layers,
+                expr_dropout=expr_dropout,
+                recon_embed_dim=recon_embed_dim,
+                recon_num_heads=recon_num_heads,
+                recon_num_layers=recon_num_layers,
+                recon_dropout=recon_dropout
+            ).to(device)
+            
+            # Load reconstruction model weights
+            if 'reconstruction_model_state_dict' in recon_checkpoint:
+                joint_model.reconstruction_model.load_state_dict(recon_checkpoint['reconstruction_model_state_dict'])
+                logger.info(f"✅ Successfully loaded reconstruction model from epoch {recon_checkpoint.get('epoch', 'unknown')}")
+                print(f"✅ Successfully loaded reconstruction model from: {reconstruction_model_checkpoint_path}")
+            else:
+                # Try loading the entire checkpoint as state dict (for compatibility)
+                joint_model.reconstruction_model.load_state_dict(recon_checkpoint)
+                logger.info("✅ Successfully loaded reconstruction model state dict directly")
+                print(f"✅ Successfully loaded reconstruction model from: {reconstruction_model_checkpoint_path}")
+            
+            # Load expression transformer weights into joint model
+            logger.info(f"Loading expression transformer weights from checkpoint: {expression_transformer_checkpoint_path}")
+            try:
+                if 'expression_transformer_state_dict' in expr_checkpoint:
+                    joint_model.expression_transformer.load_state_dict(expr_checkpoint['expression_transformer_state_dict'])
+                    logger.info(f"✅ Successfully loaded expression transformer from epoch {expr_checkpoint.get('epoch', 'unknown')}")
+                    print(f"✅ Successfully loaded expression transformer from: {expression_transformer_checkpoint_path}")
+                else:
+                    # Try loading the entire checkpoint as state dict (for compatibility)
+                    joint_model.expression_transformer.load_state_dict(expr_checkpoint)
+                    logger.info("✅ Successfully loaded expression transformer state dict directly")
+                    print(f"✅ Successfully loaded expression transformer from: {expression_transformer_checkpoint_path}")
+                
+                # Freeze expression transformer parameters
+                for param in joint_model.expression_transformer.parameters():
+                    param.requires_grad = False
+                
+                logger.info("Expression transformer loaded and frozen successfully")
+                print(f"🔒 Expression transformer frozen (parameters not trainable)")
+                
+            except Exception as e:
+                raise RuntimeError(f"Failed to load expression transformer checkpoint: {str(e)}")
+        except Exception as e:
+            raise RuntimeError(f"Failed to load reconstruction model checkpoint: {str(e)}")
+    else:
+        # No reconstruction model checkpoint - use config or defaults
+        recon_embed_dim, recon_num_heads, recon_num_layers, recon_dropout = 384, 4, 2, 0.1  # Defaults
+        
+        if reconstruction_model_config is not None:
+            # Use provided reconstruction model config
+            recon_embed_dim = reconstruction_model_config.get('embed_dim', 384)
+            recon_num_heads = reconstruction_model_config.get('num_heads', 4)
+            recon_num_layers = reconstruction_model_config.get('num_layers', 2)
+            recon_dropout = reconstruction_model_config.get('dropout', 0.1)
+            logger.info(f"Using reconstruction model architecture from config: {recon_num_layers} layers, {recon_num_heads} heads")
+            print(f"📐 Reconstruction Model Architecture from config: {recon_num_layers} layers, {recon_num_heads} heads")
+        else:
+            logger.info(f"Using default reconstruction model architecture: {recon_num_layers} layers, {recon_num_heads} heads")
+            print(f"📐 Reconstruction Model Architecture (default): {recon_num_layers} layers, {recon_num_heads} heads")
+        
+        # Get expression transformer architecture from checkpoint
+        expr_embed_dim, expr_num_heads, expr_num_layers, expr_dropout = 384, 4, 2, 0.1  # Defaults
+        if 'config' in expr_checkpoint and 'expression_model' in expr_checkpoint['config']:
+            expr_config = expr_checkpoint['config']['expression_model']
+            expr_embed_dim = expr_config.get('embed_dim', 384)
+            expr_num_heads = expr_config.get('num_heads', 4)
+            expr_num_layers = expr_config.get('num_layers', 2)
+            expr_dropout = expr_config.get('dropout', 0.1)
+            logger.info(f"Using expression transformer architecture from checkpoint: {expr_num_layers} layers, {expr_num_heads} heads")
+            print(f"📐 Expression Transformer Architecture from checkpoint: {expr_num_layers} layers, {expr_num_heads} heads")
+        else:
+            logger.warning("No architecture config found in expression transformer checkpoint, using defaults")
+            print(f"⚠️  No architecture config found in expression transformer checkpoint, using defaults")
+        
+        # Initialize joint model with expression transformer from checkpoint and reconstruction model from config/defaults
+        joint_model = JointExpressionReconstructionModel(
+            expr_embed_dim=expr_embed_dim,
+            expr_num_heads=expr_num_heads,
+            expr_num_layers=expr_num_layers,
+            expr_dropout=expr_dropout,
+            recon_embed_dim=recon_embed_dim,
+            recon_num_heads=recon_num_heads,
+            recon_num_layers=recon_num_layers,
+            recon_dropout=recon_dropout
+        ).to(device)
+        
+        logger.info("No reconstruction model checkpoint provided - training from scratch")
+        print(f"🎓 Reconstruction model will be trained from scratch")
+        
+        # Load expression transformer weights into joint model
         logger.info(f"Loading expression transformer weights from checkpoint: {expression_transformer_checkpoint_path}")
         try:
-            # Load the expression transformer state dict
             if 'expression_transformer_state_dict' in expr_checkpoint:
                 joint_model.expression_transformer.load_state_dict(expr_checkpoint['expression_transformer_state_dict'])
-                logger.info(f"Loaded expression transformer from epoch {expr_checkpoint.get('epoch', 'unknown')}")
+                logger.info(f"✅ Successfully loaded expression transformer from epoch {expr_checkpoint.get('epoch', 'unknown')}")
+                print(f"✅ Successfully loaded expression transformer from: {expression_transformer_checkpoint_path}")
             else:
                 # Try loading the entire checkpoint as state dict (for compatibility)
                 joint_model.expression_transformer.load_state_dict(expr_checkpoint)
-                logger.info("Loaded expression transformer state dict directly")
+                logger.info("✅ Successfully loaded expression transformer state dict directly")
+                print(f"✅ Successfully loaded expression transformer from: {expression_transformer_checkpoint_path}")
             
             # Freeze expression transformer parameters
             for param in joint_model.expression_transformer.parameters():
                 param.requires_grad = False
             
             logger.info("Expression transformer loaded and frozen successfully")
+            print(f"🔒 Expression transformer frozen (parameters not trainable)")
             
         except Exception as e:
             raise RuntimeError(f"Failed to load expression transformer checkpoint: {str(e)}")
-    else:
-        logger.info("No expression transformer checkpoint provided - training from scratch")
     
     # Initialize loss function
     criterion = JointLoss(
@@ -281,21 +390,24 @@ def train_expression_reconstruction(
         identity_weight=identity_weight
     ).to(device)
     
-    # Initialize optimizer (only train Components C and E, but C might be frozen)
+    # Initialize optimizer (only train Component E - reconstruction model)
     trainable_params = []
     
-    # Add expression transformer parameters only if not frozen
-    if expression_transformer_checkpoint_path is None:
-        trainable_params.extend(list(joint_model.expression_transformer.parameters()))
-        logger.info("Expression transformer parameters will be trained")
-    else:
-        logger.info("Expression transformer parameters are frozen")
+    # Expression transformer is always frozen by default
+    logger.info("Expression transformer parameters are frozen")
     
-    # Always add reconstruction model parameters
+    # Only add reconstruction model parameters (Component E)
     trainable_params.extend(list(joint_model.reconstruction_model.parameters()))
     logger.info("Reconstruction model parameters will be trained")
+    print(f"🎯 Training: Reconstruction model (transformer + CNN parts)")
+    print(f"🔒 Frozen: Expression transformer (Component C)")
     
     optimizer = optim.Adam(trainable_params, lr=learning_rate)
+    
+    # Count trainable parameters
+    total_params = sum(p.numel() for p in trainable_params)
+    logger.info(f"Total trainable parameters: {total_params:,}")
+    print(f"🎯 Training {total_params:,} parameters (reconstruction model only)")
     
     # Training loop
     joint_model.train()
@@ -412,28 +524,6 @@ def train_expression_reconstruction(
         
         # Save epoch checkpoints (only at end of epoch, not during training)
         if (epoch + 1) % save_every_epochs == 0:
-            # Joint model
-            joint_epoch_path = os.path.join(checkpoint_dir, f"joint_model_epoch_{epoch+1}.pt")
-            torch.save({
-                'epoch': epoch + 1,
-                'joint_model_state_dict': joint_model.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-                'avg_total_loss': avg_loss,
-                'avg_recon_loss': avg_recon_loss,
-                'avg_identity_loss': avg_identity_loss,
-            }, joint_epoch_path)
-            
-            # Expression transformer
-            expression_epoch_path = os.path.join(checkpoint_dir, f"expression_transformer_epoch_{epoch+1}.pt")
-            torch.save({
-                'epoch': epoch + 1,
-                'expression_transformer_state_dict': joint_model.expression_transformer.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-                'avg_total_loss': avg_loss,
-                'avg_recon_loss': avg_recon_loss,
-                'avg_identity_loss': avg_identity_loss,
-            }, expression_epoch_path)
-            
             # Reconstruction model
             reconstruction_epoch_path = os.path.join(checkpoint_dir, f"reconstruction_model_epoch_{epoch+1}.pt")
             torch.save({
@@ -445,7 +535,7 @@ def train_expression_reconstruction(
                 'avg_identity_loss': avg_identity_loss,
             }, reconstruction_epoch_path)
             
-            logger.info(f"Saved epoch checkpoints: {joint_epoch_path}, {expression_epoch_path}, {reconstruction_epoch_path}")
+            logger.info(f"Saved epoch checkpoint: {reconstruction_epoch_path}")
     
     logger.info("Training completed!")
     return joint_model
@@ -535,6 +625,9 @@ def test_joint_model():
     # Create models
     joint_model = JointExpressionReconstructionModel()
     face_id_model = FaceIDModel()
+    
+    # Initialize DINOv2 tokenizer
+    dinov2_tokenizer = DINOv2Tokenizer()
     
     # Create dummy input simulating clips
     # Simulate 2 clips: first clip has 3 frames, second clip has 2 frames

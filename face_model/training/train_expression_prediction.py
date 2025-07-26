@@ -488,6 +488,7 @@ def train_expression_prediction(
         
         avg_loss = epoch_loss / num_batches
         logger.info(f"Epoch {epoch+1}/{num_epochs} - Avg Loss: {avg_loss:.4f}")
+        print(f"Epoch {epoch+1}/{num_epochs} - Train Loss: {avg_loss:.4f}")
         
         # Log epoch metrics to TensorBoard
         writer.add_scalar('Training/Epoch_Loss', avg_loss, epoch + 1)
@@ -498,6 +499,7 @@ def train_expression_prediction(
                 joint_model, face_id_model, val_dataloader, criterion, dinov2_tokenizer, device
             )
             logger.info(f"Epoch {epoch+1}/{num_epochs} - Train Loss: {avg_loss:.4f}, Val Loss: {val_loss:.4f}")
+            print(f"Epoch {epoch+1}/{num_epochs} - Train Loss: {avg_loss:.4f}, Val Loss: {val_loss:.4f}")
             
             # Log validation metrics to TensorBoard
             writer.add_scalar('Validation/Epoch_Loss', val_loss, epoch + 1)
