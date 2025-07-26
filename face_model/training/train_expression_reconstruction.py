@@ -232,6 +232,20 @@ def train_expression_reconstruction(
     # Load the expression transformer checkpoint for architecture info
     expr_checkpoint = torch.load(expression_transformer_checkpoint_path, map_location=device)
     
+    # Get expression transformer architecture from checkpoint
+    expr_embed_dim, expr_num_heads, expr_num_layers, expr_dropout = 384, 4, 2, 0.1  # Defaults
+    if 'config' in expr_checkpoint and 'expression_model' in expr_checkpoint['config']:
+        expr_config = expr_checkpoint['config']['expression_model']
+        expr_embed_dim = expr_config.get('embed_dim', 384)
+        expr_num_heads = expr_config.get('num_heads', 4)
+        expr_num_layers = expr_config.get('num_layers', 2)
+        expr_dropout = expr_config.get('dropout', 0.1)
+        logger.info(f"Using expression transformer architecture from checkpoint: {expr_num_layers} layers, {expr_num_heads} heads")
+        print(f"📐 Expression Transformer Architecture from checkpoint: {expr_num_layers} layers, {expr_num_heads} heads")
+    else:
+        logger.warning("No architecture config found in expression transformer checkpoint, using defaults")
+        print(f"⚠️  No architecture config found in expression transformer checkpoint, using defaults")
+    
     # Load reconstruction model weights if checkpoint provided
     if reconstruction_model_checkpoint_path is not None:
         if not os.path.exists(reconstruction_model_checkpoint_path):
@@ -255,19 +269,7 @@ def train_expression_reconstruction(
                 logger.warning("No architecture config found in reconstruction model checkpoint, using defaults")
                 print(f"⚠️  No architecture config found in reconstruction model checkpoint, using defaults")
             
-            # Get expression transformer architecture from checkpoint
-            expr_embed_dim, expr_num_heads, expr_num_layers, expr_dropout = 384, 4, 2, 0.1  # Defaults
-            if 'config' in expr_checkpoint and 'expression_model' in expr_checkpoint['config']:
-                expr_config = expr_checkpoint['config']['expression_model']
-                expr_embed_dim = expr_config.get('embed_dim', 384)
-                expr_num_heads = expr_config.get('num_heads', 4)
-                expr_num_layers = expr_config.get('num_layers', 2)
-                expr_dropout = expr_config.get('dropout', 0.1)
-                logger.info(f"Using expression transformer architecture from checkpoint: {expr_num_layers} layers, {expr_num_heads} heads")
-                print(f"📐 Expression Transformer Architecture from checkpoint: {expr_num_layers} layers, {expr_num_heads} heads")
-            else:
-                logger.warning("No architecture config found in expression transformer checkpoint, using defaults")
-                print(f"⚠️  No architecture config found in expression transformer checkpoint, using defaults")
+
             
             # Initialize joint model with both architectures from checkpoints
             joint_model = JointExpressionReconstructionModel(
@@ -332,19 +334,7 @@ def train_expression_reconstruction(
             logger.info(f"Using default reconstruction model architecture: {recon_num_layers} layers, {recon_num_heads} heads")
             print(f"📐 Reconstruction Model Architecture (default): {recon_num_layers} layers, {recon_num_heads} heads")
         
-        # Get expression transformer architecture from checkpoint
-        expr_embed_dim, expr_num_heads, expr_num_layers, expr_dropout = 384, 4, 2, 0.1  # Defaults
-        if 'config' in expr_checkpoint and 'expression_model' in expr_checkpoint['config']:
-            expr_config = expr_checkpoint['config']['expression_model']
-            expr_embed_dim = expr_config.get('embed_dim', 384)
-            expr_num_heads = expr_config.get('num_heads', 4)
-            expr_num_layers = expr_config.get('num_layers', 2)
-            expr_dropout = expr_config.get('dropout', 0.1)
-            logger.info(f"Using expression transformer architecture from checkpoint: {expr_num_layers} layers, {expr_num_heads} heads")
-            print(f"📐 Expression Transformer Architecture from checkpoint: {expr_num_layers} layers, {expr_num_heads} heads")
-        else:
-            logger.warning("No architecture config found in expression transformer checkpoint, using defaults")
-            print(f"⚠️  No architecture config found in expression transformer checkpoint, using defaults")
+
         
         # Initialize joint model with expression transformer from checkpoint and reconstruction model from config/defaults
         joint_model = JointExpressionReconstructionModel(
