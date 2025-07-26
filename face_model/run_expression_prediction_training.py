@@ -75,6 +75,10 @@ def main():
     print(f"🧠 Transformer Decoder: {config['transformer_decoder']['num_layers']} layers, {config['transformer_decoder']['num_heads']} heads")
     print(f"🧵 Num workers: {config['training']['num_workers']}")
     print(f"💾 Memory optimization: drop_last={config['training']['drop_last']}")
+    print(f"🔒 Face ID Model: Will load from {config['training']['face_id_checkpoint_path']}")
+    
+
+    
     
     # Log checkpoint status
     if config['training']['expression_transformer_checkpoint_path'] is not None:

@@ -233,6 +233,14 @@ def train_expression_prediction(
     
     logger.info(f"Training dataset loaded with {len(dataloader)} batches")
     
+    # Estimate training time (more realistic for CPU training)
+    estimated_time_per_epoch = len(dataloader) * 126  # 125 seconds per batch
+    total_estimated_time = estimated_time_per_epoch * num_epochs / 3600  # Convert to hours
+    
+    print(f"📊 Training dataset loaded: {len(dataloader)} batches per epoch")
+    print(f"⏱️  Estimated training time: {total_estimated_time:.1f} hours ({total_estimated_time/24:.1f} days)")
+    print(f"💰 Estimated cost: ${total_estimated_time * 0.38:.1f} (at $0.38/hour)")
+    
     # Initialize DINOv2 tokenizer for face ID token extraction
     dinov2_tokenizer = DINOv2Tokenizer()
     
@@ -383,11 +391,13 @@ def train_expression_prediction(
     try:
         if 'face_id_model_state_dict' in checkpoint:
             face_id_model.load_state_dict(checkpoint['face_id_model_state_dict'])
-            logger.info(f"Loaded face ID model from epoch {checkpoint.get('epoch', 'unknown')}")
+            logger.info(f"✅ Successfully loaded face ID model from epoch {checkpoint.get('epoch', 'unknown')}")
+            print(f"✅ Successfully loaded face ID model from: {face_id_checkpoint_path}")
         else:
             # Try loading the entire checkpoint as state dict (for compatibility)
             face_id_model.load_state_dict(checkpoint)
-            logger.info("Loaded face ID model state dict directly")
+            logger.info("✅ Successfully loaded face ID model state dict directly")
+            print(f"✅ Successfully loaded face ID model from: {face_id_checkpoint_path}")
     except Exception as e:
         raise RuntimeError(f"Failed to load face ID model checkpoint: {str(e)}")
     
@@ -396,6 +406,7 @@ def train_expression_prediction(
         param.requires_grad = False
     
     logger.info("Face ID model loaded and frozen successfully")
+    print(f"🔒 Face ID model frozen (parameters not trainable)")
     
     # Initialize loss function
     criterion = ExpressionPredictionLoss().to(device)
