@@ -368,11 +368,11 @@ class FaceIDTrainer:
                    f"Consistency Loss: {avg_consistency_loss:.4f}, "
                    f"Contrastive Loss: {avg_contrastive_loss:.4f}")
         
-        # Log subject-specific statistics
-        for subject_id, losses in subject_losses.items():
-            if len(losses) > 0:
-                avg_subject_loss = sum(losses) / len(losses)
-                logger.info(f"  Subject {subject_id}: {avg_subject_loss:.4f}")
+        # Log subject-specific statistics (commented out to reduce verbosity)
+        # for subject_id, losses in subject_losses.items():
+        #     if len(losses) > 0:
+        #         avg_subject_loss = sum(losses) / len(losses)
+        #         logger.info(f"  Subject {subject_id}: {avg_subject_loss:.4f}")
         
         return avg_loss
     

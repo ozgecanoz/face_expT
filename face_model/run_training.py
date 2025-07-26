@@ -40,9 +40,9 @@ def main():
             'contrastive_temperature': 0.5,  # Temperature for NT-Xent loss
             'consistency_weight': 1.0,
             'contrastive_weight': 1.0,  # Default weight for contrastive loss
-            'num_workers': 0,  # Single-threaded data loading for stability
+            'num_workers': 4,  # Parallel data loading with 16 vCPUs
             'pin_memory': False,  # Not needed for CPU
-            'persistent_workers': False,  # Not applicable with num_workers=0
+            'persistent_workers': True,  # Keep workers alive for efficiency
             'drop_last': True,  # Consistent batch sizes
             # Dataset configuration
             'train_data_dir': "/mnt/dataset-storage/dbs/CCA_train_db2/",
