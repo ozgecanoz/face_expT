@@ -37,11 +37,10 @@ def main():
             'log_dir': "/mnt/dataset-storage/face_model/logs",
             'checkpoint_dir': "/mnt/dataset-storage/face_model/checkpoints",
             'learning_rate': 1e-4,
-            'batch_size': 2,  # Reduced from 4 to 2 for memory optimization
+            'batch_size': 8,  # Reduced from 4 to 2 for memory optimization
             'num_epochs': 5,
             'save_every_epochs': 1,   # Save checkpoint every epoch
             'reconstruction_weight': 1.0,
-            'identity_weight': 1.0,
             'max_train_samples': None,  # Use all available samples
             'max_val_samples': 100,   # Limit validation samples for testing
             'num_workers': 2,  # Reduced from 4 to 2 for memory optimization
@@ -118,7 +117,6 @@ def main():
         num_epochs=config['training']['num_epochs'],
         learning_rate=config['training']['learning_rate'],
         reconstruction_weight=config['training']['reconstruction_weight'],
-        identity_weight=config['training']['identity_weight'],
         max_samples=config['training']['max_train_samples'],
         val_dataset_path=config['training']['val_data_dir'],
         max_val_samples=config['training']['max_val_samples'],

@@ -93,36 +93,23 @@ class JointLoss(nn.Module):
     Joint loss function for expression reconstruction training
     """
     
-    def __init__(self, reconstruction_weight=1.0, identity_weight=1.0):
+    def __init__(self, reconstruction_weight=1.0):
         super().__init__()
         self.reconstruction_weight = reconstruction_weight
-        self.identity_weight = identity_weight
         
         # Reconstruction loss (MSE)
         self.reconstruction_loss = nn.MSELoss()
         
-        # Identity preservation loss (L2 on face ID tokens)
-        self.identity_loss = nn.MSELoss()
-        
-    def forward(self, reconstructed_faces, original_faces, face_id_tokens_orig, face_id_tokens_recon):
+    def forward(self, reconstructed_faces, original_faces):
         """
         Args:
             reconstructed_faces: (total_frames, 3, 518, 518) - Reconstructed faces
             original_faces: (total_frames, 3, 518, 518) - Original faces
-            face_id_tokens_orig: (total_frames, 1, 384) - Face ID tokens from original images
-            face_id_tokens_recon: (total_frames, 1, 384) - Face ID tokens from reconstructed images
         """
-        # Reconstruction loss
+        # Reconstruction loss only
         recon_loss = self.reconstruction_loss(reconstructed_faces, original_faces)
         
-        # Identity preservation loss
-        identity_loss = self.identity_loss(face_id_tokens_recon, face_id_tokens_orig)
-        
-        # Total loss
-        total_loss = (self.reconstruction_weight * recon_loss + 
-                     self.identity_weight * identity_loss)
-        
-        return total_loss, recon_loss, identity_loss
+        return recon_loss, recon_loss  # Return total_loss and recon_loss only
 
 
 def train_expression_reconstruction(
@@ -137,7 +124,6 @@ def train_expression_reconstruction(
     num_epochs=10,
     learning_rate=1e-4,
     reconstruction_weight=1.0,
-    identity_weight=1.0,
     max_samples=None,
     val_dataset_path=None,  # New parameter for validation dataset
     max_val_samples=None,   # New parameter for validation samples
@@ -376,8 +362,7 @@ def train_expression_reconstruction(
     
     # Initialize loss function
     criterion = JointLoss(
-        reconstruction_weight=reconstruction_weight,
-        identity_weight=identity_weight
+        reconstruction_weight=reconstruction_weight
     ).to(device)
     
     # Initialize optimizer (only train Component E - reconstruction model)
@@ -406,7 +391,7 @@ def train_expression_reconstruction(
     for epoch in range(num_epochs):
         epoch_loss = 0.0
         epoch_recon_loss = 0.0
-        epoch_identity_loss = 0.0
+        num_batches = 0
         
         progress_bar = tqdm(dataloader, desc=f"Epoch {epoch+1}/{num_epochs}")
         
@@ -456,18 +441,10 @@ def train_expression_reconstruction(
             # Forward pass with pre-computed face ID tokens
             reconstructed_faces, expression_tokens = joint_model(face_images, face_id_tokens, dinov2_tokenizer)
             
-            # Get face ID tokens from reconstructed images for identity preservation
-            with torch.no_grad():
-                patch_tokens_recon, pos_embeddings_recon = dinov2_tokenizer(reconstructed_faces)
-                face_id_tokens_recon = face_id_model(patch_tokens_recon, pos_embeddings_recon).to(device)
-                
-                # Explicitly delete intermediate tensors to free memory
-                del patch_tokens_recon, pos_embeddings_recon
-            
             # Compute loss
             try:
-                total_loss, recon_loss, identity_loss = criterion(
-                    reconstructed_faces, face_images, face_id_tokens, face_id_tokens_recon
+                total_loss, recon_loss = criterion(
+                    reconstructed_faces, face_images
                 )
                 
                 # Backward pass
@@ -486,19 +463,17 @@ def train_expression_reconstruction(
                 # Update metrics
                 epoch_loss += total_loss.item()
                 epoch_recon_loss += recon_loss.item()
-                epoch_identity_loss += identity_loss.item()
-                total_steps += 1
+                num_batches += 1
                 
                 # Update progress bar
                 progress_bar.set_postfix({
                     'Total Loss': f'{total_loss.item():.4f}',
-                    'Recon Loss': f'{recon_loss.item():.4f}',
-                    'Identity Loss': f'{identity_loss.item():.4f}'
+                    'Recon Loss': f'{recon_loss.item():.4f}'
                 })
                 
                 # Explicitly delete intermediate tensors after using them
-                del reconstructed_faces, expression_tokens, face_id_tokens_recon
-                del total_loss, recon_loss, identity_loss
+                del reconstructed_faces, expression_tokens, face_id_tokens
+                del total_loss, recon_loss
                 
                 # Clear intermediate tensors (these were already concatenated above)
                 del face_images
@@ -506,22 +481,20 @@ def train_expression_reconstruction(
             except Exception as e:
                 logger.error(f"Error in batch {batch_idx}: {str(e)}")
                 logger.error(f"Batch shapes - reconstructed_faces: {reconstructed_faces.shape}, face_images: {face_images.shape}")
-                logger.error(f"Batch shapes - face_id_tokens: {face_id_tokens.shape}, face_id_tokens_recon: {face_id_tokens_recon.shape}")
+                logger.error(f"Batch shapes - face_id_tokens: {face_id_tokens.shape}")
                 continue
         
         # Log epoch statistics
         avg_loss = epoch_loss / len(dataloader)
         avg_recon_loss = epoch_recon_loss / len(dataloader)
-        avg_identity_loss = epoch_identity_loss / len(dataloader)
         
         logger.info(f"Epoch {epoch+1}/{num_epochs} - "
                    f"Avg Total Loss: {avg_loss:.4f}, "
-                   f"Avg Recon Loss: {avg_recon_loss:.4f}, "
-                   f"Avg Identity Loss: {avg_identity_loss:.4f}")
+                   f"Avg Recon Loss: {avg_recon_loss:.4f}")
         
         # Validate if validation dataloader is provided
         if val_dataloader is not None:
-            val_loss, val_recon_loss, val_identity_loss = validate_expression_reconstruction(
+            val_loss, val_recon_loss = validate_expression_reconstruction(
                 joint_model, face_id_model, val_dataloader, criterion, dinov2_tokenizer, device
             )
             logger.info(f"Epoch {epoch+1}/{num_epochs} - "
@@ -537,7 +510,6 @@ def train_expression_reconstruction(
                 'optimizer_state_dict': optimizer.state_dict(),
                 'avg_total_loss': avg_loss,
                 'avg_recon_loss': avg_recon_loss,
-                'avg_identity_loss': avg_identity_loss,
             }, reconstruction_epoch_path)
             
             logger.info(f"Saved epoch checkpoint: {reconstruction_epoch_path}")
@@ -562,7 +534,6 @@ def validate_expression_reconstruction(
     
     total_loss = 0.0
     total_recon_loss = 0.0
-    total_identity_loss = 0.0
     num_batches = 0
     
     with torch.no_grad():  # No gradient computation for validation
@@ -596,31 +567,23 @@ def validate_expression_reconstruction(
             # Forward pass through joint model
             reconstructed_faces, expression_tokens = joint_model(all_frames, face_id_tokens, dinov2_tokenizer)
             
-            # Get face ID tokens from reconstructed images for identity preservation
-            with torch.no_grad():
-                patch_tokens_recon, pos_embeddings_recon = dinov2_tokenizer(reconstructed_faces)
-                face_id_tokens_recon = face_id_model(patch_tokens_recon, pos_embeddings_recon)
-            
             # Compute loss
-            loss, recon_loss, identity_loss = criterion(
-                reconstructed_faces, all_frames, face_id_tokens, face_id_tokens_recon
+            loss, recon_loss = criterion(
+                reconstructed_faces, all_frames
             )
             
             # Update metrics
             total_loss += loss.item()
             total_recon_loss += recon_loss.item()
-            total_identity_loss += identity_loss.item()
             num_batches += 1
     
     avg_loss = total_loss / num_batches
     avg_recon_loss = total_recon_loss / num_batches
-    avg_identity_loss = total_identity_loss / num_batches
     
     logger.info(f"Validation - Total Loss: {avg_loss:.4f}, "
-               f"Reconstruction Loss: {avg_recon_loss:.4f}, "
-               f"Identity Loss: {avg_identity_loss:.4f}")
+               f"Reconstruction Loss: {avg_recon_loss:.4f}")
     
-    return avg_loss, avg_recon_loss, avg_identity_loss
+    return avg_loss, avg_recon_loss
 
 
 def test_joint_model():
@@ -688,13 +651,12 @@ def test_joint_model():
     
     # Test loss function
     criterion = JointLoss()
-    total_loss, recon_loss, identity_loss = criterion(
-        reconstructed_faces, face_images, face_id_tokens, face_id_tokens
+    total_loss, recon_loss = criterion(
+        reconstructed_faces, face_images
     )
     
     print(f"Total loss: {total_loss.item():.4f}")
     print(f"Reconstruction loss: {recon_loss.item():.4f}")
-    print(f"Identity loss: {identity_loss.item():.4f}")
     
     print("✅ Joint model test passed!")
 
@@ -711,7 +673,6 @@ if __name__ == "__main__":
     parser.add_argument("--num_epochs", type=int, default=10, help="Number of epochs")
     parser.add_argument("--learning_rate", type=float, default=1e-4, help="Learning rate")
     parser.add_argument("--reconstruction_weight", type=float, default=1.0, help="Reconstruction loss weight")
-    parser.add_argument("--identity_weight", type=float, default=1.0, help="Identity loss weight")
     parser.add_argument("--max_samples", type=int, default=None, help="Maximum samples to load (for debugging)")
     parser.add_argument("--val_dataset_path", type=str, default=None, help="Path to validation dataset directory")
     parser.add_argument("--max_val_samples", type=int, default=None, help="Maximum validation samples to load")
@@ -733,7 +694,6 @@ if __name__ == "__main__":
             num_epochs=args.num_epochs,
             learning_rate=args.learning_rate,
             reconstruction_weight=args.reconstruction_weight,
-            identity_weight=args.identity_weight,
             max_samples=args.max_samples,
             val_dataset_path=args.val_dataset_path,
             max_val_samples=args.max_val_samples
