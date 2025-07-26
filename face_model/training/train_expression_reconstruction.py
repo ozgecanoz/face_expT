@@ -412,10 +412,13 @@ def train_expression_reconstruction(
         
         for batch_idx, batch in enumerate(progress_bar):
             # Monitor memory usage (optional)
-            # if batch_idx % 10 == 0:
-            #     process = psutil.Process()
-            #     memory_info = process.memory_info()
-            #     logger.info(f"Memory usage: {memory_info.rss / 1024 / 1024:.1f} MB")
+            if batch_idx % 5 == 0:
+                import gc
+                gc.collect()  # Force garbage collection every 5 batches
+                # if batch_idx % 10 == 0:
+                #     process = psutil.Process()
+                #     memory_info = process.memory_info()
+                #     logger.info(f"Memory usage: {memory_info.rss / 1024 / 1024:.1f} MB")
             
             # Extract frames and face ID tokens from all clips in the batch
             all_frames = []
@@ -487,6 +490,9 @@ def train_expression_reconstruction(
                 # Explicitly delete intermediate tensors after using them
                 del reconstructed_faces, expression_tokens, face_id_tokens_recon
                 del total_loss, recon_loss, identity_loss
+                
+                # Clear intermediate tensors (these were already concatenated above)
+                del face_images
                 
             except Exception as e:
                 logger.error(f"Error in batch {batch_idx}: {str(e)}")

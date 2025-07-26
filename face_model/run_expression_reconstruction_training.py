@@ -37,14 +37,14 @@ def main():
             'log_dir': "/mnt/dataset-storage/face_model/logs",
             'checkpoint_dir': "/mnt/dataset-storage/face_model/checkpoints",
             'learning_rate': 1e-4,
-            'batch_size': 16,  # Optimized for 64GB RAM
+            'batch_size': 8,  # Reduced from 16 to 8 for memory optimization
             'num_epochs': 5,
             'save_every_epochs': 1,   # Save checkpoint every epoch
             'reconstruction_weight': 1.0,
             'identity_weight': 1.0,
             'max_train_samples': None,  # Use all available samples
             'max_val_samples': 100,   # Limit validation samples for testing
-            'num_workers': 4,  # Parallel data loading with 16 vCPUs
+            'num_workers': 2,  # Reduced from 4 to 2 for memory optimization
             'pin_memory': False,  # Not needed for CPU
             'persistent_workers': True,  # Keep workers alive for efficiency
             'drop_last': True  # Consistent batch sizes

@@ -133,7 +133,17 @@ def main():
         num_workers=config['training']['num_workers'],
         pin_memory=config['training']['pin_memory'],
         persistent_workers=config['training']['persistent_workers'],
-        drop_last=config['training']['drop_last']
+        drop_last=config['training']['drop_last'],
+        # Architecture configuration
+        expr_embed_dim=config['expression_transformer']['embed_dim'],
+        expr_num_heads=config['expression_transformer']['num_heads'],
+        expr_num_layers=config['expression_transformer']['num_layers'],
+        expr_dropout=config['expression_transformer']['dropout'],
+        decoder_embed_dim=config['transformer_decoder']['embed_dim'],
+        decoder_num_heads=config['transformer_decoder']['num_heads'],
+        decoder_num_layers=config['transformer_decoder']['num_layers'],
+        decoder_dropout=config['transformer_decoder']['dropout'],
+        max_sequence_length=config['transformer_decoder']['max_sequence_length']
     )
     
     print("\n✅ Training completed!")

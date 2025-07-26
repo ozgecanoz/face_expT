@@ -33,8 +33,8 @@ class JointExpressionPredictionModel(nn.Module):
     """
     
     def __init__(self, 
-                 expr_embed_dim=384, expr_num_heads=8, expr_num_layers=2, expr_dropout=0.1,
-                 decoder_embed_dim=384, decoder_num_heads=8, decoder_num_layers=2, decoder_dropout=0.1, 
+                 expr_embed_dim=384, expr_num_heads=4, expr_num_layers=2, expr_dropout=0.1,  # Changed from 8 to 4 heads
+                 decoder_embed_dim=384, decoder_num_heads=4, decoder_num_layers=2, decoder_dropout=0.1,  # Changed from 8 to 4 heads
                  max_sequence_length=50):
         super().__init__()
         
@@ -209,7 +209,17 @@ def train_expression_prediction(
     num_workers=0,
     pin_memory=False,
     persistent_workers=False,
-    drop_last=True
+    drop_last=True,
+    # Architecture configuration parameters
+    expr_embed_dim=384,
+    expr_num_heads=4,  # Changed from 8 to 4 to match your config
+    expr_num_layers=2,
+    expr_dropout=0.1,
+    decoder_embed_dim=384,
+    decoder_num_heads=4,  # Changed from 8 to 4 to match your config
+    decoder_num_layers=2,
+    decoder_dropout=0.1,
+    max_sequence_length=50
 ):
     """
     Train the joint expression prediction model
@@ -244,8 +254,8 @@ def train_expression_prediction(
     # Initialize DINOv2 tokenizer for face ID token extraction
     dinov2_tokenizer = DINOv2Tokenizer()
     
-    # Determine expression transformer architecture
-    expr_embed_dim, expr_num_heads, expr_num_layers, expr_dropout = 384, 8, 2, 0.1  # Defaults
+    # Use provided architecture parameters for expression transformer
+    # (These are now passed as function parameters instead of hardcoded)
     
     # Load expression transformer checkpoint if provided to get architecture
     if expression_transformer_checkpoint_path is not None:
@@ -274,9 +284,8 @@ def train_expression_prediction(
         except Exception as e:
             logger.warning(f"Failed to load expression transformer checkpoint for architecture: {str(e)}, using defaults")
     
-    # Determine transformer decoder architecture
-    decoder_embed_dim, decoder_num_heads, decoder_num_layers, decoder_dropout = 384, 8, 2, 0.1  # Defaults
-    max_sequence_length = 50  # Default
+    # Use provided architecture parameters for transformer decoder
+    # (These are now passed as function parameters instead of hardcoded)
     
     # Load transformer decoder checkpoint if provided to get architecture
     if transformer_decoder_checkpoint_path is not None:
