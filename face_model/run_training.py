@@ -32,10 +32,10 @@ def main():
         'training': {
             'log_dir': "/mnt/dataset-storage/face_model/logs",
             'checkpoint_dir': "/mnt/dataset-storage/face_model/checkpoints",
-            'checkpoint_path': None,  # Start from scratch
+            'checkpoint_path': "/mnt/dataset-storage/face_model/checkpoints/face_id_epoch_4.pth",  # Start from scratch
             'learning_rate': 1e-4,
             'batch_size': 16,  # Optimized for 64GB RAM
-            'num_epochs': 5,  # 20 : More epochs for large dataset
+            'num_epochs': 1,  # 20 : More epochs for large dataset
             'save_every': 1,   # 3, Save checkpoint every 3 epochs
             'contrastive_temperature': 0.5,  # Temperature for NT-Xent loss
             'consistency_weight': 1.0,
