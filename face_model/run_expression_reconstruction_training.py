@@ -37,7 +37,7 @@ def main():
             'log_dir': "/mnt/dataset-storage/face_model/logs",
             'checkpoint_dir': "/mnt/dataset-storage/face_model/checkpoints",
             'learning_rate': 1e-4,
-            'batch_size': 4,  # Reduced from 8 to 4 for memory optimization
+            'batch_size': 2,  # Reduced from 4 to 2 for memory optimization
             'num_epochs': 5,
             'save_every_epochs': 1,   # Save checkpoint every epoch
             'reconstruction_weight': 1.0,

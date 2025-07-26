@@ -420,6 +420,14 @@ def train_expression_reconstruction(
                     process = psutil.Process()
                     memory_info = process.memory_info()
                     logger.info(f"Memory usage: {memory_info.rss / 1024 / 1024:.1f} MB")
+                    
+                    # Check system memory
+                    system_memory = psutil.virtual_memory()
+                    logger.info(f"System memory: {system_memory.available / 1024 / 1024:.1f} MB available, {system_memory.percent:.1f}% used")
+                    
+                    # Check CPU usage
+                    cpu_percent = psutil.cpu_percent(interval=1)
+                    logger.info(f"CPU usage: {cpu_percent:.1f}%")
             
             # Extract frames and face ID tokens from all clips in the batch
             all_frames = []
