@@ -415,10 +415,11 @@ def train_expression_reconstruction(
             if batch_idx % 5 == 0:
                 import gc
                 gc.collect()  # Force garbage collection every 5 batches
-                # if batch_idx % 10 == 0:
-                #     process = psutil.Process()
-                #     memory_info = process.memory_info()
-                #     logger.info(f"Memory usage: {memory_info.rss / 1024 / 1024:.1f} MB")
+                if batch_idx % 10 == 0:
+                    import psutil
+                    process = psutil.Process()
+                    memory_info = process.memory_info()
+                    logger.info(f"Memory usage: {memory_info.rss / 1024 / 1024:.1f} MB")
             
             # Extract frames and face ID tokens from all clips in the batch
             all_frames = []
