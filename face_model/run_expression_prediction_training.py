@@ -30,30 +30,34 @@ def main():
     # Configuration - Optimized for CPU training
     config = {
         'training': {
-            'train_data_dir': "/Users/ozgewhiting/Documents/EQLabs/datasets_serial/CCA_train_db1",
-            'val_data_dir': "/Users/ozgewhiting/Documents/EQLabs/datasets_serial/CCA_val_db1",
-            'face_id_checkpoint_path': "/Users/ozgewhiting/Documents/projects/dataset_utils/face_model/checkpoints/face_id_epoch_1.pth",
+            'train_data_dir': "/mnt/dataset-storage/dbs/CCA_train_db2/",
+            'max_train_samples': None,  # pass None to use all samples for full training
+            'val_data_dir': "/mnt/dataset-storage/dbs/CCA_val_db2/",
+            'max_val_samples': 100,   # Limit validation samples for testing
+            'face_id_checkpoint_path': "/mnt/dataset-storage/face_model/checkpoints/face_id_epoch_0.pth",
             'expression_transformer_checkpoint_path': None,  # Set to path if you want to load expression transformer
             'transformer_decoder_checkpoint_path': None,  # Set to path if you want to load transformer decoder
-            'log_dir': "/Users/ozgewhiting/Documents/projects/dataset_utils/face_model/logs",
-            'checkpoint_dir': "/Users/ozgewhiting/Documents/projects/dataset_utils/face_model/checkpoints",
+            'log_dir': "/mnt/dataset-storage/face_model/logs",
+            'checkpoint_dir': "/mnt/dataset-storage/face_model/checkpoints",
             'learning_rate': 1e-4,
-            'batch_size': 2,  # Reduced for CPU memory
-            'num_epochs': 2,
+            'batch_size': 16,  # Optimized for 64GB RAM (cpu vm)
+            'num_epochs': 5,
             'save_every_epochs': 1,   # Save checkpoint every epoch
-            'max_train_samples': 10,  # pass None to use all samples for full training
-            'max_val_samples': 10   # Limit validation samples for testing
+            'num_workers': 4,  # Parallel data loading with 16 vCPUs
+            'pin_memory': False,  # Not needed for CPU
+            'persistent_workers': True,  # Keep workers alive for efficiency
+            'drop_last': True  # Consistent batch sizes
         },
         'expression_transformer': {
             'embed_dim': 384,
             'num_heads': 4,  # Optimized architecture
-            'num_layers': 1,  # Optimized architecture
+            'num_layers': 2,  # Optimized architecture
             'dropout': 0.1
         },
         'transformer_decoder': {
             'embed_dim': 384,
             'num_heads': 4,  # Optimized architecture
-            'num_layers': 1,  # Optimized architecture
+            'num_layers': 2,  # Optimized architecture
             'dropout': 0.1,
             'max_sequence_length': 50
         }
@@ -69,6 +73,8 @@ def main():
     print(f"🔄 Epochs: {config['training']['num_epochs']}")
     print(f"🧠 Expression Transformer: {config['expression_transformer']['num_layers']} layers, {config['expression_transformer']['num_heads']} heads")
     print(f"🧠 Transformer Decoder: {config['transformer_decoder']['num_layers']} layers, {config['transformer_decoder']['num_heads']} heads")
+    print(f"🧵 Num workers: {config['training']['num_workers']}")
+    print(f"💾 Memory optimization: drop_last={config['training']['drop_last']}")
     
     # Log checkpoint status
     if config['training']['expression_transformer_checkpoint_path'] is not None:
@@ -119,7 +125,11 @@ def main():
         max_samples=config['training']['max_train_samples'],
         val_dataset_path=config['training']['val_data_dir'],
         max_val_samples=config['training']['max_val_samples'],
-        device=device
+        device=device,
+        num_workers=config['training']['num_workers'],
+        pin_memory=config['training']['pin_memory'],
+        persistent_workers=config['training']['persistent_workers'],
+        drop_last=config['training']['drop_last']
     )
     
     print("\n✅ Training completed!")

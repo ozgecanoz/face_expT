@@ -205,7 +205,11 @@ def train_expression_prediction(
     max_samples=None,
     val_dataset_path=None,
     max_val_samples=None,
-    device="cpu"
+    device="cpu",
+    num_workers=0,
+    pin_memory=False,
+    persistent_workers=False,
+    drop_last=True
 ):
     """
     Train the joint expression prediction model
@@ -218,13 +222,13 @@ def train_expression_prediction(
     
     # Load dataset
     dataset = FaceDataset(dataset_path, max_samples=max_samples)
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=False)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=pin_memory, persistent_workers=persistent_workers, drop_last=drop_last)
     
     # Load validation dataset if provided
     val_dataloader = None
     if val_dataset_path is not None:
         val_dataset = FaceDataset(val_dataset_path, max_samples=max_val_samples)
-        val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=False)
+        val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, pin_memory=pin_memory, persistent_workers=persistent_workers, drop_last=drop_last)
         logger.info(f"Validation dataset loaded with {len(val_dataloader)} batches")
     
     logger.info(f"Training dataset loaded with {len(dataloader)} batches")
