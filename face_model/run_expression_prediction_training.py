@@ -34,11 +34,11 @@ def main():
             'max_train_samples': None,  # pass None to use all samples for full training
             'val_data_dir': "/mnt/dataset-storage/dbs/CCA_val_db2/",
             'max_val_samples': 100,   # Limit validation samples for testing
-            'face_id_checkpoint_path': "/mnt/dataset-storage/face_model/checkpoints/face_id_epoch_0.pth",
+            'face_id_checkpoint_path': "/mnt/dataset-storage/face_model/checkpoints2/face_id_epoch_4.pth",
             'expression_transformer_checkpoint_path': None,  # Set to path if you want to load expression transformer
             'transformer_decoder_checkpoint_path': None,  # Set to path if you want to load transformer decoder
             'log_dir': "/mnt/dataset-storage/face_model/logs",
-            'checkpoint_dir': "/mnt/dataset-storage/face_model/checkpoints",
+            'checkpoint_dir': "/mnt/dataset-storage/face_model/checkpoints2",
             'learning_rate': 1e-4,
             'batch_size': 16,  # Optimized for 64GB RAM (cpu vm)
             'num_epochs': 5,

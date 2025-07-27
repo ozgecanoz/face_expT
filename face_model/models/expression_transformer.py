@@ -115,6 +115,20 @@ class ExpressionTransformer(nn.Module):
         expression_token = self.layer_norm(expression_token)
         
         return expression_token
+    
+    def inference(self, patch_tokens, pos_embeddings, face_id_token):
+        """
+        Inference method for cached DINOv2 tokens
+        
+        Args:
+            patch_tokens: (B, 1369, 384) - Cached DINOv2 patch tokens
+            pos_embeddings: (B, 1369, 384) - Cached positional embeddings
+            face_id_token: (B, 1, 384) - Face ID token from Component B
+        
+        Returns:
+            expression_token: (B, 1, 384) - Expression token
+        """
+        return self.forward(patch_tokens, pos_embeddings, face_id_token)
 
 
 def test_expression_transformer():

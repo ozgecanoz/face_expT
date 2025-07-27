@@ -31,11 +31,11 @@ def main():
         'training': {
             'train_data_dir': "/mnt/dataset-storage/dbs/CCA_train_db2/",
             'val_data_dir': "/mnt/dataset-storage/dbs/CCA_val_db2/",
-            'face_id_checkpoint_path': "/mnt/dataset-storage/face_model/checkpoints/face_id_epoch_0.pth",
-            'expression_transformer_checkpoint_path': "/mnt/dataset-storage/face_model/checkpoints/expression_transformer_epoch_5.pt",  # Required
+            'face_id_checkpoint_path': "/mnt/dataset-storage/face_model/checkpoints2/face_id_epoch_4.pth",
+            'expression_transformer_checkpoint_path': "/mnt/dataset-storage/face_model/checkpoints2/expression_transformer_epoch_5.pt",  # Required
             'reconstruction_model_checkpoint_path': None,  # Optional - will train from scratch if not provided
             'log_dir': "/mnt/dataset-storage/face_model/logs",
-            'checkpoint_dir': "/mnt/dataset-storage/face_model/checkpoints",
+            'checkpoint_dir': "/mnt/dataset-storage/face_model/checkpoints2",
             'learning_rate': 1e-4,
             'num_epochs': 5,
             'batch_size': 2,  # Reduced from 4 to 2 for memory optimization

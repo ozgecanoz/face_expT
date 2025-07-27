@@ -111,6 +111,19 @@ class FaceIDModel(nn.Module):
         
         return identity_token
     
+    def inference(self, patch_tokens, pos_embeddings):
+        """
+        Inference method for cached DINOv2 tokens
+        
+        Args:
+            patch_tokens: (B, 1369, 384) - Cached DINOv2 patch tokens
+            pos_embeddings: (B, 1369, 384) - Cached positional embeddings
+        
+        Returns:
+            identity_token: (B, 1, 384) - Identity token
+        """
+        return self.forward(patch_tokens, pos_embeddings)
+    
     def get_identity_consistency_loss(self, identity_tokens):
         """
         Compute consistency loss to ensure identity tokens are similar across frames

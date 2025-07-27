@@ -56,13 +56,21 @@ class DINOv2Tokenizer(nn.Module):
     def forward(self, x):
         """
         Args:
-            x: (B, 3, 518, 518) - Batch of face images
+            x: (B, 3, 518, 518) - Batch of face images (already normalized to [0, 1])
         
         Returns:
             patch_tokens: (B, 1369, 384) - Patch tokens only
             pos_embeddings: (B, 1369, 384) - Positional embeddings for patches
         """
         B = x.shape[0]
+        
+        # Apply ImageNet normalization
+        # ImageNet mean and std values
+        mean = torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1).to(x.device)
+        std = torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1).to(x.device)
+        
+        # Normalize: (x - mean) / std
+        x = (x - mean) / std
         
         # Get positional embeddings for patches (skip class token position)
         pos_emb = self.model.pos_embed[:, 1:, :].expand(B, -1, -1)  # (B, 1369, 384)

@@ -139,6 +139,9 @@ gsutil -m cp -r gs://face-training-datasets/CCA_train_db1/* ./dbs/CCA_train_db1/
 # Or use your multithreaded download script
 python3 batch_download_to_gcs_multithreaded.py --dataset-config CCV2_dataset_urls.json --max-workers 4
 ```
+### **2. Download the model checkpoints after training to local:** 
+gcloud compute scp trainer-cpu-vm:/mnt/dataset-storage/face_model/checkpoints/face_id_epoch_0.pth ./Documents/projects/dataset_utils/cloud_checkpoints/ --zone=us-central1-b
+
 
 ## 🎯 Training Configuration
 
@@ -211,13 +214,17 @@ free -h
 ```
 
 ### **3. TensorBoard:**
-```bash
-# Start TensorBoard
-tensorboard --logdir=/mnt/dataset-storage/face_model/logs --port=8080
-
-# Access via browser (set up port forwarding)
-gcloud compute ssh trainer-cpu-vm --zone=us-central1-b -- -L 8080:localhost:8080
-```
+�� Manual TensorBoard Setup:
+Step 1: Copy Logs from VM to Local
+Use gcloud compute scp to copy log directories
+Copy from: /mnt/dataset-storage/face_model/logs/ on VM
+Copy to: Your local machine
+Frequency: Every few epochs or when you want to check progress
+Step 2: Run TensorBoard Locally
+Start TensorBoard on your local machine
+Point to the copied log directory
+Access via: http://localhost:6006 in your browser
+Real-time updates: Refresh browser to see new data
 
 ## 💰 Cost Optimization
 
