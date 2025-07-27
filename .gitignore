@@ -94,3 +94,5 @@ dataset-uploader-key.json
 
 # Google Cloud Configuration
 gcp_config.json
+*.pth
+*.pt
