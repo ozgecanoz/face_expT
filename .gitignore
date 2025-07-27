@@ -96,3 +96,4 @@ dataset-uploader-key.json
 gcp_config.json
 *.pth
 *.pt
+cloud_checkpoints/
