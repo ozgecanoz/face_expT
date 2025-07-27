@@ -144,24 +144,34 @@ class MediaPipeFaceDetector:
         Process a frame to detect faces and extract the largest face
         
         Args:
-            frame: Input frame
+            frame: Input frame (BGR format from OpenCV)
             
         Returns:
-            Tuple of (largest_face_image, all_detected_faces)
+            Tuple of (face_image, detected_faces)
+            - face_image: Resized face image (518x518x3) or None if no face detected
+            - detected_faces: List of (x, y, width, height, confidence) tuples
         """
         # Detect faces
         detected_faces = self.detect_faces(frame)
         
         if not detected_faces:
+            self._last_cropped_face = None
             return None, detected_faces
         
-        # Find the largest face (highest area)
-        largest_face = max(detected_faces, key=lambda face: face[2] * face[3])
+        # Find the largest face (highest confidence)
+        largest_face = max(detected_faces, key=lambda x: x[4])  # Sort by confidence
         
         # Extract face region
         face_image = self.extract_face_region(frame, largest_face[:4])
         
+        # Store the last cropped face
+        self._last_cropped_face = face_image
+        
         return face_image, detected_faces
+    
+    def get_last_cropped_face(self) -> Optional[np.ndarray]:
+        """Get the last cropped face image"""
+        return getattr(self, '_last_cropped_face', None)
     
     def close(self):
         """Close MediaPipe face detection"""

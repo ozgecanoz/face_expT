@@ -17,6 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from model_loader import ModelLoader
 from face_detector import MediaPipeFaceDetector
 from token_extractor import TokenExtractor, TokenBuffer
+from webcam_demo import WebcamDemo
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -166,30 +167,24 @@ def test_token_buffer():
         return False
 
 
-def test_webcam_demo_structure():
-    """Test webcam demo structure without loading models"""
-    print("\n🧪 Testing Webcam Demo Structure...")
+def test_webcam_demo():
+    """Test webcam demo with all models"""
+    print("🧪 Testing Webcam Demo...")
     
+    # Test with dummy checkpoint paths
     try:
-        # Import the demo class
-        from webcam_demo import WebcamDemo
-        
-        # Test with dummy checkpoint paths
-        try:
-            demo = WebcamDemo(
-                face_id_checkpoint_path="dummy_face_id.pth",
-                expression_transformer_checkpoint_path="dummy_expr_trans.pth",
-                expression_predictor_checkpoint_path="dummy_expr_pred.pth",
-                device="cpu"
-            )
-            print("❌ Expected FileNotFoundError but got success")
-            return False
-        except FileNotFoundError:
-            print("✅ Correctly caught FileNotFoundError for missing checkpoints")
-            return True
-    except Exception as e:
-        print(f"❌ Webcam Demo structure test failed: {e}")
-        return False
+        demo = WebcamDemo(
+            face_id_checkpoint_path="/Users/ozgewhiting/Documents/projects/dataset_utils/cloud_checkpoints/face_id_epoch_0.pth",
+            expression_transformer_checkpoint_path="/Users/ozgewhiting/Documents/projects/dataset_utils/cloud_checkpoints/expression_transformer_epoch_5.pt",
+            expression_predictor_checkpoint_path="/Users/ozgewhiting/Documents/projects/dataset_utils/cloud_checkpoints/transformer_decoder_epoch_5.pt",
+            face_reconstruction_checkpoint_path="/Users/ozgewhiting/Documents/projects/dataset_utils/cloud_checkpoints/reconstruction_model_epoch_5.pt"
+        )
+        print("❌ Expected FileNotFoundError but got success")
+    except FileNotFoundError as e:
+        print("✅ Correctly caught FileNotFoundError for missing checkpoints")
+        print(f"Error: {e}")
+    
+    print("✅ Webcam Demo test completed!")
 
 
 def main():
@@ -201,7 +196,7 @@ def main():
         ("Face Detector", test_face_detector),
         ("Token Extractor", test_token_extractor),
         ("Token Buffer", test_token_buffer),
-        ("Webcam Demo Structure", test_webcam_demo_structure)
+        ("Webcam Demo Structure", test_webcam_demo)
     ]
     
     passed = 0
@@ -230,4 +225,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main() 
+    test_model_loader()
+    test_face_detector()
+    test_token_extractor()
+    test_webcam_demo() 

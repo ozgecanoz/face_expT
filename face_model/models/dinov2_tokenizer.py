@@ -64,22 +64,22 @@ class DINOv2Tokenizer(nn.Module):
         """
         B = x.shape[0]
         
-        # Apply ImageNet normalization
+        # Apply ImageNet normalization (COMMENTED OUT for compatibility with existing models)
         # ImageNet mean and std values
-        mean = torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1).to(x.device)
-        std = torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1).to(x.device)
+        # mean = torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1).to(x.device)
+        # std = torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1).to(x.device)
         
         # Normalize: (x - mean) / std
-        x = (x - mean) / std
+        # x = (x - mean) / std
         
         # Get positional embeddings for patches (skip class token position)
         pos_emb = self.model.pos_embed[:, 1:, :].expand(B, -1, -1)  # (B, 1369, 384)
         
-        # Use model's forward_features method to get processed tokens
+        # Use model's forward_features method to get processed tokens through all transformer layers
         with torch.no_grad():
             # This handles class token, pos embedding, and transformer blocks
             x = self.model.forward_features(x)  # (B, 1370, 384)
-        
+            
         # Extract only patch tokens (skip class token)
         patch_tokens = x[:, 1:, :]  # (B, 1369, 384)
         

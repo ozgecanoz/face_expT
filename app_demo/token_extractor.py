@@ -17,27 +17,18 @@ logger = logging.getLogger(__name__)
 
 
 class TokenExtractor:
-    """Efficiently extracts tokens from face images using cached DINOv2 tokens"""
+    """Extracts tokens from face images and predicts next expression token"""
     
-    def __init__(self, models: Dict[str, Any], tokenizer: Any, device: str = "cpu"):
-        """
-        Initialize token extractor
-        
-        Args:
-            models: Dictionary containing loaded models
-            tokenizer: DINOv2 tokenizer
-            device: Device to run models on
-        """
-        self.models = models
+    def __init__(self, face_id_model, expression_transformer, expression_predictor, face_reconstruction_model, tokenizer, device="cpu"):
+        self.face_id_model = face_id_model
+        self.expression_transformer = expression_transformer
+        self.expression_predictor = expression_predictor
+        self.face_reconstruction_model = face_reconstruction_model
         self.tokenizer = tokenizer
         self.device = device
         
-        # Extract models
-        self.face_id_model = models['face_id_model']
-        self.expression_transformer = models['expression_transformer']
-        self.expression_predictor = models['expression_predictor']
-        
-        logger.info("Token Extractor initialized")
+        # Initialize circular buffer for 30 frames
+        self.token_buffer = TokenBuffer(buffer_size=30)
     
     def extract_tokens_from_face(self, face_image: np.ndarray) -> Dict[str, torch.Tensor]:
         """
@@ -76,10 +67,10 @@ class TokenExtractor:
         expression_token = self._extract_expression_token(patch_tokens, pos_embeddings, face_id_token)
         
         return {
-            'patch_tokens': patch_tokens,
-            'pos_embeddings': pos_embeddings,
             'face_id_token': face_id_token,
-            'expression_token': expression_token
+            'expression_token': expression_token,
+            'patch_tokens': patch_tokens,
+            'pos_embeddings': pos_embeddings
         }
     
     def _extract_face_id_token(self, patch_tokens: torch.Tensor, 
@@ -137,6 +128,28 @@ class TokenExtractor:
             predicted_token = self.expression_predictor._forward_single_clip(expression_tokens)
         
         return predicted_token
+    
+    def reconstruct_face(self, face_id_token: torch.Tensor, expression_token: torch.Tensor, 
+                        patch_tokens: torch.Tensor, pos_embeddings: torch.Tensor) -> torch.Tensor:
+        """
+        Reconstruct face image from face ID and expression tokens using actual DINOv2 tokens
+        
+        Args:
+            face_id_token: (1, 1, 384) - Face ID token
+            expression_token: (1, 1, 384) - Expression token
+            patch_tokens: (1, 1369, 384) - DINOv2 patch tokens from input frame
+            pos_embeddings: (1, 1369, 384) - Positional embeddings from input frame
+            
+        Returns:
+            reconstructed_face: (1, 3, 518, 518) - Reconstructed face image
+        """
+        with torch.no_grad():
+            # Use actual DINOv2 tokens from the input frame
+            reconstructed_face = self.face_reconstruction_model(
+                patch_tokens, pos_embeddings, face_id_token, expression_token
+            )
+        
+        return reconstructed_face
     
     def process_frame_tokens(self, face_image: np.ndarray) -> Dict[str, torch.Tensor]:
         """

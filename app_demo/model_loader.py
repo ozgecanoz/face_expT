@@ -17,6 +17,7 @@ from face_model.models.dinov2_tokenizer import DINOv2Tokenizer
 from face_model.models.face_id_model import FaceIDModel
 from face_model.models.expression_transformer import ExpressionTransformer
 from face_model.models.expression_transformer_decoder import ExpressionTransformerDecoder
+from face_model.models.face_reconstruction_model import FaceReconstructionModel
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,8 @@ class ModelLoader:
     def load_all_models(self, 
                         face_id_checkpoint_path: str,
                         expression_transformer_checkpoint_path: str,
-                        expression_predictor_checkpoint_path: str) -> Dict[str, Any]:
+                        expression_predictor_checkpoint_path: str,
+                        face_reconstruction_checkpoint_path: str) -> Dict[str, Any]:
         """
         Load all models from checkpoints
         
@@ -40,6 +42,7 @@ class ModelLoader:
             face_id_checkpoint_path: Path to Face ID model checkpoint
             expression_transformer_checkpoint_path: Path to Expression Transformer checkpoint
             expression_predictor_checkpoint_path: Path to Expression Predictor checkpoint
+            face_reconstruction_checkpoint_path: Path to Face Reconstruction model checkpoint
             
         Returns:
             Dictionary containing all loaded models and tokenizer
@@ -69,13 +72,20 @@ class ModelLoader:
         self.models['expression_predictor'] = expression_predictor
         logger.info("✅ Expression Predictor loaded")
         
+        # Load Face Reconstruction model
+        logger.info("🎨 Loading Face Reconstruction model...")
+        face_reconstruction_model = self._load_face_reconstruction_model(face_reconstruction_checkpoint_path)
+        self.models['face_reconstruction'] = face_reconstruction_model
+        logger.info("✅ Face Reconstruction model loaded")
+        
         logger.info("🎉 All models loaded successfully!")
         
         return {
             'tokenizer': self.tokenizer,
             'face_id_model': face_id_model,
             'expression_transformer': expression_transformer,
-            'expression_predictor': expression_predictor
+            'expression_predictor': expression_predictor,
+            'face_reconstruction_model': face_reconstruction_model
         }
     
     def _load_face_id_model(self, checkpoint_path: str) -> FaceIDModel:
@@ -209,6 +219,49 @@ class ModelLoader:
         
         return expression_predictor
     
+    def _load_face_reconstruction_model(self, checkpoint_path: str) -> FaceReconstructionModel:
+        """Load Face Reconstruction model with architecture from checkpoint"""
+        if not os.path.exists(checkpoint_path):
+            raise FileNotFoundError(f"Face Reconstruction checkpoint not found: {checkpoint_path}")
+        
+        # Load checkpoint to get architecture
+        checkpoint = torch.load(checkpoint_path, map_location=self.device)
+        
+        # Get architecture from checkpoint config
+        if 'config' in checkpoint and 'reconstruction_model' in checkpoint['config']:
+            recon_config = checkpoint['config']['reconstruction_model']
+            embed_dim = recon_config.get('embed_dim', 384)
+            num_heads = recon_config.get('num_heads', 4)
+            num_layers = recon_config.get('num_layers', 2)
+            dropout = recon_config.get('dropout', 0.1)
+            logger.info(f"📐 Face Reconstruction architecture: {num_layers} layers, {num_heads} heads")
+        else:
+            # Fallback to default architecture
+            embed_dim, num_heads, num_layers, dropout = 384, 4, 2, 0.1
+            logger.warning("No architecture config found in Face Reconstruction checkpoint, using defaults")
+        
+        # Initialize model with correct architecture
+        face_reconstruction_model = FaceReconstructionModel(
+            embed_dim=embed_dim,
+            num_heads=num_heads,
+            num_layers=num_layers,
+            dropout=dropout
+        ).to(self.device)
+        
+        # Load state dict
+        if 'reconstruction_model_state_dict' in checkpoint:
+            face_reconstruction_model.load_state_dict(checkpoint['reconstruction_model_state_dict'])
+            logger.info(f"Loaded Face Reconstruction model from epoch {checkpoint.get('epoch', 'unknown')}")
+        else:
+            # Try loading the entire checkpoint as state dict
+            face_reconstruction_model.load_state_dict(checkpoint)
+            logger.info("Loaded Face Reconstruction model state dict directly")
+        
+        # Set to evaluation mode
+        face_reconstruction_model.eval()
+        
+        return face_reconstruction_model
+    
     def get_models(self) -> Dict[str, Any]:
         """Get all loaded models"""
         return self.models
@@ -230,7 +283,8 @@ def test_model_loader():
         models = loader.load_all_models(
             face_id_checkpoint_path="/Users/ozgewhiting/Documents/projects/dataset_utils/cloud_checkpoints/face_id_epoch_0.pth",
             expression_transformer_checkpoint_path="/Users/ozgewhiting/Documents/projects/dataset_utils/cloud_checkpoints/expression_transformer_epoch_5.pt",
-            expression_predictor_checkpoint_path="/Users/ozgewhiting/Documents/projects/dataset_utils/cloud_checkpoints/transformer_decoder_epoch_5.pt"
+            expression_predictor_checkpoint_path="/Users/ozgewhiting/Documents/projects/dataset_utils/cloud_checkpoints/transformer_decoder_epoch_5.pt",
+            face_reconstruction_checkpoint_path="/Users/ozgewhiting/Documents/projects/dataset_utils/cloud_checkpoints/reconstruction_model_epoch_5.pt"
         )
         print("❌ Expected FileNotFoundError but got success")
     except FileNotFoundError as e:

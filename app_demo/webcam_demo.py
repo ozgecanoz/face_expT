@@ -10,6 +10,8 @@ import logging
 import argparse
 import time
 from typing import Optional, Dict, Any
+import os
+import json
 
 # Import our components
 from model_loader import ModelLoader
@@ -28,6 +30,8 @@ class WebcamDemo:
                  face_id_checkpoint_path: str,
                  expression_transformer_checkpoint_path: str,
                  expression_predictor_checkpoint_path: str,
+                 face_reconstruction_checkpoint_path: str,
+                 identity_features_path: str = None,
                  device: str = "cpu",
                  confidence_threshold: float = 0.5):
         """
@@ -37,11 +41,30 @@ class WebcamDemo:
             face_id_checkpoint_path: Path to Face ID model checkpoint
             expression_transformer_checkpoint_path: Path to Expression Transformer checkpoint
             expression_predictor_checkpoint_path: Path to Expression Predictor checkpoint
+            face_reconstruction_checkpoint_path: Path to Face Reconstruction model checkpoint
+            identity_features_path: Path to JSON file with identity features (optional)
             device: Device to run models on
             confidence_threshold: Face detection confidence threshold
         """
         self.device = device
         self.confidence_threshold = confidence_threshold
+        self.identity_features_path = identity_features_path
+        
+        # Load identity features if provided
+        self.identity_features = None
+        self.first_frame_expression_token = None  # Store first frame's expression token for comparison
+        if identity_features_path is not None:
+            self.identity_features = self._load_identity_features(identity_features_path)
+            if self.identity_features is not None:
+                logger.info(f"✅ Loaded identity features from: {identity_features_path}")
+                logger.info(f"   Identity source: {self.identity_features.get('video_path', 'unknown')}")
+                logger.info(f"   Face ID token shape: {self.identity_features['face_id_token'].shape}")
+                logger.info(f"   Face ID token stats: mean={self.identity_features['face_id_token'].mean():.4f}, std={self.identity_features['face_id_token'].std():.4f}")
+            else:
+                logger.warning(f"⚠️ Failed to load identity features from: {identity_features_path}")
+                logger.warning("   Will use current frame's face ID for reconstruction")
+        else:
+            logger.info("ℹ️ No identity features provided - will use current frame's identity")
         
         # Load all models
         logger.info("🚀 Loading models...")
@@ -49,13 +72,21 @@ class WebcamDemo:
         self.models = model_loader.load_all_models(
             face_id_checkpoint_path=face_id_checkpoint_path,
             expression_transformer_checkpoint_path=expression_transformer_checkpoint_path,
-            expression_predictor_checkpoint_path=expression_predictor_checkpoint_path
+            expression_predictor_checkpoint_path=expression_predictor_checkpoint_path,
+            face_reconstruction_checkpoint_path=face_reconstruction_checkpoint_path
         )
         
         # Initialize components
         self.tokenizer = self.models['tokenizer']
         self.face_detector = MediaPipeFaceDetector(confidence_threshold=confidence_threshold)
-        self.token_extractor = TokenExtractor(self.models, self.tokenizer, device=device)
+        self.token_extractor = TokenExtractor(
+            face_id_model=self.models['face_id_model'],
+            expression_transformer=self.models['expression_transformer'],
+            expression_predictor=self.models['expression_predictor'],
+            face_reconstruction_model=self.models['face_reconstruction_model'],
+            tokenizer=self.models['tokenizer'],
+            device=self.device
+        )
         self.token_buffer = TokenBuffer(buffer_size=30)
         
         # Initialize webcam
@@ -67,6 +98,75 @@ class WebcamDemo:
         self.fps_start_time = time.time()
         
         logger.info("✅ Webcam Demo initialized successfully!")
+    
+    def _load_identity_features(self, json_path: str) -> Optional[Dict[str, Any]]:
+        """
+        Load identity features from JSON file
+        
+        Args:
+            json_path: Path to JSON file with identity features
+            
+        Returns:
+            Dictionary containing identity features or None if failed
+        """
+        try:
+            if not os.path.exists(json_path):
+                logger.error(f"Identity features file not found: {json_path}")
+                return None
+            
+            with open(json_path, 'r') as f:
+                identity_data = json.load(f)
+            
+            # Validate required fields
+            required_fields = ['face_id_token', 'patch_tokens', 'pos_embeddings']
+            for field in required_fields:
+                if field not in identity_data:
+                    logger.error(f"Missing required field '{field}' in identity features file")
+                    return None
+            
+            # Convert lists back to numpy arrays
+            identity_features = {
+                'face_id_token': np.array(identity_data['face_id_token'], dtype=np.float32),
+                'patch_tokens': np.array(identity_data['patch_tokens'], dtype=np.float32),
+                'pos_embeddings': np.array(identity_data['pos_embeddings'], dtype=np.float32),
+                'video_path': identity_data.get('video_path', 'unknown'),
+                'frame_shape': identity_data.get('frame_shape', [518, 518, 3])
+            }
+            
+            logger.info(f"✅ Loaded identity features:")
+            logger.info(f"   Face ID token shape: {identity_features['face_id_token'].shape}")
+            logger.info(f"   Patch tokens shape: {identity_features['patch_tokens'].shape}")
+            logger.info(f"   Pos embeddings shape: {identity_features['pos_embeddings'].shape}")
+            
+            return identity_features
+            
+        except Exception as e:
+            logger.error(f"Error loading identity features: {e}")
+            return None
+    
+    def _calculate_cosine_similarity(self, token1: torch.Tensor, token2: torch.Tensor) -> float:
+        """
+        Calculate cosine similarity between two tokens
+        
+        Args:
+            token1: First token tensor
+            token2: Second token tensor
+            
+        Returns:
+            Cosine similarity value (0.0 to 1.0)
+        """
+        # Ensure tokens are 1D
+        token1_flat = token1.squeeze().flatten()
+        token2_flat = token2.squeeze().flatten()
+        
+        # Calculate cosine similarity
+        cos_sim = torch.nn.functional.cosine_similarity(
+            token1_flat.unsqueeze(0), 
+            token2_flat.unsqueeze(0), 
+            dim=1
+        ).item()
+        
+        return cos_sim
     
     def start_webcam(self, camera_index: int = 0):
         """Start webcam capture"""
@@ -95,7 +195,8 @@ class WebcamDemo:
                 'face_detected': False,
                 'detected_faces': detected_faces,
                 'tokens': None,
-                'prediction': None
+                'prediction': None,
+                'reconstructed_face': None
             }
         
         # Extract tokens from face
@@ -106,8 +207,78 @@ class WebcamDemo:
                 'face_detected': True,
                 'detected_faces': detected_faces,
                 'tokens': None,
-                'prediction': None
+                'prediction': None,
+                'reconstructed_face': None
             }
+        
+        # Store first frame's expression token for comparison
+        if self.first_frame_expression_token is None and tokens.get('expression_token') is not None:
+            self.first_frame_expression_token = tokens['expression_token'].clone()
+            logger.info("📸 Stored first frame's expression token for comparison")
+            logger.info(f"   First frame expression token (first 5 values): {self.first_frame_expression_token.squeeze().cpu().numpy()[:5]}")
+        
+        # Compare current expression token with first frame's expression token
+        if self.first_frame_expression_token is not None and tokens.get('expression_token') is not None:
+            current_expr = tokens['expression_token'].squeeze()  # (384,)
+            first_expr = self.first_frame_expression_token.squeeze()  # (384,)
+            
+            # Calculate cosine similarity
+            cos_sim = torch.nn.functional.cosine_similarity(current_expr.unsqueeze(0), first_expr.unsqueeze(0), dim=1).item()
+            
+            # Store for display on frame
+            self.current_expression_similarity = cos_sim
+            
+            # Print comparison info
+            logger.info(f"🔍 Frame {self.token_buffer.get_frame_count()}:")
+            logger.info(f"   Current expression token (first 5 values): {current_expr.cpu().numpy()[:5]}")
+            logger.info(f"   First frame expression token (first 5 values): {first_expr.cpu().numpy()[:5]}")
+            logger.info(f"   Cosine similarity: {cos_sim:.4f} (1.0 = identical, 0.0 = completely different)")
+            
+            # Log if expressions are very similar (potential issue)
+            if cos_sim > 0.95:
+                logger.warning(f"⚠️ Expression tokens are very similar (cos_sim={cos_sim:.4f}) - expressions may not be changing!")
+            elif cos_sim < 0.5:
+                logger.info(f"✅ Expression tokens are significantly different (cos_sim={cos_sim:.4f})")
+        else:
+            self.current_expression_similarity = None
+        
+        # Reconstruct face from tokens
+        reconstructed_face = None
+        if tokens.get('face_id_token') is not None and tokens.get('expression_token') is not None:
+            # Get DINOv2 tokens from the token extraction
+            patch_tokens = tokens.get('patch_tokens')
+            pos_embeddings = tokens.get('pos_embeddings')
+            
+            if patch_tokens is not None and pos_embeddings is not None:
+                # Use loaded identity features if available, otherwise use current frame's
+                if self.identity_features is not None:
+                    # Use someone else's identity with current expression
+                    identity_face_id_token = torch.from_numpy(self.identity_features['face_id_token']).float().unsqueeze(0).to(self.device)
+                    identity_patch_tokens = torch.from_numpy(self.identity_features['patch_tokens']).float().unsqueeze(0).to(self.device)
+                    identity_pos_embeddings = torch.from_numpy(self.identity_features['pos_embeddings']).float().unsqueeze(0).to(self.device)
+                    
+                    # Debug: Print token statistics
+                    logger.info(f"🔍 Identity token stats: mean={identity_face_id_token.mean().item():.4f}, std={identity_face_id_token.std().item():.4f}")
+                    logger.info(f"🔍 Current expression token stats: mean={tokens['expression_token'].mean().item():.4f}, std={tokens['expression_token'].std().item():.4f}")
+                    
+                    reconstructed_face = self.token_extractor.reconstruct_face(
+                        identity_face_id_token,  # Someone else's identity
+                        tokens['expression_token'],  # Current expression
+                        identity_patch_tokens,  # Someone else's patch tokens
+                        identity_pos_embeddings  # Someone else's pos embeddings
+                    )
+                else:
+                    # Use current frame's identity and expression
+                    reconstructed_face = self.token_extractor.reconstruct_face(
+                        tokens['face_id_token'],
+                        tokens['expression_token'],
+                        patch_tokens,
+                        pos_embeddings
+                    )
+                
+                # Convert to numpy for display
+                reconstructed_face = reconstructed_face.squeeze(0).cpu().numpy()  # (3, 518, 518)
+                reconstructed_face = np.transpose(reconstructed_face, (1, 2, 0))  # (518, 518, 3)
         
         # Add tokens to buffer
         self.token_buffer.add_frame_tokens(
@@ -128,6 +299,7 @@ class WebcamDemo:
             'detected_faces': detected_faces,
             'tokens': tokens,
             'prediction': prediction,
+            'reconstructed_face': reconstructed_face,
             'frame_count': self.token_buffer.get_frame_count()
         }
     
@@ -168,31 +340,93 @@ class WebcamDemo:
             cv2.putText(frame, "PREDICTION READY", (10, 90), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
         elif results.get('face_detected', False):
-            cv2.putText(frame, "COLLECTING FRAMES", (10, 90), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+            cv2.putText(frame, "FACE DETECTED", (10, 90), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
+        
+        # Draw identity source info
+        if self.identity_features is not None:
+            identity_source = os.path.basename(self.identity_features.get('video_path', 'unknown'))
+            cv2.putText(frame, f"ID: {identity_source}", (10, 120), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+            cv2.putText(frame, "RECONSTRUCTING WITH LOADED IDENTITY", (10, 150), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
         else:
-            cv2.putText(frame, "NO FACE DETECTED", (10, 90), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+            cv2.putText(frame, "RECONSTRUCTING WITH CURRENT IDENTITY", (10, 120), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+        
+        # Draw expression similarity if available
+        if hasattr(self, 'current_expression_similarity') and self.current_expression_similarity is not None:
+            similarity_text = f"Expression similarity to first: {self.current_expression_similarity:.3f}"
+            cv2.putText(frame, similarity_text, (10, 180), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
         
         return frame
     
     def print_token_info(self, results: Dict[str, Any]):
         """Print token information to console"""
-        if results.get('tokens') is not None:
-            tokens = results['tokens']
+        if results is None or 'tokens' not in results:
+            return
+        
+        tokens = results['tokens']
+        frame_num = results.get('frame_num', 0)
+        
+        # Print token statistics
+        face_id_token = tokens.get('face_id_token')
+        expression_token = tokens.get('expression_token')
+        predicted_token = tokens.get('predicted_token')
+        
+        if face_id_token is not None:
+            face_id_stats = f"mean={face_id_token.mean().item():.4f}, std={face_id_token.std().item():.4f}"
+            print(f"📊 Frame {frame_num}:")
+            print(f"   Face ID Token: {face_id_stats}")
+        
+        if expression_token is not None:
+            expr_stats = f"mean={expression_token.mean().item():.4f}, std={expression_token.std().item():.4f}"
+            print(f"   Expression Token: {expr_stats}")
+        
+        if predicted_token is not None:
+            pred_stats = f"mean={predicted_token.mean().item():.4f}, std={predicted_token.std().item():.4f}"
+            print(f"   🔮 Prediction: {pred_stats}")
+    
+    def display_face_comparison(self, original_face: np.ndarray, reconstructed_face: np.ndarray) -> np.ndarray:
+        """
+        Display original and reconstructed faces side by side
+        
+        Args:
+            original_face: Original cropped face image (518x518x3)
+            reconstructed_face: Reconstructed face image (518x518x3)
             
-            # Print token statistics
-            face_id_token = tokens['face_id_token']
-            expression_token = tokens['expression_token']
-            
-            print(f"\n📊 Frame {results.get('frame_count', 0)}:")
-            print(f"   Face ID Token: mean={face_id_token.mean().item():.4f}, std={face_id_token.std().item():.4f}")
-            print(f"   Expression Token: mean={expression_token.mean().item():.4f}, std={expression_token.std().item():.4f}")
-            
-            # Print prediction if available
-            if results.get('prediction') is not None:
-                prediction = results['prediction']
-                print(f"   🔮 Prediction: mean={prediction.mean().item():.4f}, std={prediction.std().item():.4f}")
+        Returns:
+            Combined display image
+        """
+        # Ensure both images are in the same format
+        if original_face.dtype != np.uint8:
+            original_face = (original_face * 255).astype(np.uint8)
+        
+        if reconstructed_face.dtype != np.uint8:
+            reconstructed_face = (reconstructed_face * 255).astype(np.uint8)
+        
+        # Resize both images to a reasonable display size
+        display_size = (400, 400)
+        original_resized = cv2.resize(original_face, display_size)
+        reconstructed_resized = cv2.resize(reconstructed_face, display_size)
+        
+        # Create side-by-side display
+        combined_image = np.hstack([original_resized, reconstructed_resized])
+        
+        # Add labels
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 1
+        thickness = 2
+        color = (255, 255, 255)  # White text
+        
+        # Add "Original" label
+        cv2.putText(combined_image, "Original", (50, 50), font, font_scale, color, thickness)
+        
+        # Add "Reconstructed" label
+        cv2.putText(combined_image, "Reconstructed", (450, 50), font, font_scale, color, thickness)
+        
+        return combined_image
     
     def run(self, camera_index: int = 0, print_tokens: bool = True):
         """
@@ -224,6 +458,17 @@ class WebcamDemo:
                 
                 # Display frame
                 cv2.imshow('Webcam Demo', frame)
+                
+                # Display face comparison if reconstruction is available
+                if results.get('reconstructed_face') is not None and results.get('face_detected', False):
+                    # Get the original face image from the detector
+                    original_face = self.face_detector.get_last_cropped_face()
+                    if original_face is not None:
+                        comparison_image = self.display_face_comparison(
+                            original_face, 
+                            results['reconstructed_face']
+                        )
+                        cv2.imshow('Face Comparison', comparison_image)
                 
                 # Print token information if requested
                 if print_tokens and results.get('tokens') is not None:
@@ -266,6 +511,10 @@ def main():
                        help="Path to Expression Transformer checkpoint")
     parser.add_argument("--expression_predictor_checkpoint", type=str, required=True,
                        help="Path to Expression Predictor checkpoint")
+    parser.add_argument("--face_reconstruction_checkpoint", type=str, required=True,
+                       help="Path to Face Reconstruction model checkpoint")
+    parser.add_argument("--identity_features", type=str, default=None,
+                       help="Path to JSON file with identity features (optional)")
     parser.add_argument("--device", type=str, default="cpu",
                        help="Device to run models on (cpu/cuda)")
     parser.add_argument("--camera", type=int, default=0,
@@ -282,6 +531,8 @@ def main():
         face_id_checkpoint_path=args.face_id_checkpoint,
         expression_transformer_checkpoint_path=args.expression_transformer_checkpoint,
         expression_predictor_checkpoint_path=args.expression_predictor_checkpoint,
+        face_reconstruction_checkpoint_path=args.face_reconstruction_checkpoint,
+        identity_features_path=args.identity_features,
         device=args.device,
         confidence_threshold=args.confidence
     )
