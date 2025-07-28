@@ -21,13 +21,14 @@ class ExpressionTransformer(nn.Module):
     while K,V context remains fixed and doesn't get updated.
     """
     
-    def __init__(self, embed_dim=384, num_heads=8, num_layers=2, dropout=0.1, max_subjects=100000):
+    def __init__(self, embed_dim=384, num_heads=8, num_layers=2, dropout=0.1, max_subjects=3500):
         super().__init__()
         self.embed_dim = embed_dim
         self.num_heads = num_heads
         self.max_subjects = max_subjects
         
         # Learnable subject embeddings (replaces face ID model)
+        # Typical usage: 100-1000 subjects for academic datasets, 1000-10000 for commercial
         self.subject_embeddings = nn.Embedding(max_subjects, embed_dim)
         
         # Expression query initialization (learnable)
