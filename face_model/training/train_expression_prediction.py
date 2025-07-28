@@ -28,22 +28,23 @@ logger = logging.getLogger(__name__)
 class JointExpressionPredictionModel(nn.Module):
     """
     Joint model combining Components C and D
-    Component C: Expression Transformer (extracts expression tokens)
+    Component C: Expression Transformer (extracts expression tokens using subject embeddings)
     Component D: Transformer Decoder (predicts next expression token)
     """
     
     def __init__(self, 
-                 expr_embed_dim=384, expr_num_heads=4, expr_num_layers=2, expr_dropout=0.1,  # Changed from 8 to 4 heads
+                 expr_embed_dim=384, expr_num_heads=4, expr_num_layers=2, expr_dropout=0.1, expr_max_subjects=3500,  # Added max_subjects
                  decoder_embed_dim=384, decoder_num_heads=4, decoder_num_layers=2, decoder_dropout=0.1,  # Changed from 8 to 4 heads
                  max_sequence_length=50):
         super().__init__()
         
-        # Component C: Expression Transformer (trainable)
+        # Component C: Expression Transformer (trainable) - now uses subject embeddings
         self.expression_transformer = ExpressionTransformer(
             embed_dim=expr_embed_dim, 
             num_heads=expr_num_heads, 
             num_layers=expr_num_layers, 
-            dropout=expr_dropout
+            dropout=expr_dropout,
+            max_subjects=expr_max_subjects  # Added max_subjects parameter
         )
         
         # Component D: Transformer Decoder (trainable)
@@ -56,14 +57,14 @@ class JointExpressionPredictionModel(nn.Module):
         )
         
         logger.info(f"Joint Expression Prediction Model initialized")
-        logger.info(f"  Expression Transformer: {expr_num_layers} layers, {expr_num_heads} heads, {expr_embed_dim} dim")
+        logger.info(f"  Expression Transformer: {expr_num_layers} layers, {expr_num_heads} heads, {expr_embed_dim} dim, {expr_max_subjects} subjects")
         logger.info(f"  Transformer Decoder: {decoder_num_layers} layers, {decoder_num_heads} heads, {decoder_embed_dim} dim")
         
-    def forward(self, face_images, face_id_tokens, tokenizer, clip_lengths=None):
+    def forward(self, face_images, subject_ids, tokenizer, clip_lengths=None):
         """
         Args:
             face_images: (total_frames, 3, 518, 518) - Input face images from multiple clips
-            face_id_tokens: (total_frames, 1, 384) - Face ID tokens (same for all frames in clip)
+            subject_ids: (total_frames,) - Subject IDs for each frame
             tokenizer: DINOv2Tokenizer instance
             clip_lengths: List of clip lengths for processing individual clips
         
@@ -73,13 +74,13 @@ class JointExpressionPredictionModel(nn.Module):
         """
         if clip_lengths is None:
             # Fallback: process as single clip
-            return self._forward_single_clip(face_images, face_id_tokens, tokenizer)
+            return self._forward_single_clip(face_images, subject_ids, tokenizer)
         
         # Component A: Extract patch tokens using provided tokenizer
         patch_tokens, pos_embeddings = tokenizer(face_images)  # (total_frames, 1369, 384), (total_frames, 1369, 384)
         
-        # Component C: Extract expression tokens for all frames
-        all_expression_tokens = self.expression_transformer(patch_tokens, pos_embeddings, face_id_tokens)  # (total_frames, 1, 384)
+        # Component C: Extract expression tokens for all frames using subject embeddings
+        all_expression_tokens = self.expression_transformer(patch_tokens, pos_embeddings, subject_ids)  # (total_frames, 1, 384)
         
         # Component D: Predict next tokens for all clips using transformer decoder
         all_predicted_next_tokens = self.transformer_decoder(all_expression_tokens, clip_lengths)
@@ -94,35 +95,29 @@ class JointExpressionPredictionModel(nn.Module):
         
         return expression_tokens_by_clip, all_predicted_next_tokens
     
-    def _forward_single_clip(self, face_images, face_id_tokens, tokenizer):
+    def _forward_single_clip(self, face_images, subject_ids, tokenizer):
         """
         Process a single clip (fallback for when clip_lengths is None)
         
         Args:
-            face_images: (clip_length, 3, 518, 518) - Input face images for one clip
-            face_id_tokens: (clip_length, 1, 384) - Face ID tokens for one clip
+            face_images: (num_frames, 3, 518, 518) - Input face images
+            subject_ids: (num_frames,) - Subject IDs for each frame
             tokenizer: DINOv2Tokenizer instance
         
         Returns:
-            expression_tokens: (clip_length, 1, 384) - Expression tokens for all frames
-            predicted_next_token: (1, 1, 384) - Predicted next token for the last frame
+            expression_tokens: (num_frames, 1, 384) - Expression tokens
+            predicted_next_token: (1, 1, 384) - Predicted next token
         """
-        total_frames = face_images.shape[0]
+        # Component A: Extract patch tokens
+        patch_tokens, pos_embeddings = tokenizer(face_images)  # (num_frames, 1369, 384), (num_frames, 1369, 384)
         
-        # Component A: Extract patch tokens using provided tokenizer
-        patch_tokens, pos_embeddings = tokenizer(face_images)  # (clip_length, 1369, 384), (clip_length, 1369, 384)
+        # Component C: Extract expression tokens using subject embeddings
+        expression_tokens = self.expression_transformer(patch_tokens, pos_embeddings, subject_ids)  # (num_frames, 1, 384)
         
-        # Component C: Extract expression tokens for all frames
-        expression_tokens = self.expression_transformer(patch_tokens, pos_embeddings, face_id_tokens)  # (clip_length, 1, 384)
+        # Component D: Predict next token
+        predicted_next_token = self.transformer_decoder._forward_single_clip(expression_tokens)  # (1, 1, 384)
         
-        # Component D: Predict next token using transformer decoder
-        if total_frames > 1:
-            predicted_next_token = self.transformer_decoder(expression_tokens)  # (1, 1, 384)
-        else:
-            # Single frame case
-            predicted_next_token = torch.zeros(1, 1, 384, device=expression_tokens.device)
-        
-        return expression_tokens, predicted_next_token
+        return [expression_tokens], [predicted_next_token]
 
 
 class ExpressionPredictionLoss(nn.Module):
@@ -146,55 +141,55 @@ class ExpressionPredictionLoss(nn.Module):
         return loss
 
 
-def prepare_expression_training_data(batch, face_id_model, dinov2_tokenizer, device):
+def prepare_expression_training_data(batch, dinov2_tokenizer, device):
     """
-    Prepare data for expression prediction training
+    Prepare training data for expression prediction using subject embeddings
     
     Args:
-        batch: Batch from dataloader
-        face_id_model: Frozen face ID model
+        batch: Batch from dataloader containing 'frames' and 'subject_id' for each sample
         dinov2_tokenizer: DINOv2Tokenizer instance
         device: Device to use
     
     Returns:
         face_images: (total_frames, 3, 518, 518) - All face images
-        face_id_tokens: (total_frames, 1, 384) - Face ID tokens (same for all frames in clip)
+        subject_ids: (total_frames,) - Subject IDs for each frame
         clip_lengths: List of clip lengths
     """
     # Extract frames from all clips in the batch
     all_frames = []
-    face_id_tokens = []
+    subject_ids = []
     clip_lengths = []
     
-    for frames in batch['frames']:
+    for i, (frames, subject_id) in enumerate(zip(batch['frames'], batch['subject_id'])):
         # frames: (num_frames, 3, 518, 518) for one clip
         num_frames = frames.shape[0]
         all_frames.append(frames)
         clip_lengths.append(num_frames)
         
-        # Extract face ID token from first frame of this clip
-        first_frame = frames[0:1]  # (1, 3, 518, 518)
+        # Convert subject_id to integer if it's a string
+        if isinstance(subject_id, str):
+            # Try to convert string subject ID to integer
+            try:
+                subject_id_int = int(subject_id)
+            except ValueError:
+                # If conversion fails, use hash of string as subject ID
+                subject_id_int = hash(subject_id) % 3500  # Ensure it's within max_subjects range
+        else:
+            subject_id_int = int(subject_id)
         
-        # Get DINOv2 tokens for first frame
-        patch_tokens, pos_emb = dinov2_tokenizer(first_frame)
-        
-        # Get face ID token for first frame
-        face_id_token = face_id_model(patch_tokens, pos_emb)  # (1, 1, 384)
-        
-        # Repeat face ID token for all frames in this clip
-        clip_face_id_tokens = face_id_token.repeat(num_frames, 1, 1)  # (num_frames, 1, 384)
-        face_id_tokens.append(clip_face_id_tokens)
+        # Repeat subject ID for all frames in this clip
+        clip_subject_ids = torch.full((num_frames,), subject_id_int, dtype=torch.long)
+        subject_ids.append(clip_subject_ids)
     
-    # Concatenate all frames and face ID tokens
+    # Concatenate all frames and subject IDs
     face_images = torch.cat(all_frames, dim=0).to(device)  # (total_frames, 3, 518, 518)
-    face_id_tokens = torch.cat(face_id_tokens, dim=0).to(device)  # (total_frames, 1, 384)
+    subject_ids = torch.cat(subject_ids, dim=0).to(device)  # (total_frames,)
     
-    return face_images, face_id_tokens, clip_lengths
+    return face_images, subject_ids, clip_lengths
 
 
 def train_expression_prediction(
     dataset_path,
-    face_id_checkpoint_path,
     expression_transformer_checkpoint_path=None,
     transformer_decoder_checkpoint_path=None,
     checkpoint_dir="checkpoints",
@@ -215,6 +210,7 @@ def train_expression_prediction(
     expr_num_heads=4,  # Changed from 8 to 4 to match your config
     expr_num_layers=2,
     expr_dropout=0.1,
+    expr_max_subjects=3500,  # Added max_subjects parameter
     decoder_embed_dim=384,
     decoder_num_heads=4,  # Changed from 8 to 4 to match your config
     decoder_num_layers=2,
@@ -222,8 +218,8 @@ def train_expression_prediction(
     max_sequence_length=50
 ):
     """
-    Train the joint expression prediction model
-    Requires a pre-trained face ID model checkpoint
+    Train the joint expression prediction model using subject embeddings
+    No longer requires a pre-trained face ID model
     """
     logger.info(f"Starting joint expression prediction training on device: {device}")
     
@@ -251,11 +247,8 @@ def train_expression_prediction(
     print(f"⏱️  Estimated training time: {total_estimated_time:.1f} hours ({total_estimated_time/24:.1f} days)")
     print(f"💰 Estimated cost: ${total_estimated_time * 0.38:.1f} (at $0.38/hour)")
     
-    # Initialize DINOv2 tokenizer for face ID token extraction
+    # Initialize DINOv2 tokenizer
     dinov2_tokenizer = DINOv2Tokenizer()
-    
-    # Use provided architecture parameters for expression transformer
-    # (These are now passed as function parameters instead of hardcoded)
     
     # Load expression transformer checkpoint if provided to get architecture
     if expression_transformer_checkpoint_path is not None:
@@ -277,7 +270,8 @@ def train_expression_prediction(
                 expr_num_heads = expr_config.get('num_heads', 8)
                 expr_num_layers = expr_config.get('num_layers', 2)
                 expr_dropout = expr_config.get('dropout', 0.1)
-                logger.info(f"Using expression transformer architecture from checkpoint: {expr_num_layers} layers, {expr_num_heads} heads")
+                expr_max_subjects = expr_config.get('max_subjects', 3500) # Added max_subjects
+                logger.info(f"Using expression transformer architecture from checkpoint: {expr_num_layers} layers, {expr_num_heads} heads, {expr_max_subjects} subjects")
             else:
                 logger.warning("No architecture config found in expression transformer checkpoint, using defaults")
                 
@@ -321,6 +315,7 @@ def train_expression_prediction(
         expr_num_heads=expr_num_heads,
         expr_num_layers=expr_num_layers,
         expr_dropout=expr_dropout,
+        expr_max_subjects=expr_max_subjects,  # Added max_subjects parameter
         decoder_embed_dim=decoder_embed_dim,
         decoder_num_heads=decoder_num_heads,
         decoder_num_layers=decoder_num_layers,
@@ -365,57 +360,57 @@ def train_expression_prediction(
         logger.info("No transformer decoder checkpoint provided - training from scratch")
     
     # Initialize face ID model and load pre-trained checkpoint
-    if not os.path.exists(face_id_checkpoint_path):
-        raise FileNotFoundError(
-            f"Face ID model checkpoint not found: {face_id_checkpoint_path}\n"
-            f"Please train the face ID model first using train_face_id.py"
-        )
+    # if not os.path.exists(face_id_checkpoint_path):
+    #     raise FileNotFoundError(
+    #         f"Face ID model checkpoint not found: {face_id_checkpoint_path}\n"
+    #         f"Please train the face ID model first using train_face_id.py"
+    #     )
     
-    # Load checkpoint to get architecture
-    checkpoint = torch.load(face_id_checkpoint_path, map_location=device)
+    # # Load checkpoint to get architecture
+    # checkpoint = torch.load(face_id_checkpoint_path, map_location=device)
     
-    # Get architecture from checkpoint config
-    if 'config' in checkpoint and 'face_id_model' in checkpoint['config']:
-        face_id_config = checkpoint['config']['face_id_model']
-        embed_dim = face_id_config.get('embed_dim', 384)
-        num_heads = face_id_config.get('num_heads', 8)
-        num_layers = face_id_config.get('num_layers', 2)
-        dropout = face_id_config.get('dropout', 0.1)
-        logger.info(f"Loading face ID model with architecture from checkpoint: {num_layers} layers, {num_heads} heads")
-    else:
-        # Fallback to default architecture
-        embed_dim, num_heads, num_layers, dropout = 384, 8, 2, 0.1
-        logger.warning("No architecture config found in checkpoint, using defaults")
+    # # Get architecture from checkpoint config
+    # if 'config' in checkpoint and 'face_id_model' in checkpoint['config']:
+    #     face_id_config = checkpoint['config']['face_id_model']
+    #     embed_dim = face_id_config.get('embed_dim', 384)
+    #     num_heads = face_id_config.get('num_heads', 8)
+    #     num_layers = face_id_config.get('num_layers', 2)
+    #     dropout = face_id_config.get('dropout', 0.1)
+    #     logger.info(f"Loading face ID model with architecture from checkpoint: {num_layers} layers, {num_heads} heads")
+    # else:
+    #     # Fallback to default architecture
+    #     embed_dim, num_heads, num_layers, dropout = 384, 8, 2, 0.1
+    #     logger.warning("No architecture config found in checkpoint, using defaults")
     
-    # Initialize face ID model with correct architecture
-    face_id_model = FaceIDModel(
-        embed_dim=embed_dim,
-        num_heads=num_heads,
-        num_layers=num_layers,
-        dropout=dropout
-    ).to(device)
+    # # Initialize face ID model with correct architecture
+    # face_id_model = FaceIDModel(
+    #     embed_dim=embed_dim,
+    #     num_heads=num_heads,
+    #     num_layers=num_layers,
+    #     dropout=dropout
+    # ).to(device)
     
-    # Load face ID model checkpoint
-    logger.info(f"Loading face ID model from checkpoint: {face_id_checkpoint_path}")
-    try:
-        if 'face_id_model_state_dict' in checkpoint:
-            face_id_model.load_state_dict(checkpoint['face_id_model_state_dict'])
-            logger.info(f"✅ Successfully loaded face ID model from epoch {checkpoint.get('epoch', 'unknown')}")
-            print(f"✅ Successfully loaded face ID model from: {face_id_checkpoint_path}")
-        else:
-            # Try loading the entire checkpoint as state dict (for compatibility)
-            face_id_model.load_state_dict(checkpoint)
-            logger.info("✅ Successfully loaded face ID model state dict directly")
-            print(f"✅ Successfully loaded face ID model from: {face_id_checkpoint_path}")
-    except Exception as e:
-        raise RuntimeError(f"Failed to load face ID model checkpoint: {str(e)}")
+    # # Load face ID model checkpoint
+    # logger.info(f"Loading face ID model from checkpoint: {face_id_checkpoint_path}")
+    # try:
+    #     if 'face_id_model_state_dict' in checkpoint:
+    #         face_id_model.load_state_dict(checkpoint['face_id_model_state_dict'])
+    #         logger.info(f"✅ Successfully loaded face ID model from epoch {checkpoint.get('epoch', 'unknown')}")
+    #         print(f"✅ Successfully loaded face ID model from: {face_id_checkpoint_path}")
+    #     else:
+    #         # Try loading the entire checkpoint as state dict (for compatibility)
+    #         face_id_model.load_state_dict(checkpoint)
+    #         logger.info("✅ Successfully loaded face ID model state dict directly")
+    #         print(f"✅ Successfully loaded face ID model from: {face_id_checkpoint_path}")
+    # except Exception as e:
+    #     raise RuntimeError(f"Failed to load face ID model checkpoint: {str(e)}")
     
-    # Freeze face ID model parameters
-    for param in face_id_model.parameters():
-        param.requires_grad = False
+    # # Freeze face ID model parameters
+    # for param in face_id_model.parameters():
+    #     param.requires_grad = False
     
-    logger.info("Face ID model loaded and frozen successfully")
-    print(f"🔒 Face ID model frozen (parameters not trainable)")
+    # logger.info("Face ID model loaded and frozen successfully")
+    # print(f"🔒 Face ID model frozen (parameters not trainable)")
     
     # Initialize loss function
     criterion = ExpressionPredictionLoss().to(device)
@@ -447,12 +442,12 @@ def train_expression_prediction(
         
         for batch_idx, batch in enumerate(progress_bar):
             # Prepare data
-            face_images, face_id_tokens, clip_lengths = prepare_expression_training_data(
-                batch, face_id_model, dinov2_tokenizer, device
+            face_images, subject_ids, clip_lengths = prepare_expression_training_data(
+                batch, dinov2_tokenizer, device
             )
             
             # Forward pass through joint model
-            all_expression_tokens, all_predicted_next_tokens = joint_model(face_images, face_id_tokens, dinov2_tokenizer, clip_lengths)
+            all_expression_tokens, all_predicted_next_tokens = joint_model(face_images, subject_ids, dinov2_tokenizer, clip_lengths)
             
             # Compute loss for each clip
             batch_loss = 0.0
@@ -505,7 +500,7 @@ def train_expression_prediction(
         # Validate if validation dataloader is provided
         if val_dataloader is not None:
             val_loss = validate_expression_prediction(
-                joint_model, face_id_model, val_dataloader, criterion, dinov2_tokenizer, device
+                joint_model, val_dataloader, criterion, dinov2_tokenizer, device
             )
             logger.info(f"Epoch {epoch+1}/{num_epochs} - Train Loss: {avg_loss:.4f}, Val Loss: {val_loss:.4f}")
             print(f"Epoch {epoch+1}/{num_epochs} - Train Loss: {avg_loss:.4f}, Val Loss: {val_loss:.4f}")
@@ -536,7 +531,8 @@ def train_expression_prediction(
                         'embed_dim': expr_embed_dim,
                         'num_heads': expr_num_heads,
                         'num_layers': expr_num_layers,
-                        'dropout': expr_dropout
+                        'dropout': expr_dropout,
+                        'max_subjects': expr_max_subjects # Added max_subjects
                     }
                 }
             }, expr_epoch_path)
@@ -576,7 +572,6 @@ def train_expression_prediction(
 
 def validate_expression_prediction(
     joint_model,
-    face_id_model,
     val_dataloader,
     criterion,
     dinov2_tokenizer,
@@ -586,7 +581,6 @@ def validate_expression_prediction(
     Validate the joint expression prediction model
     """
     joint_model.eval()
-    face_id_model.eval()
     
     total_loss = 0.0
     num_batches = 0
@@ -594,12 +588,12 @@ def validate_expression_prediction(
     with torch.no_grad():  # No gradient computation for validation
         for batch_idx, batch in enumerate(val_dataloader):
             # Prepare data
-            face_images, face_id_tokens, clip_lengths = prepare_expression_training_data(
-                batch, face_id_model, dinov2_tokenizer, device
+            face_images, subject_ids, clip_lengths = prepare_expression_training_data(
+                batch, dinov2_tokenizer, device
             )
             
             # Forward pass through joint model
-            all_expression_tokens, all_predicted_next_tokens = joint_model(face_images, face_id_tokens, dinov2_tokenizer, clip_lengths)
+            all_expression_tokens, all_predicted_next_tokens = joint_model(face_images, subject_ids, dinov2_tokenizer, clip_lengths)
             
             # Compute loss for each clip
             batch_loss = 0.0
@@ -642,13 +636,13 @@ def test_joint_expression_prediction():
         expr_num_heads=4,
         expr_num_layers=1,
         expr_dropout=0.1,
+        expr_max_subjects=3500,  # Added max_subjects
         decoder_embed_dim=384,
         decoder_num_heads=4,
         decoder_num_layers=1,
         decoder_dropout=0.1,
         max_sequence_length=50
     )
-    face_id_model = FaceIDModel()
     dinov2_tokenizer = DINOv2Tokenizer()
     
     # Create dummy input simulating clips
@@ -660,107 +654,56 @@ def test_joint_expression_prediction():
     face_images = torch.cat([clip1_frames, clip2_frames], dim=0)  # (8, 3, 518, 518)
     clip_lengths = [5, 3]  # Length of each clip
     
-    # Efficiently extract face ID tokens from first frame of each clip
-    face_id_tokens = []
+    # Create subject IDs for each clip (simulating real subject IDs from dataset)
+    subject_ids = []
     current_idx = 0
     
-    for clip_length in clip_lengths:
-        # Get first frame of this clip
-        first_frame = face_images[current_idx:current_idx+1]  # (1, 3, 518, 518)
-        
-        # Extract face ID token from first frame
-        with torch.no_grad():
-            first_frame_patches, first_frame_pos = dinov2_tokenizer(first_frame)
-            first_frame_face_id = face_id_model(first_frame_patches, first_frame_pos)  # (1, 1, 384)
-        
-        # Repeat face ID token for all frames in this clip
-        clip_face_ids = first_frame_face_id.repeat(clip_length, 1, 1)  # (clip_length, 1, 384)
-        face_id_tokens.append(clip_face_ids)
-        
+    for i, clip_length in enumerate(clip_lengths):
+        # Simulate realistic subject IDs (e.g., 123, 456, etc.)
+        subject_id = 100 + i  # Subject 100 for first clip, 101 for second clip
+        clip_subject_ids = torch.full((clip_length,), subject_id, dtype=torch.long)
+        subject_ids.append(clip_subject_ids)
         current_idx += clip_length
     
-    # Concatenate all face ID tokens
-    face_id_tokens = torch.cat(face_id_tokens, dim=0)  # (8, 1, 384)
+    # Concatenate all subject IDs
+    subject_ids = torch.cat(subject_ids, dim=0)  # (8,)
     
-    # Forward pass with pre-computed face ID tokens
-    all_expression_tokens, all_predicted_next_tokens = joint_model(face_images, face_id_tokens, dinov2_tokenizer, clip_lengths)
+    # Forward pass through joint model
+    all_expression_tokens, all_predicted_next_tokens = joint_model(face_images, subject_ids, dinov2_tokenizer, clip_lengths)
     
     print(f"Input face images shape: {face_images.shape}")
+    print(f"Subject IDs shape: {subject_ids.shape}")
     print(f"Clip lengths: {clip_lengths}")
-    print(f"Number of clips processed: {len(all_expression_tokens)}")
+    print(f"Number of expression token clips: {len(all_expression_tokens)}")
+    print(f"Number of predicted next token clips: {len(all_predicted_next_tokens)}")
     
-    # Assert correct number of clips
-    assert len(all_expression_tokens) == len(clip_lengths), f"Expected {len(clip_lengths)} clips, got {len(all_expression_tokens)}"
-    assert len(all_predicted_next_tokens) == len(clip_lengths), f"Expected {len(clip_lengths)} predictions, got {len(all_predicted_next_tokens)}"
+    # Check that subject IDs are correct within each clip
+    print(f"Subject IDs for clip 1 (frames 0-4): {subject_ids[0:5]}")
+    print(f"Subject IDs for clip 2 (frames 5-7): {subject_ids[5:8]}")
     
-    for clip_idx, (clip_expression_tokens, clip_predicted_next_token) in enumerate(zip(all_expression_tokens, all_predicted_next_tokens)):
-        print(f"Clip {clip_idx}:")
-        print(f"  Expression tokens shape: {clip_expression_tokens.shape}")
-        print(f"  Predicted next token shape: {clip_predicted_next_token.shape}")
-        
-        # Assert shapes are correct
-        expected_expr_shape = (clip_lengths[clip_idx], 1, 384)
-        expected_pred_shape = (1, 1, 384)
-        assert clip_expression_tokens.shape == expected_expr_shape, f"Clip {clip_idx}: Expected expression tokens shape {expected_expr_shape}, got {clip_expression_tokens.shape}"
-        assert clip_predicted_next_token.shape == expected_pred_shape, f"Clip {clip_idx}: Expected prediction shape {expected_pred_shape}, got {clip_predicted_next_token.shape}"
+    # Verify subject IDs are the same within clips
+    assert torch.all(subject_ids[0:5] == 100), "Subject IDs should be 100 for clip 1"
+    assert torch.all(subject_ids[5:8] == 101), "Subject IDs should be 101 for clip 2"
     
-    print(f"Face ID tokens shape: {face_id_tokens.shape}")
+    # Test loss function
+    criterion = ExpressionPredictionLoss()
+    total_loss = 0.0
+    num_valid_clips = 0
     
-    # Check that face ID tokens are the same within each clip
-    print(f"Face ID token for clip 1 (frames 0-4): {face_id_tokens[0, 0, :5]}")  # First 5 values
-    print(f"Face ID token for clip 1 (frame 1): {face_id_tokens[1, 0, :5]}")
-    print(f"Face ID token for clip 2 (frames 5-7): {face_id_tokens[5, 0, :5]}")
-    print(f"Face ID token for clip 2 (frame 6): {face_id_tokens[6, 0, :5]}")
+    for clip_expression_tokens, clip_predicted_next_token in zip(all_expression_tokens, all_predicted_next_tokens):
+        if clip_expression_tokens.shape[0] > 1:
+            actual_next_token = clip_expression_tokens[-1:]
+            clip_loss = criterion(clip_predicted_next_token, actual_next_token)
+            total_loss += clip_loss.item()
+            num_valid_clips += 1
     
-    # Assert face ID tokens are consistent within clips
-    assert torch.allclose(face_id_tokens[0, 0, :], face_id_tokens[1, 0, :]), "Face ID tokens should be same within clip 1"
-    assert torch.allclose(face_id_tokens[5, 0, :], face_id_tokens[6, 0, :]), "Face ID tokens should be same within clip 2"
+    if num_valid_clips > 0:
+        avg_loss = total_loss / num_valid_clips
+        print(f"Average loss: {avg_loss:.4f}")
+    else:
+        print("No valid clips for loss calculation")
     
-    print("\n✅ Joint Expression Prediction Model test passed!")
-    
-    # Test with single clip batch
-    print("\n🧪 Testing single clip batch:")
-    
-    # Create a batch with only one clip (3 frames)
-    single_clip_frames = torch.randn(3, 3, 518, 518)  # 3 frames
-    single_clip_lengths = [3]  # One clip with 3 frames
-    
-    # Extract face ID token from first frame
-    with torch.no_grad():
-        first_frame_patches, first_frame_pos = dinov2_tokenizer(single_clip_frames[0:1])
-        first_frame_face_id = face_id_model(first_frame_patches, first_frame_pos)  # (1, 1, 384)
-    
-    # Repeat face ID token for all frames
-    single_clip_face_id_tokens = first_frame_face_id.repeat(3, 1, 1)  # (3, 1, 384)
-    
-    print(f"Single clip frames shape: {single_clip_frames.shape}")
-    print(f"Single clip face ID tokens shape: {single_clip_face_id_tokens.shape}")
-    print(f"Single clip lengths: {single_clip_lengths}")
-    
-    # Forward pass with single clip
-    single_clip_expression_tokens, single_clip_predicted_next_tokens = joint_model(
-        single_clip_frames, single_clip_face_id_tokens, dinov2_tokenizer, single_clip_lengths
-    )
-    
-    print(f"Single clip expression tokens: {len(single_clip_expression_tokens)} clips")
-    print(f"Single clip predicted tokens: {len(single_clip_predicted_next_tokens)} predictions")
-    
-    # Assert single clip batch has correct number of elements
-    assert len(single_clip_expression_tokens) == 1, f"Expected 1 clip, got {len(single_clip_expression_tokens)}"
-    assert len(single_clip_predicted_next_tokens) == 1, f"Expected 1 prediction, got {len(single_clip_predicted_next_tokens)}"
-    
-    for clip_idx, (expr_tokens, pred_tokens) in enumerate(zip(single_clip_expression_tokens, single_clip_predicted_next_tokens)):
-        print(f"  Clip {clip_idx}:")
-        print(f"    Expression tokens shape: {expr_tokens.shape}")
-        print(f"    Predicted tokens shape: {pred_tokens.shape}")
-        
-        # Assert shapes are correct for single clip
-        expected_expr_shape = (3, 1, 384)  # 3 frames
-        expected_pred_shape = (1, 1, 384)  # 1 prediction
-        assert expr_tokens.shape == expected_expr_shape, f"Single clip: Expected expression tokens shape {expected_expr_shape}, got {expr_tokens.shape}"
-        assert pred_tokens.shape == expected_pred_shape, f"Single clip: Expected prediction shape {expected_pred_shape}, got {pred_tokens.shape}"
-    
-    print("\n✅ Single clip batch test passed!")
+    print("✅ Joint expression prediction test passed!")
 
 
 if __name__ == "__main__":

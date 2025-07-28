@@ -34,7 +34,6 @@ def main():
             'max_train_samples': None,  # pass None to use all samples for full training
             'val_data_dir': "/mnt/dataset-storage/dbs/CCA_val_db2/",
             'max_val_samples': 100,   # Limit validation samples for testing
-            'face_id_checkpoint_path': "/mnt/dataset-storage/face_model/checkpoints2/face_id_epoch_4.pth",
             'expression_transformer_checkpoint_path': None,  # Set to path if you want to load expression transformer
             'transformer_decoder_checkpoint_path': None,  # Set to path if you want to load transformer decoder
             'log_dir': "/mnt/dataset-storage/face_model/logs",
@@ -52,7 +51,8 @@ def main():
             'embed_dim': 384,
             'num_heads': 4,  # Optimized architecture
             'num_layers': 2,  # Optimized architecture
-            'dropout': 0.1
+            'dropout': 0.1,
+            'max_subjects': 3500  # Added max_subjects parameter
         },
         'transformer_decoder': {
             'embed_dim': 384,
@@ -75,7 +75,6 @@ def main():
     print(f"🧠 Transformer Decoder: {config['transformer_decoder']['num_layers']} layers, {config['transformer_decoder']['num_heads']} heads")
     print(f"🧵 Num workers: {config['training']['num_workers']}")
     print(f"💾 Memory optimization: drop_last={config['training']['drop_last']}")
-    print(f"🔒 Face ID Model: Will load from {config['training']['face_id_checkpoint_path']}")
     
 
     
@@ -112,13 +111,11 @@ def main():
         print(f"🎓 Transformer Decoder: Will train from scratch")
     
     print(f"\n🔗 Joint Training: Both Expression Transformer and Transformer Decoder will be trained together")
-    print(f"🔒 Frozen: Face ID Model (Component A)")
     
     # Start training
     print("\n🎯 Starting training...")
     train_expression_prediction(
         dataset_path=config['training']['train_data_dir'],
-        face_id_checkpoint_path=config['training']['face_id_checkpoint_path'],
         expression_transformer_checkpoint_path=config['training']['expression_transformer_checkpoint_path'],
         transformer_decoder_checkpoint_path=config['training']['transformer_decoder_checkpoint_path'],
         checkpoint_dir=config['training']['checkpoint_dir'],
@@ -139,6 +136,7 @@ def main():
         expr_num_heads=config['expression_transformer']['num_heads'],
         expr_num_layers=config['expression_transformer']['num_layers'],
         expr_dropout=config['expression_transformer']['dropout'],
+        expr_max_subjects=config['expression_transformer']['max_subjects'],  # Added max_subjects parameter
         decoder_embed_dim=config['transformer_decoder']['embed_dim'],
         decoder_num_heads=config['transformer_decoder']['num_heads'],
         decoder_num_layers=config['transformer_decoder']['num_layers'],
