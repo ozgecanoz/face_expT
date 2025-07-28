@@ -1,0 +1,135 @@
+{
+  "datasets": [
+
+    {
+      "name": "CC_part_4_2.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An95rtU0R7tI_eVpIdn7REMbMjBR_2XP75F6iAVuKHciPHkgGamBM0Tl9p5Me308tthITUMRNlaBo2BWaSHZ8DvfvlNSy0ZumtMhuhpEUllhv5zVMQgs8xgpV2IQ.zip?_nc_gid=L3x_XWfeGxuYB0CiMsvTTQ&_nc_oc=AdmS24icpJ7GOqOGicpTbCWXUsvQv-pBixzELR9MnWr8LtlP4IeMgKisRIemmwV1uTm2fJDPa3dF-tDYDBGx_Zl1&ccb=10-5&oh=00_AfRwieLz_XpDETMQ9xJjUVrqZ6dtVUSa6DT3xfZqN5JCUQ&oe=68AC561D&_nc_sid=005f0f",
+      "remote_path": "face_training_datasets/casual_conversations_full"
+    }, --> download failed (111GB)
+
+    {
+      "name": "CC_part_7_1.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An8PXawskvoLsnhqIRgSVCQzxuQjt9PRgcKDEnAVQ8adkVOJvH2dLD0hswUzQUNMghCb_KRbLDagvo5dM05f966vs2ppYAWdLhmp1lha3Go5BlaMj52V5Bjcg_pW.zip?_nc_gid=S1HUwhjjL1w9Fhw2PwjGMw&_nc_oc=AdmAgA91Y7i3SqKjomFH57S3CMUu74HeI-whBcB2YpUHQHB0820IfMXOqnFkDnZrDJszNGwQGzskujOwKCpaAyHw&ccb=10-5&oh=00_AfTr4d8DCHVliD8zheSpSmWaBKfab2Yic9zg8UYmMHbc2Q&oe=68AC5277&_nc_sid=005f0f",
+      "remote_path": "face_training_datasets/casual_conversations_full"
+    }, --> no space left (129GB)
+    {
+      "name": "CC_part_7_2.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An8jV_wQs_JvPHWU7OtlBDXkHv6z0wAXvXMdmZk_7J9t-W6jEZknLEzjLlwWGXhOLDGCIivFcveW6OrmKGbrZ7lZwSVoJt58Z1KL0tD7cCmjpqn_eaTc_ixFk6NN.zip?_nc_gid=ZR-yiaf6Brehvdlyl9HwrQ&_nc_oc=AdmYhBpK4Xd1lJkpw21IoeEBOwkFMfkJ4UGV5_SaJFD7dFrjP0RmKzXtJBjzaPIadu9__Toiw-j3NgmgWIcEB5KS&ccb=10-5&oh=00_AfS3zvVfY2wUSYGPQKENPZWYl_vwXEKY_y9pXz5RRw9Z2A&oe=68AC4A4F&_nc_sid=005f0f",
+      "remote_path": "face_training_datasets/casual_conversations_full"
+    }, --> no space left (138GB)  (7_3 was 122GB and completed)
+
+    {
+      "name": "CC_part_8_2.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An-WAhR508Ckjw7Z1K-7nkzYWKr8sEEeoehzojZ8UizOjSPNF3qAMm5CM5bYuZbF0ajLF9UsN0uGR_5xnyd1wjJYj0VIo0pQq_iQjIjn-fLFFQIlWcW7DQrUw_nP.zip?_nc_gid=iubtlhJ6MAfXzyoAltmmWA&_nc_oc=AdmnKv5kiHt_duqsdYmGVFWWPb6GzNwC03unuhVPtotwaBd_8i5tqsmLeUzx-2ovZuzoCCNDjGcCtYjzbsbY23r6&ccb=10-5&oh=00_AfS8V16XrEYKOzF4TUt5oJuiHgqPo4r7062WBC_B2WW6PQ&oe=68AC700E&_nc_sid=005f0f",
+      "remote_path": "face_training_datasets/casual_conversations_full"
+    }, --> download failed (99GB)
+    {
+      "name": "CC_part_8_3.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An-pqtzZmTVJkub09wro5pJnp_bFCIJLiFpYQzNkvt4K3wJmhbtGRvoH4_3ZgZStK5P7-qjQ8mXkR4TzNzMIA41hwOOLRz7al4j7uORJdjcD0nHjT1KLitVDLq1s.zip?_nc_gid=cMIYiWdPYKBfykCEDF-78Q&_nc_oc=AdnJknWEIMfZh0or01g-i57lC7snrESf94rFynoTWf-OzRJM4rPYk-Y3kAxiclGF4Yny03o88fufVSGuq5QqCOmm&ccb=10-5&oh=00_AfTMGStY_pCD6ii90SR2P6c1FZIOI_Ce1B7jI0PRqXykVw&oe=68AC59EB&_nc_sid=005f0f",
+      "remote_path": "face_training_datasets/casual_conversations_full"
+    }, --> download failed (111GB)
+
+ 
+    {
+      "name": "CC_part_10_1.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An97_ZAjx_RCoOBwumHpbYsg-3GUB4b6PLblMDGGzDoWD8yH3jTjISE1MTta-hb2LlnK35qHgNCuZKOL_VJgZ5mmhd0b_Svujn8PxdM1H5RUWCcEGMt6F24-kG8w4Q.zip?_nc_gid=lgNhAILVVdbdrm_IElKwTw&_nc_oc=Adl-I5ZH2pqD1D4b0bJh0haAvI_rMPHzY0BjvD7B66M1EFVBQ_1tTqzmgbxUT0S_6KXTC-ovL0f_8Go2bFWDq0Tc&ccb=10-5&oh=00_AfT75LmJe_s6tDZzaZyFBkuqL_4kEG0KFH1zYT5Y6D5Hrg&oe=68AC63C4&_nc_sid=005f0f",
+      "remote_path": "face_training_datasets/casual_conversations_full"
+    }, --> extraction failed 143GB (no space left)
+
+    {
+      "name": "CC_part_12_2.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An-YsVhk3HoMe85H5cVFxY07VD-bRKGkfEjD7e9zxtAuf0QrExVJgIEXGL5V0FR0cv6NnlMcctyRoxUM7xwoK-CyF2dXcpFzD4gtWKqX5wd5iRNKZu-owiwIWA_Gjg.zip?_nc_gid=prfFo5A--g6IGII6fCi1Tw&_nc_oc=AdkPjCzXZUlYOdpjHXIAEXnQ62UUti-RfkbnxQDbrH62gEKs0_3KeeidLUyi8ilLNBVdwPEnlMoK0wfB--8czyXH&ccb=10-5&oh=00_AfTXRe5o-0BAUSH7muFCkiJU_ps2ewD70PGzBPW3eLBi3g&oe=68AC6BD4&_nc_sid=005f0f",
+      "remote_path": "face_training_datasets/casual_conversations_full"
+    }, --> download failed (102GB)
+
+    {
+      "name": "CC_part_12_4.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An-sIfIPo5CY8nPY-KQ3gnuGZ6fpI9uL3IJexrXqYg_EFAiruI2REzmch-IB00KOjYqXaxoD6PON_H46lC3RNfVjNu2Zq76yGHpJdEzgde1URGRXOUon4FHKdJJ-cQ.zip?_nc_gid=IWKA6M54Yf8L2j1tslGClg&_nc_oc=AdmpYU-hUEu1DyNTcmiEGPPjK4dmBMcttGwj70YTcsMxOV6SK9ilnrnFbalOV6WYUFiUptNu3jyBEyeOH6ZRLL-D&ccb=10-5&oh=00_AfT5-zDh7BYRYdrQP6VoAUlLw9Ac9zJwLRWAiWjhXoo8Xg&oe=68AC4D86&_nc_sid=005f0f",
+      "remote_path": "face_training_datasets/casual_conversations_full"
+    }, --> download failed (95GB)
+
+
+    {
+      "name": "CC_part_13_3.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An8R_isKrvF6fC2pesYTps8cqsde_Cvt7NE-6kcll7UOjB2hDbHlYIaJJrqMG0ua2exgeCGnsVCXI5qwu_OZhKuJtzg5skhES8pZmvqOltj39EeLJD9qEK14aHVhHQ.zip?_nc_gid=xznIrTYqmJhp60qPkTsIFw&_nc_oc=AdlRpyeIZ3CIyK59NoZEUYOvb4CpL4WZ5QTwXvywCU42bUdrfrbpmyr88gQfigB5XiNgROFLo1UUeC_VIJsLXDv6&ccb=10-5&oh=00_AfQuVnFhxjssrd3sdYxdJocN4KbtxjuatrW3sqbkGhnDxw&oe=68AC4E52&_nc_sid=005f0f",
+      "remote_path": "face_training_datasets/casual_conversations_full"
+    }, --> download failed (87GB)
+
+
+
+    {
+      "name": "CC_part_15_4.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An_Oi0y6Nr_LhsK9BzWBiyRbegHDBELAoWjxVaAJSawM5IdNow9yI-41mywUtbvOX9746dEkA5yvHv15ZuIyj9FUYgQtF1czjBUa_X_rE4C5QbIdjQ22ivziHnAcCg.zip?_nc_gid=O2oKqc5T9z5WkUbT4uHAoA&_nc_oc=AdkZ4hjS9Dx3FZy8rh7yjcNVDirBJv5tq9tBG6soTGDlFSYX7l48atco0FMyhGygZJ70bXVIc3MewusfIgypYdt2&ccb=10-5&oh=00_AfRAyjV4XXUd_DHSCcRAx-yOpgU558aNQP7uDuhc_OL0lg&oe=68AC67B9&_nc_sid=005f0f",
+      "remote_path": "face_training_datasets/casual_conversations_full"
+    }, --> extraction failed 135GB (no space left)
+
+
+    {
+      "name": "CC_part_16_2.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An_ta1f6gxeY_bjphGeOvm2HRBg_l020P5K_Y9A-yi7GoW_SoBNpKumCI9lbVrago7mvABgJ_v1x-IYmQdGY9p0Dj4PUlKi0nE-ClJBWKL_kji-DBfXll_vSXJ-AJA.zip?_nc_gid=q5T_gZP8rqBExKxeQfRH_Q&_nc_oc=Adm2qb6J_I3O8_Hhg7-Bp1XvnthuzWef0ZDQyQWi2DVm3uj5fwY6UxpzFzyDwrBfMs4U5g_MfQVgiRjW17jEyVx2&ccb=10-5&oh=00_AfQRtkaakuYJwbOAGfMHJl1TupNR5M2TYEssRMWx_u3dUQ&oe=68AC529D&_nc_sid=005f0f",
+      "remote_path": "face_training_datasets/casual_conversations_full"
+    }, --> download failed  but also large (94GB)
+
+    {
+      "name": "CC_part_16_3.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An-FSZ-vCREjGs9qe7dk63MDPCFg53RmKJ6PLq7TOdE14OgMkEStto_UzzBIqxCy1PWW8cKbNoL51dxl_Gj5ehduh2N-anP2vtzD6gfv5FWc-tRWNjk9DKwIaZ4XdA.zip?_nc_gid=QkDjzSxaM2hYHlm755oUXA&_nc_oc=AdnMtP4C64GqjBrGOOYA_f3noYh8k92B27FfsYzl6EaqGyAtOuuB6uxd6LOfndFjNoO-ns3CH8cdDxZ92UChlbKY&ccb=10-5&oh=00_AfRIEahCnl7HYojizDNuAVSWUzU4UDuXeGR6F1eugQJUrg&oe=68AC7549&_nc_sid=005f0f",
+      "remote_path": "face_training_datasets/casual_conversations_full"
+    }, --> download failed but also large (145GB)
+
+    {
+      "name": "CC_part_16_4.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An8sJamfCYh_62gynOgaRJceq7MBrPrL2SKr08qElyYfsBOKaqXk8uqqshyU91WemnbKm54crCNqF2UrFt6ma-A4DyXQ4YIsdBtzacbiHLc1peTDynvYuAecYn1rSw.zip?_nc_gid=ujpfIpF0nJ3FkpeiiEMuMA&_nc_oc=AdmiKl8iaeVINXwiTUppV6_3deGEyb_nQJ4CtcGBgqVP2ABcGuLEPEO5ZRMscd-LqnmRNuZ9_xu9mJ_41u6et1HF&ccb=10-5&oh=00_AfSm7nksPAjcRDTodsQcS6ie43mWMK-cuxvp3VUmj-DkvA&oe=68AC749B&_nc_sid=005f0f",
+      "remote_path": "face_training_datasets/casual_conversations_full"
+    }, --> stopped here (124GB)
+    {
+      "name": "CC_part_17_1.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An8wzhibG-gG-NonOiagkuPxk0eZumIc-W4fnZ-AUAJgAoVwJs19t3To8G40to7tc369TZMkEPm2hSJbXtrH4_G9_hYfs_qlhvujylcZmRpLCEZ25XGrhwD6gfRweA.zip?_nc_gid=PhYL4fEgF6zEzc1PaaYakw&_nc_oc=AdlDvlFt-JTXCmr4ny-_STwnzXo80_tqvUKyVshkLl9Em1mv1F_du5_TjpZO7RaCLb5GzmhyWv9lcHnopuYaKXCt&ccb=10-5&oh=00_AfTIYZxPYcgtl8f0orq4qUlBKnm23UYA263wS3tpeR9_og&oe=68AC7694&_nc_sid=005f0f",
+      "remote_path": "face_training_datasets/casual_conversations_full"
+    },
+    {
+      "name": "CC_part_17_2.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An8fvOcxFqNQAgNzqArgBiQPMDTqfSHqvZbbvKRBZAuHDbmF9XBtQjFBSip-6dyU-ajQkAMp5GMB6gBVaUing9hS2rhjkrJK14M27mx02PUVoN3Q3N0DznuXx4dG2A.zip?_nc_gid=1ffTVJNyz-LIHcGOJggUwA&_nc_oc=Adm4aJLSP9D1YGdKfABRQdPofd5PETOosDITgTg-K4zWXpS6tZfXeJQYDrSosacg6rfOeC-T8iyGRU2iKyHuC8mu&ccb=10-5&oh=00_AfSHuJ7kVTe_S64MNU759_xhUH1HcvLO8NAWZWiji1LjVA&oe=68AC5DB8&_nc_sid=005f0f",
+      "remote_path": "face_training_datasets/casual_conversations_full"
+    },
+    {
+      "name": "CC_part_17_3.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An96sM4PWaMUQtRE8b5OOyWMMdR1BooXl3cCr2kuAI_6cj5FVtM6wys3lD5NIvkezoTTHwOHoWeFuI-YqAnyuo64SMwOP6zslyxvlgPsEu65XonmaijToC93jeE10w.zip?_nc_gid=KR8MB3L9gMnvlR99s93RCA&_nc_oc=Admg153P00Dep81MZqXdgKSOdOo_hR3MPlUgoNiySP73Wc9FDZbiT9xq3r5iiOiZiqeXDhxlOdMjKDclBPfb90jL&ccb=10-5&oh=00_AfST47Pt5hl9SJPrKHGBtlWOdnKXGqFPJz6m0Id8iubr4w&oe=68AC66D1&_nc_sid=005f0f",
+      "remote_path": "face_training_datasets/casual_conversations_full"
+    },
+    {
+      "name": "CC_part_17_4.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An_iO6WXmIs8chg7MDPI15oO6Ens7jTs3DfOdF_SAD0oCrs7zlRvXZjurUKq6ApzpGz5KUyxMHdYWLQLU5UbilawNlUjkr-IFFR1yv_k-ikeRVkWgZyJeOqVkGMocA.zip?_nc_gid=-c5HIaId3FMkXCpAufB6GA&_nc_oc=Adm530ANGTgffZfBMkK2tJn8V3Hy1IfyfKA-ex0lAI8Y9ZJoXINDVCavsYb38_mayzLMVE0XMJt1pJI-vIPR9Mc1&ccb=10-5&oh=00_AfQb1bYqT04rzfwE1HlXUsNUULclm5B4VK7BFTElez-avw&oe=68AC55B9&_nc_sid=005f0f",
+      "remote_path": "face_training_datasets/casual_conversations_full"
+    },
+    {
+      "name": "CC_part_18_1.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An9M8wuBSR-UTn9PV7zs24I1rz6sinIamAK6wWrZ4V4lAhL87J9MQAyON2so3iwdIh2XkpvdH01_vxu3rQzJovb469Mj3X1dTw4d9ecxzsNaQpDKPyjz7aVhW6I68Q.zip?_nc_gid=ncAKpMH-qu1OaYN8Jd2mwg&_nc_oc=Adn7NSDWKSit3mxSpSLENpl_ojb5RSMTxn8h9vsNC0OdTgzUAZfiFhc6KmS8PzyF443f_CjqoiBn0tjz1NCdezP1&ccb=10-5&oh=00_AfTerITLtw2AYGacJuXDUHbNLHPHq_2EFH9kdg6PlfxYKg&oe=68AC561C&_nc_sid=005f0f",
+      "remote_path": "face_training_datasets/casual_conversations_full"
+    },
+    {
+      "name": "CC_part_18_2.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An__mzBwbtKDrERpPXdC80XgUNyChiQW4RPTsEOiO7_ZP_OvtSimU2W-2rxIRs1a9vV_bOHSm_lrqA91zQ0E_9FtnIleYvQMkzNLpqm_k8YDd9-10cRIS2acXXhbLw.zip?_nc_gid=IbWMud3_evRfg0MDIAJhHQ&_nc_oc=Adk-vbZbfDYKlLpnBHmWhq_ds4NYMZe5fZwJr83ylcHl9Erer6owOkAfxXngELl5TxcE40UFUP7eKr2_wTWp37qv&ccb=10-5&oh=00_AfSY8wsHNFhQDPzgRuJIm9EIrn7LYx24bzB5pzB2IsArpg&oe=68AC7814&_nc_sid=005f0f",
+      "remote_path": "face_training_datasets/casual_conversations_full"
+    },
+    {
+      "name": "CC_part_18_3.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An_ONqsU44kPesg-ljWUnuLgfig53Y685GxTnRuaENnC_pDsHCO7-kGSFKkZF17mL98py-15uKTyGnOZPps2BompuzsLBwGNBY2UwHT-1mj2MQlv04TZZo6MQBNm6g.zip?_nc_gid=CXFeDRSDq72PvTNhnHGJig&_nc_oc=Adkqx1H7rbezcgooBeQanJ9bB1CccP87j7GkjUJ7En6yP9n1ONXHpmrGRC-kpBW8i8z0O6wD0xlbSuc-3tKQW37G&ccb=10-5&oh=00_AfRwP-Uvhq1ewM3hIWSzy4aLiCzaLD-bjpcGtRAB28cMwQ&oe=68AC5147&_nc_sid=005f0f",
+      "remote_path": "face_training_datasets/casual_conversations_full"
+    },
+    {
+      "name": "CC_part_19_1.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An9SjEE0FrIt069pIwWf-9lLYU0n9m-tyaXSBHa94TGs8jBCMZODooBr_OZKW-835ZLYdXqJw2aTCnT4-x337TdUad4NVZixTK5XUnrZscNaa1d6Ev_0n16LwicyAw.zip?_nc_gid=4zPzhNVPGJbmIhdwEO2wNA&_nc_oc=Adn0Nafrc7ZWfZAD7FvbcExp8BsHTYJTwXKhuSekEkMv3lLeKKAQqCMT9GkYUr7hvhUw27LRm16oIhnpYwNIOBnl&ccb=10-5&oh=00_AfQ42PGEbzF3_QmaMLB0ri94yA71o8Qqga8oLZmO3ceyUg&oe=68AC7B72&_nc_sid=005f0f",
+      "remote_path": "face_training_datasets/casual_conversations_full"
+    },
+    {
+      "name": "CC_part_19_2.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An9caF7Al00UvghAq6PRGEtJdxb53n2jsJn0jvpws3Hsd2Dl7vvuiPviipsHIMXbZWKdNTtKR14q5latcCyiE4DtP7xqJ6o1jL86w3JN4FeA8FtadbllfC1SBLezJA.zip?_nc_gid=ACEbk5mEbP8rsRjTPtSeJQ&_nc_oc=AdmUNJxeTduCeWk2hnjoi9CaSx_QFqyvHgCA5XfwzYceasv94eYPMB6rnTsII_PHUuOnAT0fyZnMM2LBtZvlV_He&ccb=10-5&oh=00_AfR5vBA0NUKfLMvJ0dvSJevDBAH7lAdspKiPj0G93hhGPg&oe=68AC4FF2&_nc_sid=005f0f",
+      "remote_path": "face_training_datasets/casual_conversations_full"
+    },
+    {
+      "name": "CC_part_19_3.zip",
+      "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An-C8DzFliE3xM12oUX2Bwp961_pz4BqtMnHUnKyRbvVs8PEAvjZFO-4bxpbFuEpWQoJVY7Uv62eWrZJOZNBsUBB9QHqki_QlODVSfLPeeHOkEEogN5tK3IHdgXRKg.zip?_nc_gid=9TFAMC6J0G3TV5LXQRiitg&_nc_oc=Adn5OQ0WFDUtaHgOqhwVjPAHpoUTUiTG9jrxwSr4c0erEmQHOgxNRKGBfUM1lfAy2CKKMDc3n4tu-9jif3lrZq--&ccb=10-5&oh=00_AfTVy1j1wAVNCQBMP0jV3r0q2WjlrG7ljwn07zLLWj2ufg&oe=68AC799E&_nc_sid=005f0f",
+      "remote_path": "face_training_datasets/casual_conversations_full"
+    }
+  ]
+}
