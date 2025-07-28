@@ -77,6 +77,17 @@ class FaceReconstructionModel(nn.Module):
         # Pass through optimized CNN decoder
         reconstructed_face = self.cnn_decoder(spatial_features)  # (B, 3, 518, 518)
         
+        # Un-normalize the output using ImageNet mean and std
+        # ImageNet mean and std values (same as used in DINOv2 tokenizer)
+        mean = torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1).to(reconstructed_face.device)
+        std = torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1).to(reconstructed_face.device)
+        
+        # Un-normalize: x * std + mean
+        reconstructed_face = reconstructed_face * std + mean
+        
+        # Clamp to valid range [0, 1]
+        reconstructed_face = torch.clamp(reconstructed_face, 0.0, 1.0)
+        
         return reconstructed_face
 
 
@@ -173,10 +184,13 @@ def test_face_reconstruction_model():
     print(f"Subject embeddings shape: {subject_embeddings.shape}")
     print(f"Expression token shape: {expression_token.shape}")
     print(f"Reconstructed face shape: {reconstructed_face.shape}")
-    
-    # Check output range
     print(f"Output min: {reconstructed_face.min().item():.4f}")
     print(f"Output max: {reconstructed_face.max().item():.4f}")
+    
+    # Check that output is in valid range [0, 1] after un-normalization
+    assert reconstructed_face.min() >= 0.0, f"Output min should be >= 0, got {reconstructed_face.min().item()}"
+    assert reconstructed_face.max() <= 1.0, f"Output max should be <= 1, got {reconstructed_face.max().item()}"
+    print("✅ Output is in valid range [0, 1]")
     
     # Test with different batch sizes
     batch_size_2 = 1
