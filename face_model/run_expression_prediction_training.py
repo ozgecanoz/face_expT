@@ -37,7 +37,7 @@ def main():
             'expression_transformer_checkpoint_path': None,  # Set to path if you want to load expression transformer
             'transformer_decoder_checkpoint_path': None,  # Set to path if you want to load transformer decoder
             'log_dir': "/mnt/dataset-storage/face_model/logs",
-            'checkpoint_dir': "/mnt/dataset-storage/face_model/checkpoints2",
+            'checkpoint_dir': "/mnt/dataset-storage/face_model/checkpoints_with_subject_ids",
             'learning_rate': 1e-4,
             'batch_size': 16,  # Optimized for 64GB RAM (cpu vm)
             'num_epochs': 5,
