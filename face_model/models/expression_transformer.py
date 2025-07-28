@@ -128,17 +128,55 @@ class ExpressionTransformer(nn.Module):
     
     def inference(self, patch_tokens, pos_embeddings, subject_ids):
         """
-        Inference method for cached DINOv2 tokens
+        Inference method that returns both expression tokens and subject embeddings
         
         Args:
-            patch_tokens: (B, 1369, 384) - Cached DINOv2 patch tokens
-            pos_embeddings: (B, 1369, 384) - Cached positional embeddings
+            patch_tokens: (B, 1369, 384) - 1 frame of patch tokens per batch
+            pos_embeddings: (B, 1369, 384) - Positional embeddings for patches
             subject_ids: (B,) - Subject IDs for each sample in batch
         
         Returns:
             expression_token: (B, 1, 384) - Expression token
+            subject_embeddings: (B, 1, 384) - Subject embeddings used
         """
-        return self.forward(patch_tokens, pos_embeddings, subject_ids)
+        B, num_patches, embed_dim = patch_tokens.shape
+        
+        # Get subject embeddings for batch
+        subject_embeddings = self.subject_embeddings(subject_ids)  # (B, 384)
+        subject_embeddings = subject_embeddings.unsqueeze(1)  # (B, 1, 384)
+        
+        # Initialize expression query for batch
+        query = self.expression_query.expand(B, 1, embed_dim)
+        
+        # Prepare fixed K,V context (doesn't get updated)
+        # Add positional embeddings to patch tokens
+        patch_tokens_with_pos = patch_tokens + pos_embeddings
+        
+        # Combine subject_embeddings and patch_tokens for K, V
+        # subject_embeddings: (B, 1, 384), patch_tokens_with_pos: (B, 1369, 384)
+        kv_context = torch.cat([subject_embeddings, patch_tokens_with_pos], dim=1)  # (B, 1370, 384)
+        
+        # Apply cross-attention layers that only update the query
+        for i, (attention_layer, ffn_layer, query_norm) in enumerate(
+            zip(self.cross_attention_layers, self.ffn_layers, self.query_norms)
+        ):
+            # Cross-attention: query attends to kv_context
+            attended_query, _ = attention_layer(query, kv_context, kv_context)
+            
+            # Residual connection and normalization for query
+            query = query_norm(query + attended_query)
+            
+            # Feed-forward network for query
+            ffn_output = ffn_layer(query)
+            query = query + ffn_output
+        
+        # Final output projection
+        expression_token = self.output_proj(query)  # (B, 1, 384)
+        
+        # Final layer normalization
+        expression_token = self.layer_norm(expression_token)
+        
+        return expression_token, subject_embeddings
 
 
 def test_expression_transformer():
@@ -160,31 +198,19 @@ def test_expression_transformer():
     
     # Forward pass
     model.eval()  # Ensure model is in evaluation mode
-    expression_token = model(patch_tokens, pos_embeddings, subject_ids)
+    expression_token_forward = model(patch_tokens, pos_embeddings, subject_ids)
     
     print(f"Patch tokens shape: {patch_tokens.shape}")
     print(f"Positional embeddings shape: {pos_embeddings.shape}")
     print(f"Subject IDs shape: {subject_ids.shape}")
-    print(f"Expression token shape: {expression_token.shape}")
+    print(f"Expression token shape: {expression_token_forward.shape}")
     
-    # Test inference method with same inputs
-    with torch.no_grad():
-        expression_token_inference = model.inference(patch_tokens, pos_embeddings, subject_ids)
-    print(f"Inference method result shape: {expression_token_inference.shape}")
+    # Test inference method
+    expression_token_inference, subject_embeddings_inference = model.inference(patch_tokens, pos_embeddings, subject_ids)
+    print(f"Inference method result shapes: expression={expression_token_inference.shape}, subject_embeddings={subject_embeddings_inference.shape}")
     
-    # Verify inference matches forward pass
-    diff = torch.abs(expression_token - expression_token_inference).max().item()
-    print(f"Max difference between forward and inference: {diff}")
-    print("✅ Inference method works correctly")
-    
-    # Test with different batch size
-    batch_size_2 = 3
-    patch_tokens_2 = torch.randn(batch_size_2, num_patches, embed_dim)
-    pos_embeddings_2 = torch.randn(batch_size_2, num_patches, embed_dim)
-    subject_ids_2 = torch.randint(0, model.max_subjects, (batch_size_2,))
-    
-    expression_token_2 = model(patch_tokens_2, pos_embeddings_2, subject_ids_2)
-    print(f"Expression token shape (batch_size={batch_size_2}): {expression_token_2.shape}")
+    # Test that forward and inference produce similar results (they should be identical)
+    assert torch.allclose(expression_token_forward, expression_token_inference, atol=1e-6), "Forward and inference should produce identical results"
     
     print("✅ Expression Transformer test passed!")
 

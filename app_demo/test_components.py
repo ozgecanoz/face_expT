@@ -35,9 +35,9 @@ def test_model_loader():
         # Test with dummy paths (will fail, but tests structure)
         try:
             loader.load_all_models(
-                face_id_checkpoint_path="dummy_face_id.pth",
                 expression_transformer_checkpoint_path="dummy_expr_trans.pth",
-                expression_predictor_checkpoint_path="dummy_expr_pred.pth"
+                expression_predictor_checkpoint_path="dummy_expr_pred.pth",
+                face_reconstruction_checkpoint_path="dummy_recon.pth"
             )
             print("❌ Expected FileNotFoundError but got success")
         except FileNotFoundError:
@@ -96,23 +96,30 @@ def test_token_extractor():
                 self.name = name
             
             def inference(self, *args):
-                return torch.randn(1, 1, 384)
+                if self.name == 'expression':
+                    return torch.randn(1, 1, 384), torch.randn(1, 1, 384)  # expression_token, subject_embeddings
+                else:
+                    return torch.randn(1, 1, 384)
         
         class DummyTokenizer:
             def __call__(self, face_tensor):
                 return torch.randn(1, 1369, 384), torch.randn(1, 1369, 384)
         
+        class DummyReconstructionModel:
+            def __call__(self, patch_tokens, pos_embeddings, subject_embeddings, expression_token):
+                return torch.randn(1, 3, 518, 518)
+        
         # Create dummy models
         models = {
-            'face_id_model': DummyModel('face_id'),
             'expression_transformer': DummyModel('expression'),
             'expression_predictor': DummyModel('predictor')
         }
         
         tokenizer = DummyTokenizer()
+        face_reconstruction_model = DummyReconstructionModel()
         
         # Create token extractor
-        extractor = TokenExtractor(models, tokenizer, device="cpu")
+        extractor = TokenExtractor(models, tokenizer, face_reconstruction_model, device="cpu")
         print("✅ Token Extractor created successfully")
         
         # Create dummy face image
@@ -174,7 +181,6 @@ def test_webcam_demo():
     # Test with dummy checkpoint paths
     try:
         demo = WebcamDemo(
-            face_id_checkpoint_path="/Users/ozgewhiting/Documents/projects/dataset_utils/cloud_checkpoints/face_id_epoch_0.pth",
             expression_transformer_checkpoint_path="/Users/ozgewhiting/Documents/projects/dataset_utils/cloud_checkpoints/expression_transformer_epoch_5.pt",
             expression_predictor_checkpoint_path="/Users/ozgewhiting/Documents/projects/dataset_utils/cloud_checkpoints/transformer_decoder_epoch_5.pt",
             face_reconstruction_checkpoint_path="/Users/ozgewhiting/Documents/projects/dataset_utils/cloud_checkpoints/reconstruction_model_epoch_5.pt"

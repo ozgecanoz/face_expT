@@ -27,28 +27,29 @@ class WebcamDemo:
     """Main webcam demo application"""
     
     def __init__(self, 
-                 face_id_checkpoint_path: str,
                  expression_transformer_checkpoint_path: str,
                  expression_predictor_checkpoint_path: str,
                  face_reconstruction_checkpoint_path: str,
                  identity_features_path: str = None,
                  device: str = "cpu",
-                 confidence_threshold: float = 0.5):
+                 confidence_threshold: float = 0.5,
+                 subject_id: int = 0):
         """
         Initialize webcam demo
         
         Args:
-            face_id_checkpoint_path: Path to Face ID model checkpoint
             expression_transformer_checkpoint_path: Path to Expression Transformer checkpoint
             expression_predictor_checkpoint_path: Path to Expression Predictor checkpoint
             face_reconstruction_checkpoint_path: Path to Face Reconstruction model checkpoint
             identity_features_path: Path to JSON file with identity features (optional)
             device: Device to run models on
             confidence_threshold: Face detection confidence threshold
+            subject_id: Subject ID for the current user
         """
         self.device = device
         self.confidence_threshold = confidence_threshold
         self.identity_features_path = identity_features_path
+        self.subject_id = subject_id
         
         # Load identity features if provided
         self.identity_features = None
@@ -58,11 +59,10 @@ class WebcamDemo:
             if self.identity_features is not None:
                 logger.info(f"✅ Loaded identity features from: {identity_features_path}")
                 logger.info(f"   Identity source: {self.identity_features.get('video_path', 'unknown')}")
-                logger.info(f"   Face ID token shape: {self.identity_features['face_id_token'].shape}")
-                logger.info(f"   Face ID token stats: mean={self.identity_features['face_id_token'].mean():.4f}, std={self.identity_features['face_id_token'].std():.4f}")
+                logger.info(f"   Subject ID: {self.identity_features.get('subject_id', 'unknown')}")
             else:
                 logger.warning(f"⚠️ Failed to load identity features from: {identity_features_path}")
-                logger.warning("   Will use current frame's face ID for reconstruction")
+                logger.warning("   Will use current frame's identity for reconstruction")
         else:
             logger.info("ℹ️ No identity features provided - will use current frame's identity")
         
@@ -70,7 +70,6 @@ class WebcamDemo:
         logger.info("🚀 Loading models...")
         model_loader = ModelLoader(device=device)
         self.models = model_loader.load_all_models(
-            face_id_checkpoint_path=face_id_checkpoint_path,
             expression_transformer_checkpoint_path=expression_transformer_checkpoint_path,
             expression_predictor_checkpoint_path=expression_predictor_checkpoint_path,
             face_reconstruction_checkpoint_path=face_reconstruction_checkpoint_path
@@ -80,12 +79,12 @@ class WebcamDemo:
         self.tokenizer = self.models['tokenizer']
         self.face_detector = MediaPipeFaceDetector(confidence_threshold=confidence_threshold)
         self.token_extractor = TokenExtractor(
-            face_id_model=self.models['face_id_model'],
             expression_transformer=self.models['expression_transformer'],
             expression_predictor=self.models['expression_predictor'],
             face_reconstruction_model=self.models['face_reconstruction_model'],
             tokenizer=self.models['tokenizer'],
-            device=self.device
+            device=self.device,
+            subject_id=self.subject_id
         )
         self.token_buffer = TokenBuffer(buffer_size=30)
         
@@ -130,7 +129,8 @@ class WebcamDemo:
                 'patch_tokens': np.array(identity_data['patch_tokens'], dtype=np.float32),
                 'pos_embeddings': np.array(identity_data['pos_embeddings'], dtype=np.float32),
                 'video_path': identity_data.get('video_path', 'unknown'),
-                'frame_shape': identity_data.get('frame_shape', [518, 518, 3])
+                'frame_shape': identity_data.get('frame_shape', [518, 518, 3]),
+                'subject_id': identity_data.get('subject_id', 'unknown')
             }
             
             logger.info(f"✅ Loaded identity features:")
@@ -244,33 +244,38 @@ class WebcamDemo:
         
         # Reconstruct face from tokens
         reconstructed_face = None
-        if tokens.get('face_id_token') is not None and tokens.get('expression_token') is not None:
+        if tokens.get('expression_token') is not None:
             # Get DINOv2 tokens from the token extraction
             patch_tokens = tokens.get('patch_tokens')
             pos_embeddings = tokens.get('pos_embeddings')
+            subject_embeddings = tokens.get('subject_embeddings')
             
-            if patch_tokens is not None and pos_embeddings is not None:
+            if patch_tokens is not None and pos_embeddings is not None and subject_embeddings is not None:
                 # Use loaded identity features if available, otherwise use current frame's
                 if self.identity_features is not None:
                     # Use someone else's identity with current expression
-                    identity_face_id_token = torch.from_numpy(self.identity_features['face_id_token']).float().unsqueeze(0).to(self.device)
-                    identity_patch_tokens = torch.from_numpy(self.identity_features['patch_tokens']).float().unsqueeze(0).to(self.device)
-                    identity_pos_embeddings = torch.from_numpy(self.identity_features['pos_embeddings']).float().unsqueeze(0).to(self.device)
+                    identity_subject_id = self.identity_features.get('subject_id', 1)  # Use different subject ID
+                    identity_subject_ids = torch.tensor([identity_subject_id], dtype=torch.long, device=self.device)
+                    
+                    # Get subject embeddings for the identity subject
+                    identity_expression_token, identity_subject_embeddings = self.token_extractor.expression_transformer.inference(
+                        patch_tokens, pos_embeddings, identity_subject_ids
+                    )
                     
                     # Debug: Print token statistics
-                    logger.info(f"🔍 Identity token stats: mean={identity_face_id_token.mean().item():.4f}, std={identity_face_id_token.std().item():.4f}")
+                    logger.info(f"🔍 Identity subject ID: {identity_subject_id}")
                     logger.info(f"🔍 Current expression token stats: mean={tokens['expression_token'].mean().item():.4f}, std={tokens['expression_token'].std().item():.4f}")
                     
                     reconstructed_face = self.token_extractor.reconstruct_face(
-                        identity_face_id_token,  # Someone else's identity
+                        identity_subject_embeddings,  # Someone else's identity
                         tokens['expression_token'],  # Current expression
-                        identity_patch_tokens,  # Someone else's patch tokens
-                        identity_pos_embeddings  # Someone else's pos embeddings
+                        patch_tokens,  # Current frame's patch tokens
+                        pos_embeddings  # Current frame's pos embeddings
                     )
                 else:
                     # Use current frame's identity and expression
                     reconstructed_face = self.token_extractor.reconstruct_face(
-                        tokens['face_id_token'],
+                        subject_embeddings,
                         tokens['expression_token'],
                         patch_tokens,
                         pos_embeddings
@@ -281,16 +286,13 @@ class WebcamDemo:
                 reconstructed_face = np.transpose(reconstructed_face, (1, 2, 0))  # (518, 518, 3)
         
         # Add tokens to buffer
-        self.token_buffer.add_frame_tokens(
-            tokens['face_id_token'],
-            tokens['expression_token']
-        )
+        self.token_buffer.add_frame_tokens(tokens['expression_token'])
         
         # Check if ready for prediction
         prediction = None
         if self.token_buffer.is_ready_for_prediction():
-            face_id_seq, expr_seq = self.token_buffer.get_prediction_sequence()
-            if face_id_seq is not None and expr_seq is not None:
+            expr_seq, _ = self.token_buffer.get_prediction_sequence()
+            if expr_seq is not None:
                 # Predict next expression token
                 prediction = self.token_extractor.predict_next_expression(expr_seq)
         
@@ -505,8 +507,6 @@ class WebcamDemo:
 def main():
     """Main function"""
     parser = argparse.ArgumentParser(description="Webcam Demo with Face Token Extraction")
-    parser.add_argument("--face_id_checkpoint", type=str, required=True,
-                       help="Path to Face ID model checkpoint")
     parser.add_argument("--expression_transformer_checkpoint", type=str, required=True,
                        help="Path to Expression Transformer checkpoint")
     parser.add_argument("--expression_predictor_checkpoint", type=str, required=True,
@@ -521,6 +521,8 @@ def main():
                        help="Camera index to use")
     parser.add_argument("--confidence", type=float, default=0.5,
                        help="Face detection confidence threshold")
+    parser.add_argument("--subject_id", type=int, default=0,
+                       help="Subject ID for the current user")
     parser.add_argument("--no_print_tokens", action="store_true",
                        help="Disable token printing to console")
     
@@ -528,13 +530,13 @@ def main():
     
     # Create and run demo
     demo = WebcamDemo(
-        face_id_checkpoint_path=args.face_id_checkpoint,
         expression_transformer_checkpoint_path=args.expression_transformer_checkpoint,
         expression_predictor_checkpoint_path=args.expression_predictor_checkpoint,
         face_reconstruction_checkpoint_path=args.face_reconstruction_checkpoint,
         identity_features_path=args.identity_features,
         device=args.device,
-        confidence_threshold=args.confidence
+        confidence_threshold=args.confidence,
+        subject_id=args.subject_id
     )
     
     demo.run(

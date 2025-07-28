@@ -31,7 +31,6 @@ def main():
         'training': {
             'train_data_dir': "/mnt/dataset-storage/dbs/CCA_train_db2/",
             'val_data_dir': "/mnt/dataset-storage/dbs/CCA_val_db2/",
-            'face_id_checkpoint_path': "/mnt/dataset-storage/face_model/checkpoints2/face_id_epoch_4.pth",
             'expression_transformer_checkpoint_path': "/mnt/dataset-storage/face_model/checkpoints2/expression_transformer_epoch_5.pt",  # Required
             'reconstruction_model_checkpoint_path': None,  # Optional - will train from scratch if not provided
             'log_dir': "/mnt/dataset-storage/face_model/logs",
@@ -73,7 +72,6 @@ def main():
     os.makedirs(config['training']['checkpoint_dir'], exist_ok=True)
     
     # Log checkpoint status
-    print(f"🔒 Face ID Model: Will load from {config['training']['face_id_checkpoint_path']}")
     print(f"🔒 Expression Transformer: Will load from {config['training']['expression_transformer_checkpoint_path']}")
     
     if config['training']['reconstruction_model_checkpoint_path'] is not None:
@@ -82,17 +80,6 @@ def main():
         print(f"🎓 Reconstruction Model: Will train from scratch")
     
     # Try to load and display architecture info for checkpoints
-    try:
-        # Face ID checkpoint info
-        face_id_checkpoint = torch.load(config['training']['face_id_checkpoint_path'], map_location='cpu')
-        if 'config' in face_id_checkpoint and 'face_id_model' in face_id_checkpoint['config']:
-            face_id_config = face_id_checkpoint['config']['face_id_model']
-            print(f"   📐 Face ID Architecture: {face_id_config.get('num_layers', '?')} layers, {face_id_config.get('num_heads', '?')} heads")
-        else:
-            print(f"   ⚠️  No Face ID architecture info in checkpoint")
-    except Exception as e:
-        print(f"   ⚠️  Could not read Face ID checkpoint info: {str(e)}")
-    
     try:
         # Expression transformer checkpoint info
         expr_checkpoint = torch.load(config['training']['expression_transformer_checkpoint_path'], map_location='cpu')
@@ -108,9 +95,9 @@ def main():
     print("\n🎯 Starting training...")
     train_expression_reconstruction(
         dataset_path=config['training']['train_data_dir'],
-        face_id_checkpoint_path=config['training']['face_id_checkpoint_path'],
         expression_transformer_checkpoint_path=config['training']['expression_transformer_checkpoint_path'],
         reconstruction_model_checkpoint_path=config['training']['reconstruction_model_checkpoint_path'],
+        reconstruction_model_config=config['reconstruction_model'],
         checkpoint_dir=config['training']['checkpoint_dir'],
         save_every_epochs=config['training']['save_every_epochs'],
         batch_size=config['training']['batch_size'],

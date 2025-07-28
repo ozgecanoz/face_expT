@@ -1,6 +1,7 @@
 """
 Model Loader for Webcam Demo
-Loads Face ID, Expression Transformer, and Expression Predictor models from checkpoints
+Loads Expression Transformer, Expression Predictor, and Face Reconstruction models from checkpoints
+Uses subject embeddings instead of face ID model
 """
 
 import torch
@@ -14,7 +15,6 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from face_model.models.dinov2_tokenizer import DINOv2Tokenizer
-from face_model.models.face_id_model import FaceIDModel
 from face_model.models.expression_transformer import ExpressionTransformer
 from face_model.models.expression_transformer_decoder import ExpressionTransformerDecoder
 from face_model.models.face_reconstruction_model import FaceReconstructionModel
@@ -31,7 +31,6 @@ class ModelLoader:
         self.tokenizer = None
         
     def load_all_models(self, 
-                        face_id_checkpoint_path: str,
                         expression_transformer_checkpoint_path: str,
                         expression_predictor_checkpoint_path: str,
                         face_reconstruction_checkpoint_path: str) -> Dict[str, Any]:
@@ -39,7 +38,6 @@ class ModelLoader:
         Load all models from checkpoints
         
         Args:
-            face_id_checkpoint_path: Path to Face ID model checkpoint
             expression_transformer_checkpoint_path: Path to Expression Transformer checkpoint
             expression_predictor_checkpoint_path: Path to Expression Predictor checkpoint
             face_reconstruction_checkpoint_path: Path to Face Reconstruction model checkpoint
@@ -53,12 +51,6 @@ class ModelLoader:
         logger.info("📦 Loading DINOv2 tokenizer...")
         self.tokenizer = DINOv2Tokenizer()
         logger.info("✅ DINOv2 tokenizer loaded")
-        
-        # Load Face ID model
-        logger.info("👤 Loading Face ID model...")
-        face_id_model = self._load_face_id_model(face_id_checkpoint_path)
-        self.models['face_id'] = face_id_model
-        logger.info("✅ Face ID model loaded")
         
         # Load Expression Transformer
         logger.info("😊 Loading Expression Transformer...")
@@ -82,54 +74,10 @@ class ModelLoader:
         
         return {
             'tokenizer': self.tokenizer,
-            'face_id_model': face_id_model,
             'expression_transformer': expression_transformer,
             'expression_predictor': expression_predictor,
             'face_reconstruction_model': face_reconstruction_model
         }
-    
-    def _load_face_id_model(self, checkpoint_path: str) -> FaceIDModel:
-        """Load Face ID model with architecture from checkpoint"""
-        if not os.path.exists(checkpoint_path):
-            raise FileNotFoundError(f"Face ID checkpoint not found: {checkpoint_path}")
-        
-        # Load checkpoint to get architecture
-        checkpoint = torch.load(checkpoint_path, map_location=self.device)
-        
-        # Get architecture from checkpoint config
-        if 'config' in checkpoint and 'face_id_model' in checkpoint['config']:
-            face_id_config = checkpoint['config']['face_id_model']
-            embed_dim = face_id_config.get('embed_dim', 384)
-            num_heads = face_id_config.get('num_heads', 4)
-            num_layers = face_id_config.get('num_layers', 2)
-            dropout = face_id_config.get('dropout', 0.1)
-            logger.info(f"📐 Face ID architecture: {num_layers} layers, {num_heads} heads")
-        else:
-            # Fallback to default architecture
-            embed_dim, num_heads, num_layers, dropout = 384, 4, 2, 0.1
-            logger.warning("No architecture config found in Face ID checkpoint, using defaults")
-        
-        # Initialize model with correct architecture
-        face_id_model = FaceIDModel(
-            embed_dim=embed_dim,
-            num_heads=num_heads,
-            num_layers=num_layers,
-            dropout=dropout
-        ).to(self.device)
-        
-        # Load state dict
-        if 'face_id_model_state_dict' in checkpoint:
-            face_id_model.load_state_dict(checkpoint['face_id_model_state_dict'])
-            logger.info(f"Loaded Face ID model from epoch {checkpoint.get('epoch', 'unknown')}")
-        else:
-            # Try loading the entire checkpoint as state dict
-            face_id_model.load_state_dict(checkpoint)
-            logger.info("Loaded Face ID model state dict directly")
-        
-        # Set to evaluation mode
-        face_id_model.eval()
-        
-        return face_id_model
     
     def _load_expression_transformer(self, checkpoint_path: str) -> ExpressionTransformer:
         """Load Expression Transformer with architecture from checkpoint"""
@@ -146,10 +94,11 @@ class ModelLoader:
             num_heads = expr_config.get('num_heads', 4)
             num_layers = expr_config.get('num_layers', 2)
             dropout = expr_config.get('dropout', 0.1)
-            logger.info(f"📐 Expression Transformer architecture: {num_layers} layers, {num_heads} heads")
+            max_subjects = expr_config.get('max_subjects', 3500)  # Load from checkpoint
+            logger.info(f"📐 Expression Transformer architecture: {num_layers} layers, {num_heads} heads, {max_subjects} subjects")
         else:
             # Fallback to default architecture
-            embed_dim, num_heads, num_layers, dropout = 384, 4, 2, 0.1
+            embed_dim, num_heads, num_layers, dropout, max_subjects = 384, 4, 2, 0.1, 3500
             logger.warning("No architecture config found in Expression Transformer checkpoint, using defaults")
         
         # Initialize model with correct architecture
@@ -157,16 +106,37 @@ class ModelLoader:
             embed_dim=embed_dim,
             num_heads=num_heads,
             num_layers=num_layers,
-            dropout=dropout
+            dropout=dropout,
+            max_subjects=max_subjects  # Use max_subjects from checkpoint
         ).to(self.device)
         
         # Load state dict
         if 'expression_transformer_state_dict' in checkpoint:
-            expression_transformer.load_state_dict(checkpoint['expression_transformer_state_dict'])
+            state_dict = checkpoint['expression_transformer_state_dict']
+            
+            # Check for subject_embeddings.weight - required for demo
+            if 'subject_embeddings.weight' not in state_dict:
+                raise RuntimeError(
+                    f"Checkpoint {checkpoint_path} is missing 'subject_embeddings.weight'. "
+                    f"This checkpoint was trained with the old architecture (using face ID model). "
+                    f"Please train a new Expression Transformer with subject embeddings for the demo to work."
+                )
+            
+            expression_transformer.load_state_dict(state_dict)
             logger.info(f"Loaded Expression Transformer from epoch {checkpoint.get('epoch', 'unknown')}")
         else:
             # Try loading the entire checkpoint as state dict
-            expression_transformer.load_state_dict(checkpoint)
+            state_dict = checkpoint
+            
+            # Check for subject_embeddings.weight - required for demo
+            if 'subject_embeddings.weight' not in state_dict:
+                raise RuntimeError(
+                    f"Checkpoint {checkpoint_path} is missing 'subject_embeddings.weight'. "
+                    f"This checkpoint was trained with the old architecture (using face ID model). "
+                    f"Please train a new Expression Transformer with subject embeddings for the demo to work."
+                )
+            
+            expression_transformer.load_state_dict(state_dict)
             logger.info("Loaded Expression Transformer state dict directly")
         
         # Set to evaluation mode
@@ -281,7 +251,6 @@ def test_model_loader():
     # Test with dummy checkpoint paths (these won't exist, but we can test the structure)
     try:
         models = loader.load_all_models(
-            face_id_checkpoint_path="/Users/ozgewhiting/Documents/projects/dataset_utils/cloud_checkpoints/face_id_epoch_0.pth",
             expression_transformer_checkpoint_path="/Users/ozgewhiting/Documents/projects/dataset_utils/cloud_checkpoints/expression_transformer_epoch_5.pt",
             expression_predictor_checkpoint_path="/Users/ozgewhiting/Documents/projects/dataset_utils/cloud_checkpoints/transformer_decoder_epoch_5.pt",
             face_reconstruction_checkpoint_path="/Users/ozgewhiting/Documents/projects/dataset_utils/cloud_checkpoints/reconstruction_model_epoch_5.pt"

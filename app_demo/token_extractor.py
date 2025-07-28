@@ -1,6 +1,6 @@
 """
 Token Extractor for Webcam Demo
-Efficiently extracts face ID and expression tokens using cached DINOv2 tokens
+Efficiently extracts expression tokens using cached DINOv2 tokens and subject embeddings
 """
 
 import torch
@@ -17,15 +17,15 @@ logger = logging.getLogger(__name__)
 
 
 class TokenExtractor:
-    """Extracts tokens from face images and predicts next expression token"""
+    """Extracts tokens from face images and predicts next expression token using subject embeddings"""
     
-    def __init__(self, face_id_model, expression_transformer, expression_predictor, face_reconstruction_model, tokenizer, device="cpu"):
-        self.face_id_model = face_id_model
+    def __init__(self, expression_transformer, expression_predictor, face_reconstruction_model, tokenizer, device="cpu", subject_id=0):
         self.expression_transformer = expression_transformer
         self.expression_predictor = expression_predictor
         self.face_reconstruction_model = face_reconstruction_model
         self.tokenizer = tokenizer
         self.device = device
+        self.subject_id = subject_id  # Subject ID for the current user
         
         # Initialize circular buffer for 30 frames
         self.token_buffer = TokenBuffer(buffer_size=30)
@@ -60,56 +60,37 @@ class TokenExtractor:
         with torch.no_grad():
             patch_tokens, pos_embeddings = self.tokenizer(face_tensor)
         
-        # Extract face ID token
-        face_id_token = self._extract_face_id_token(patch_tokens, pos_embeddings)
+        # Create subject ID tensor
+        subject_ids = torch.tensor([self.subject_id], dtype=torch.long, device=self.device)
         
-        # Extract expression token
-        expression_token = self._extract_expression_token(patch_tokens, pos_embeddings, face_id_token)
+        # Extract expression token and subject embeddings using inference method
+        expression_token, subject_embeddings = self.expression_transformer.inference(patch_tokens, pos_embeddings, subject_ids)
         
         return {
-            'face_id_token': face_id_token,
             'expression_token': expression_token,
+            'subject_embeddings': subject_embeddings,
             'patch_tokens': patch_tokens,
-            'pos_embeddings': pos_embeddings
+            'pos_embeddings': pos_embeddings,
+            'subject_ids': subject_ids
         }
-    
-    def _extract_face_id_token(self, patch_tokens: torch.Tensor, 
-                              pos_embeddings: torch.Tensor) -> torch.Tensor:
-        """
-        Extract face ID token using cached DINOv2 tokens
-        
-        Args:
-            patch_tokens: DINOv2 patch tokens (1, 1369, 384)
-            pos_embeddings: Positional embeddings (1, 1369, 384)
-            
-        Returns:
-            Face ID token (1, 1, 384)
-        """
-        with torch.no_grad():
-            # Use the new inference method for cached tokens
-            face_id_token = self.face_id_model.inference(patch_tokens, pos_embeddings)
-        
-        return face_id_token
     
     def _extract_expression_token(self, patch_tokens: torch.Tensor, 
                                 pos_embeddings: torch.Tensor,
-                                face_id_token: torch.Tensor) -> torch.Tensor:
+                                subject_ids: torch.Tensor) -> torch.Tensor:
         """
-        Extract expression token using cached DINOv2 tokens
+        Extract expression token using cached DINOv2 tokens and subject embeddings
         
         Args:
             patch_tokens: DINOv2 patch tokens (1, 1369, 384)
             pos_embeddings: Positional embeddings (1, 1369, 384)
-            face_id_token: Face ID token (1, 1, 384)
+            subject_ids: Subject IDs (1,)
             
         Returns:
             Expression token (1, 1, 384)
         """
         with torch.no_grad():
-            # Use the new inference method for cached tokens
-            expression_token = self.expression_transformer.inference(
-                patch_tokens, pos_embeddings, face_id_token
-            )
+            # Use the new inference method for cached tokens with subject embeddings
+            expression_token, _ = self.expression_transformer.inference(patch_tokens, pos_embeddings, subject_ids)
         
         return expression_token
     
@@ -129,13 +110,13 @@ class TokenExtractor:
         
         return predicted_token
     
-    def reconstruct_face(self, face_id_token: torch.Tensor, expression_token: torch.Tensor, 
+    def reconstruct_face(self, subject_embeddings: torch.Tensor, expression_token: torch.Tensor, 
                         patch_tokens: torch.Tensor, pos_embeddings: torch.Tensor) -> torch.Tensor:
         """
-        Reconstruct face image from face ID and expression tokens using actual DINOv2 tokens
+        Reconstruct face image from subject embeddings and expression tokens using actual DINOv2 tokens
         
         Args:
-            face_id_token: (1, 1, 384) - Face ID token
+            subject_embeddings: (1, 1, 384) - Subject embeddings from Expression Transformer
             expression_token: (1, 1, 384) - Expression token
             patch_tokens: (1, 1369, 384) - DINOv2 patch tokens from input frame
             pos_embeddings: (1, 1369, 384) - Positional embeddings from input frame
@@ -144,9 +125,9 @@ class TokenExtractor:
             reconstructed_face: (1, 3, 518, 518) - Reconstructed face image
         """
         with torch.no_grad():
-            # Use actual DINOv2 tokens from the input frame
+            # Use actual DINOv2 tokens from the input frame and subject embeddings from Expression Transformer
             reconstructed_face = self.face_reconstruction_model(
-                patch_tokens, pos_embeddings, face_id_token, expression_token
+                patch_tokens, pos_embeddings, subject_embeddings, expression_token
             )
         
         return reconstructed_face
@@ -183,8 +164,7 @@ class TokenBuffer:
         self.buffer_size = buffer_size
         self.token_dim = token_dim
         
-        # Initialize circular buffers
-        self.face_id_tokens = torch.zeros(buffer_size, 1, token_dim)
+        # Initialize circular buffers (removed face_id_tokens since we use subject embeddings)
         self.expression_tokens = torch.zeros(buffer_size, 1, token_dim)
         
         # Track current position and frame count
@@ -193,54 +173,47 @@ class TokenBuffer:
         
         logger.info(f"Token Buffer initialized with size {buffer_size}")
     
-    def add_frame_tokens(self, face_id_token: torch.Tensor, 
-                        expression_token: torch.Tensor) -> None:
+    def add_frame_tokens(self, expression_token: torch.Tensor) -> None:
         """
-        Add tokens for a new frame
+        Add expression token to the buffer
         
         Args:
-            face_id_token: Face ID token (1, 1, 384)
             expression_token: Expression token (1, 1, 384)
         """
-        # Store tokens in circular buffer
-        self.face_id_tokens[self.current_index] = face_id_token.squeeze(0)
-        self.expression_tokens[self.current_index] = expression_token.squeeze(0)
+        # Store expression token
+        self.expression_tokens[self.current_index] = expression_token
         
         # Update indices
         self.current_index = (self.current_index + 1) % self.buffer_size
-        self.frame_count += 1
+        self.frame_count = min(self.frame_count + 1, self.buffer_size)
+        
+        logger.debug(f"Added expression token to buffer at index {self.current_index}")
     
     def get_prediction_sequence(self) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Get the sequence of tokens for prediction (last 29 frames)
         
         Returns:
-            Tuple of (face_id_sequence, expression_sequence) for prediction
+            Tuple of (expression_tokens, None) for compatibility
         """
         if self.frame_count < 29:
-            # Not enough frames for prediction
             return None, None
         
-        # Get the last 29 frames (excluding current frame)
+        # Get the last 29 expression tokens
         start_idx = (self.current_index - 29) % self.buffer_size
-        end_idx = (self.current_index - 1) % self.buffer_size
+        end_idx = self.current_index
         
-        if start_idx <= end_idx:
-            # Normal sequence
-            face_id_sequence = self.face_id_tokens[start_idx:end_idx+1]
-            expression_sequence = self.expression_tokens[start_idx:end_idx+1]
+        if start_idx < end_idx:
+            # No wrap-around
+            expression_sequence = self.expression_tokens[start_idx:end_idx]
         else:
-            # Wrapped sequence
-            face_id_sequence = torch.cat([
-                self.face_id_tokens[start_idx:],
-                self.face_id_tokens[:end_idx+1]
-            ], dim=0)
+            # Wrap-around case
             expression_sequence = torch.cat([
                 self.expression_tokens[start_idx:],
-                self.expression_tokens[:end_idx+1]
+                self.expression_tokens[:end_idx]
             ], dim=0)
         
-        return face_id_sequence, expression_sequence
+        return expression_sequence, None  # Return None for face_id_tokens for compatibility
     
     def is_ready_for_prediction(self) -> bool:
         """Check if we have enough frames for prediction"""
@@ -252,7 +225,6 @@ class TokenBuffer:
     
     def reset(self):
         """Reset the buffer"""
-        self.face_id_tokens.zero_()
         self.expression_tokens.zero_()
         self.current_index = 0
         self.frame_count = 0
@@ -260,62 +232,71 @@ class TokenBuffer:
 
 
 def test_token_extractor():
-    """Test the token extractor with dummy data"""
+    """Test the token extractor"""
     print("🧪 Testing Token Extractor...")
     
-    # Create dummy models (these won't work, but we can test the structure)
+    # Create dummy models
     class DummyModel:
         def __init__(self, name):
             self.name = name
         
         def inference(self, *args):
-            return torch.randn(1, 1, 384)
+            return torch.randn(1, 1, 384), torch.randn(1, 1, 384) # Changed to return subject embeddings
     
-    # Create dummy tokenizer
     class DummyTokenizer:
         def __call__(self, face_tensor):
             return torch.randn(1, 1369, 384), torch.randn(1, 1369, 384)
     
     # Create dummy models
-    models = {
-        'face_id_model': DummyModel('face_id'),
-        'expression_transformer': DummyModel('expression'),
-        'expression_predictor': DummyModel('predictor')
-    }
-    
+    expression_transformer = DummyModel('expression')
+    expression_predictor = DummyModel('predictor')
+    face_reconstruction_model = DummyModel('reconstruction')
     tokenizer = DummyTokenizer()
     
     # Create token extractor
-    extractor = TokenExtractor(models, tokenizer, device="cpu")
+    extractor = TokenExtractor(
+        expression_transformer=expression_transformer,
+        expression_predictor=expression_predictor,
+        face_reconstruction_model=face_reconstruction_model,
+        tokenizer=tokenizer,
+        device="cpu",
+        subject_id=0  # Use subject ID 0 for testing
+    )
+    print("✅ Token Extractor created successfully")
     
     # Create dummy face image
     dummy_face = np.random.randint(0, 255, (518, 518, 3), dtype=np.uint8)
     
     # Test token extraction
-    try:
-        tokens = extractor.process_frame_tokens(dummy_face)
-        print("✅ Token extraction test passed!")
-        print(f"Extracted tokens: {list(tokens.keys())}")
-    except Exception as e:
-        print(f"❌ Token extraction test failed: {e}")
+    tokens = extractor.process_frame_tokens(dummy_face)
+    if tokens is not None:
+        print("✅ Token extraction completed successfully")
+        print(f"   Extracted tokens: {list(tokens.keys())}")
+    else:
+        print("❌ Token extraction failed")
+        return False
     
     # Test token buffer
-    print("\n🧪 Testing Token Buffer...")
     buffer = TokenBuffer(buffer_size=30)
+    print("✅ Token Buffer created successfully")
     
     # Add some dummy tokens
     for i in range(35):
-        face_id_token = torch.randn(1, 1, 384)
         expression_token = torch.randn(1, 1, 384)
-        buffer.add_frame_tokens(face_id_token, expression_token)
+        buffer.add_frame_tokens(expression_token)
         
         if buffer.is_ready_for_prediction():
-            face_id_seq, expr_seq = buffer.get_prediction_sequence()
-            print(f"Frame {i}: Ready for prediction, sequence shape: {face_id_seq.shape}")
+            expr_seq, _ = buffer.get_prediction_sequence()
+            print(f"Frame {i}: Ready for prediction, sequence shape: {expr_seq.shape}")
         else:
             print(f"Frame {i}: Not ready for prediction")
     
-    print("✅ Token Buffer test completed!")
+    # Test reset
+    buffer.reset()
+    print("✅ Token Buffer reset successfully")
+    
+    print("✅ Token Extractor test passed!")
+    return True
 
 
 if __name__ == "__main__":

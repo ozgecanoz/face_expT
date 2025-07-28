@@ -1,6 +1,6 @@
 """
 Component E: Face Reconstruction Model (Learnable)
-Reconstructs face images from identity and expression tokens
+Reconstructs face images from subject embeddings and expression tokens
 Optimized for reduced parameter count (~70% reduction)
 """
 
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class FaceReconstructionModel(nn.Module):
     """
     Component E: Face Reconstruction Model (Optimized)
-    Input: Patch tokens (1369×384) + Face ID token (1×384) + Expression token (1×384)
+    Input: Patch tokens (1369×384) + Subject embeddings (1×384) + Expression token (1×384)
     Output: Reconstructed face image (518×518×3)
     """
     
@@ -39,12 +39,12 @@ class FaceReconstructionModel(nn.Module):
         
         logger.info(f"Optimized Face Reconstruction Model initialized with {num_layers} transformer layer, {num_heads} heads")
         
-    def forward(self, patch_tokens, pos_embeddings, face_id_token, expression_token):
+    def forward(self, patch_tokens, pos_embeddings, subject_embeddings, expression_token):
         """
         Args:
             patch_tokens: (B, 1369, 384) - Patch tokens from Component A
             pos_embeddings: (B, 1369, 384) - Positional embeddings
-            face_id_token: (B, 1, 384) - Face ID token from Component B
+            subject_embeddings: (B, 1, 384) - Subject embeddings from Expression Transformer
             expression_token: (B, 1, 384) - Expression token from Component C
         
         Returns:
@@ -55,10 +55,10 @@ class FaceReconstructionModel(nn.Module):
         # Add positional embeddings to patch tokens
         patch_tokens_with_pos = patch_tokens + pos_embeddings
         
-        # Combine face_id and expression tokens for K, V
-        identity_expression = torch.cat([face_id_token, expression_token], dim=1)  # (B, 2, 384)
+        # Combine subject embeddings and expression tokens for K, V
+        identity_expression = torch.cat([subject_embeddings, expression_token], dim=1)  # (B, 2, 384)
         
-        # Cross-attention: patch tokens attend to [face_id, expression]
+        # Cross-attention: patch tokens attend to [subject_embeddings, expression]
         # Concatenate patch tokens and identity_expression
         combined = torch.cat([patch_tokens_with_pos, identity_expression], dim=1)  # (B, 1371, 384)
         
@@ -162,15 +162,15 @@ def test_face_reconstruction_model():
     
     patch_tokens = torch.randn(batch_size, num_patches, embed_dim)
     pos_embeddings = torch.randn(batch_size, num_patches, embed_dim)
-    face_id_token = torch.randn(batch_size, 1, embed_dim)
+    subject_embeddings = torch.randn(batch_size, 1, embed_dim) # Dummy subject embeddings
     expression_token = torch.randn(batch_size, 1, embed_dim)
     
     # Forward pass
-    reconstructed_face = model(patch_tokens, pos_embeddings, face_id_token, expression_token)
+    reconstructed_face = model(patch_tokens, pos_embeddings, subject_embeddings, expression_token)
     
     print(f"Patch tokens shape: {patch_tokens.shape}")
     print(f"Positional embeddings shape: {pos_embeddings.shape}")
-    print(f"Face ID token shape: {face_id_token.shape}")
+    print(f"Subject embeddings shape: {subject_embeddings.shape}")
     print(f"Expression token shape: {expression_token.shape}")
     print(f"Reconstructed face shape: {reconstructed_face.shape}")
     
@@ -182,10 +182,10 @@ def test_face_reconstruction_model():
     batch_size_2 = 1
     patch_tokens_2 = torch.randn(batch_size_2, num_patches, embed_dim)
     pos_embeddings_2 = torch.randn(batch_size_2, num_patches, embed_dim)
-    face_id_token_2 = torch.randn(batch_size_2, 1, embed_dim)
+    subject_embeddings_2 = torch.randn(batch_size_2, 1, embed_dim)
     expression_token_2 = torch.randn(batch_size_2, 1, embed_dim)
     
-    reconstructed_face_2 = model(patch_tokens_2, pos_embeddings_2, face_id_token_2, expression_token_2)
+    reconstructed_face_2 = model(patch_tokens_2, pos_embeddings_2, subject_embeddings_2, expression_token_2)
     print(f"Reconstructed face shape (batch_size={batch_size_2}): {reconstructed_face_2.shape}")
     
     print("✅ Optimized Face Reconstruction Model test passed!")
