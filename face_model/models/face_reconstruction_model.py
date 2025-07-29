@@ -77,13 +77,13 @@ class FaceReconstructionModel(nn.Module):
         # Pass through optimized CNN decoder
         reconstructed_face = self.cnn_decoder(spatial_features)  # (B, 3, 518, 518)
         
+        # WARNNING: we do not need this, cnn decodes to an image in the range [0,1] via sigmoid, in the loss we'll just use the MSE with a target image in this range
         # Un-normalize the output using ImageNet mean and std
         # ImageNet mean and std values (same as used in DINOv2 tokenizer)
-        mean = torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1).to(reconstructed_face.device)
-        std = torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1).to(reconstructed_face.device)
-        
+        #mean = torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1).to(reconstructed_face.device)
+        #std = torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1).to(reconstructed_face.device)
         # Un-normalize: x * std + mean
-        reconstructed_face = reconstructed_face * std + mean
+        #reconstructed_face = reconstructed_face * std + mean
         
         # Clamp to valid range [0, 1]
         reconstructed_face = torch.clamp(reconstructed_face, 0.0, 1.0)

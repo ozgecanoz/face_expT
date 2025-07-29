@@ -116,8 +116,8 @@ class WebcamDemo:
             with open(json_path, 'r') as f:
                 identity_data = json.load(f)
             
-            # Validate required fields
-            required_fields = ['face_id_token', 'patch_tokens', 'pos_embeddings']
+            # Validate required fields (no longer need face_id_token)
+            required_fields = ['patch_tokens', 'pos_embeddings', 'subject_id', 'subject_embeddings']
             for field in required_fields:
                 if field not in identity_data:
                     logger.error(f"Missing required field '{field}' in identity features file")
@@ -125,18 +125,19 @@ class WebcamDemo:
             
             # Convert lists back to numpy arrays
             identity_features = {
-                'face_id_token': np.array(identity_data['face_id_token'], dtype=np.float32),
                 'patch_tokens': np.array(identity_data['patch_tokens'], dtype=np.float32),
                 'pos_embeddings': np.array(identity_data['pos_embeddings'], dtype=np.float32),
+                'subject_embeddings': np.array(identity_data['subject_embeddings'], dtype=np.float32),
+                'subject_id': identity_data['subject_id'],
                 'video_path': identity_data.get('video_path', 'unknown'),
-                'frame_shape': identity_data.get('frame_shape', [518, 518, 3]),
-                'subject_id': identity_data.get('subject_id', 'unknown')
+                'frame_shape': identity_data.get('frame_shape', [518, 518, 3])
             }
             
             logger.info(f"✅ Loaded identity features:")
-            logger.info(f"   Face ID token shape: {identity_features['face_id_token'].shape}")
+            logger.info(f"   Subject ID: {identity_features['subject_id']}")
             logger.info(f"   Patch tokens shape: {identity_features['patch_tokens'].shape}")
             logger.info(f"   Pos embeddings shape: {identity_features['pos_embeddings'].shape}")
+            logger.info(f"   Subject embeddings shape: {identity_features['subject_embeddings'].shape}")
             
             return identity_features
             
@@ -251,39 +252,63 @@ class WebcamDemo:
             subject_embeddings = tokens.get('subject_embeddings')
             
             if patch_tokens is not None and pos_embeddings is not None and subject_embeddings is not None:
-                # Use loaded identity features if available, otherwise use current frame's
+                '''
+                # When using identity features, use the loaded identity's subject embeddings
                 if self.identity_features is not None:
-                    # Use someone else's identity with current expression
-                    identity_subject_id = self.identity_features.get('subject_id', 1)  # Use different subject ID
-                    identity_subject_ids = torch.tensor([identity_subject_id], dtype=torch.long, device=self.device)
+                    # Get identity subject ID and precomputed subject embeddings
+                    identity_subject_id = self.identity_features['subject_id']
                     
-                    # Get subject embeddings for the identity subject
-                    identity_expression_token, identity_subject_embeddings = self.token_extractor.expression_transformer.inference(
-                        patch_tokens, pos_embeddings, identity_subject_ids
-                    )
+                    # Load precomputed subject embeddings from JSON
+                    identity_subject_embeddings = torch.tensor(
+                        self.identity_features['subject_embeddings'], 
+                        dtype=torch.float32, 
+                        device=self.device
+                    ).squeeze().unsqueeze(0).unsqueeze(0)  # (1, 1, 384)
                     
-                    # Debug: Print token statistics
-                    logger.info(f"🔍 Identity subject ID: {identity_subject_id}")
-                    logger.info(f"🔍 Current expression token stats: mean={tokens['expression_token'].mean().item():.4f}, std={tokens['expression_token'].std().item():.4f}")
+                    # Load identity's DINOv2 tokens from JSON
+                    identity_patch_tokens = torch.tensor(
+                        self.identity_features['patch_tokens'], 
+                        dtype=torch.float32, 
+                        device=self.device
+                    ).unsqueeze(0)  # (1, 1369, 384)
                     
+                    identity_pos_embeddings = torch.tensor(
+                        self.identity_features['pos_embeddings'], 
+                        dtype=torch.float32, 
+                        device=self.device
+                    ).unsqueeze(0)  # (1, 1369, 384)
+                    
+                    logger.info(f"✅ Using precomputed subject embeddings for identity subject {identity_subject_id}")
+                    logger.info(f"   Subject embeddings shape: {identity_subject_embeddings.shape}")
+                    
+                    # Reconstruct face using identity's subject embeddings and current frame's expression token
                     reconstructed_face = self.token_extractor.reconstruct_face(
-                        identity_subject_embeddings,  # Someone else's identity
-                        tokens['expression_token'],  # Current expression
-                        patch_tokens,  # Current frame's patch tokens
-                        pos_embeddings  # Current frame's pos embeddings
+                        identity_subject_embeddings,  # Use precomputed subject embeddings
+                        tokens['expression_token'],   # Use current frame's expression token
+                        identity_patch_tokens,        # Use identity's DINOv2 tokens
+                        identity_pos_embeddings       # Use identity's positional embeddings
                     )
-                else:
-                    # Use current frame's identity and expression
-                    reconstructed_face = self.token_extractor.reconstruct_face(
-                        subject_embeddings,
-                        tokens['expression_token'],
-                        patch_tokens,
-                        pos_embeddings
-                    )
+                    '''
+                # Use current frame's identity and expression
+                reconstructed_face = self.token_extractor.reconstruct_face(
+                subject_embeddings,
+                tokens['expression_token'],
+                patch_tokens,
+                pos_embeddings
+                )
+            else:
+                    
+                # Use current frame's identity and expression
+                reconstructed_face = self.token_extractor.reconstruct_face(
+                subject_embeddings,
+                tokens['expression_token'],
+                patch_tokens,
+                pos_embeddings
+                )
                 
-                # Convert to numpy for display
-                reconstructed_face = reconstructed_face.squeeze(0).cpu().numpy()  # (3, 518, 518)
-                reconstructed_face = np.transpose(reconstructed_face, (1, 2, 0))  # (518, 518, 3)
+            # Convert to numpy for display
+            reconstructed_face = reconstructed_face.squeeze(0).cpu().numpy()  # (3, 518, 518)
+            reconstructed_face = np.transpose(reconstructed_face, (1, 2, 0))  # (518, 518, 3)
         
         # Add tokens to buffer
         self.token_buffer.add_frame_tokens(tokens['expression_token'])
@@ -291,10 +316,25 @@ class WebcamDemo:
         # Check if ready for prediction
         prediction = None
         if self.token_buffer.is_ready_for_prediction():
+            logger.info("🔍 Ready for prediction, getting sequence...")
             expr_seq, _ = self.token_buffer.get_prediction_sequence()
             if expr_seq is not None:
+                # Debug: Print sequence shape
+                logger.info(f"Prediction sequence shape: {expr_seq.shape}")
+                
                 # Predict next expression token
-                prediction = self.token_extractor.predict_next_expression(expr_seq)
+                logger.info("🔍 Calling predict_next_expression...")
+                try:
+                    prediction = self.token_extractor.predict_next_expression(expr_seq)
+                    logger.info("✅ Prediction successful")
+                except Exception as e:
+                    logger.error(f"❌ Error in predict_next_expression: {e}")
+                    import traceback
+                    logger.error(f"Traceback: {traceback.format_exc()}")
+                
+                # Debug: Print prediction shape
+                if prediction is not None:
+                    logger.info(f"Prediction shape: {prediction.shape}")
         
         return {
             'face_detected': True,
@@ -353,7 +393,9 @@ class WebcamDemo:
             cv2.putText(frame, "RECONSTRUCTING WITH LOADED IDENTITY", (10, 150), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
         else:
-            cv2.putText(frame, "RECONSTRUCTING WITH CURRENT IDENTITY", (10, 120), 
+            cv2.putText(frame, f"Subject ID: {self.subject_id}", (10, 120), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+            cv2.putText(frame, "RECONSTRUCTING WITH CURRENT IDENTITY", (10, 150), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
         
         # Draw expression similarity if available
@@ -373,14 +415,11 @@ class WebcamDemo:
         frame_num = results.get('frame_num', 0)
         
         # Print token statistics
-        face_id_token = tokens.get('face_id_token')
         expression_token = tokens.get('expression_token')
         predicted_token = tokens.get('predicted_token')
+        subject_ids = tokens.get('subject_ids')
         
-        if face_id_token is not None:
-            face_id_stats = f"mean={face_id_token.mean().item():.4f}, std={face_id_token.std().item():.4f}"
-            print(f"📊 Frame {frame_num}:")
-            print(f"   Face ID Token: {face_id_stats}")
+        print(f"📊 Frame {frame_num} (Subject ID: {self.subject_id}):")
         
         if expression_token is not None:
             expr_stats = f"mean={expression_token.mean().item():.4f}, std={expression_token.std().item():.4f}"

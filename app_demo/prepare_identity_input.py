@@ -4,20 +4,21 @@ Prepare Identity Input for Webcam Demo
 Extracts DINOv2 features from video clips and saves as JSON with subject ID
 """
 
+import cv2
+import numpy as np
 import json
+import logging
+import argparse
+from typing import Dict, Optional
+import torch
 import os
 import sys
-import argparse
-import logging
-import numpy as np
-import torch
-import cv2
-from typing import Dict, Any, Optional
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from face_model.models.dinov2_tokenizer import DINOv2Tokenizer
+from face_model.models.expression_transformer import ExpressionTransformer
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -25,21 +26,76 @@ logger = logging.getLogger(__name__)
 
 
 class IdentityExtractor:
-    """Extract DINOv2 features from video clips"""
+    """Extract identity features from video clips"""
     
-    def __init__(self, device: str = "cpu"):
+    def __init__(self, device: str = "cpu", expression_transformer_checkpoint_path: str = None):
         """
         Initialize identity extractor
         
         Args:
-            device: Device to run models on
+            device: Device to use for computation
+            expression_transformer_checkpoint_path: Path to Expression Transformer checkpoint for subject embeddings
         """
         self.device = device
         
-        # Load DINOv2 tokenizer
+        # Initialize DINOv2 tokenizer
         logger.info("📦 Loading DINOv2 tokenizer...")
         self.tokenizer = DINOv2Tokenizer()
         logger.info("✅ DINOv2 tokenizer loaded")
+        
+        # Initialize Expression Transformer for subject embeddings
+        if expression_transformer_checkpoint_path:
+            logger.info("😊 Loading Expression Transformer for subject embeddings...")
+            self.expression_transformer = self._load_expression_transformer(expression_transformer_checkpoint_path)
+            logger.info("✅ Expression Transformer loaded")
+        else:
+            logger.warning("⚠️ No Expression Transformer checkpoint provided - subject embeddings will not be extracted")
+            self.expression_transformer = None
+    
+    def _load_expression_transformer(self, checkpoint_path: str) -> ExpressionTransformer:
+        """Load Expression Transformer with architecture from checkpoint"""
+        if not os.path.exists(checkpoint_path):
+            raise FileNotFoundError(f"Expression Transformer checkpoint not found: {checkpoint_path}")
+        
+        # Load checkpoint to get architecture
+        checkpoint = torch.load(checkpoint_path, map_location=self.device)
+        
+        # Get architecture from checkpoint config
+        if 'config' in checkpoint and 'expression_model' in checkpoint['config']:
+            expr_config = checkpoint['config']['expression_model']
+            embed_dim = expr_config.get('embed_dim', 384)
+            num_heads = expr_config.get('num_heads', 4)
+            num_layers = expr_config.get('num_layers', 2)
+            dropout = expr_config.get('dropout', 0.1)
+            max_subjects = expr_config.get('max_subjects', 3500)
+            logger.info(f"📐 Expression Transformer architecture: {num_layers} layers, {num_heads} heads, {max_subjects} subjects")
+        else:
+            # Fallback to default architecture
+            embed_dim, num_heads, num_layers, dropout, max_subjects = 384, 4, 2, 0.1, 3500
+            logger.warning("No architecture config found in Expression Transformer checkpoint, using defaults")
+        
+        # Initialize model with correct architecture
+        expression_transformer = ExpressionTransformer(
+            embed_dim=embed_dim,
+            num_heads=num_heads,
+            num_layers=num_layers,
+            dropout=dropout,
+            max_subjects=max_subjects
+        ).to(self.device)
+        
+        # Load state dict
+        if 'expression_transformer_state_dict' in checkpoint:
+            expression_transformer.load_state_dict(checkpoint['expression_transformer_state_dict'])
+            logger.info(f"Loaded Expression Transformer from epoch {checkpoint.get('epoch', 'unknown')}")
+        else:
+            # Try loading the entire checkpoint as state dict
+            expression_transformer.load_state_dict(checkpoint)
+            logger.info("Loaded Expression Transformer state dict directly")
+        
+        # Set to evaluation mode
+        expression_transformer.eval()
+        
+        return expression_transformer
     
     def extract_first_frame(self, video_path: str) -> Optional[np.ndarray]:
         """
@@ -77,12 +133,13 @@ class IdentityExtractor:
             logger.error(f"Error extracting first frame from {video_path}: {e}")
             return None
     
-    def extract_identity_features(self, face_image: np.ndarray) -> Dict[str, np.ndarray]:
+    def extract_identity_features(self, face_image: np.ndarray, subject_id: int) -> Dict[str, np.ndarray]:
         """
-        Extract DINOv2 features from face image
+        Extract DINOv2 features and subject embeddings from face image
         
         Args:
             face_image: Face image (H, W, 3) in RGB format
+            subject_id: Subject ID for this identity
             
         Returns:
             Dictionary containing extracted features
@@ -112,16 +169,39 @@ class IdentityExtractor:
             patch_tokens_np = patch_tokens.squeeze(0).cpu().numpy()  # (1369, 384)
             pos_embeddings_np = pos_embeddings.squeeze(0).cpu().numpy()  # (1369, 384)
             
+            # Extract subject embeddings if Expression Transformer is available
+            subject_embeddings_np = None
+            if self.expression_transformer is not None:
+                # Create subject IDs tensor
+                subject_ids = torch.tensor([subject_id], dtype=torch.long, device=self.device)
+                
+                # Extract subject embeddings using inference
+                with torch.no_grad():
+                    _, subject_embeddings = self.expression_transformer.inference(patch_tokens, pos_embeddings, subject_ids)
+                
+                # Convert to numpy
+                subject_embeddings_np = subject_embeddings.squeeze(0).cpu().numpy()  # (384,)
+                
+                logger.info(f"✅ Extracted subject embeddings:")
+                logger.info(f"   Subject embeddings shape: {subject_embeddings_np.shape}")
+                logger.info(f"   Subject embeddings stats: mean={subject_embeddings_np.mean():.4f}, std={subject_embeddings_np.std():.4f}")
+            
             logger.info(f"✅ Extracted DINOv2 features:")
             logger.info(f"   Patch tokens shape: {patch_tokens_np.shape}")
             logger.info(f"   Positional embeddings shape: {pos_embeddings_np.shape}")
             logger.info(f"   Patch tokens stats: mean={patch_tokens_np.mean():.4f}, std={patch_tokens_np.std():.4f}")
             logger.info(f"   Pos embeddings stats: mean={pos_embeddings_np.mean():.4f}, std={pos_embeddings_np.std():.4f}")
             
-            return {
+            features = {
                 'patch_tokens': patch_tokens_np,
                 'pos_embeddings': pos_embeddings_np
             }
+            
+            # Add subject embeddings if available
+            if subject_embeddings_np is not None:
+                features['subject_embeddings'] = subject_embeddings_np
+            
+            return features
             
         except Exception as e:
             logger.error(f"Error extracting identity features: {e}")
@@ -148,7 +228,7 @@ class IdentityExtractor:
                 return False
             
             # Extract identity features
-            features = self.extract_identity_features(first_frame)
+            features = self.extract_identity_features(first_frame, subject_id)
             if not features:
                 return False
             
@@ -164,6 +244,10 @@ class IdentityExtractor:
                     'pos_embeddings_shape': features['pos_embeddings'].shape
                 }
             }
+            
+            # Add subject embeddings to output data if available
+            if 'subject_embeddings' in features:
+                output_data['subject_embeddings'] = features['subject_embeddings'].tolist()
             
             # Save to JSON file
             with open(output_path, 'w') as f:
@@ -184,35 +268,30 @@ class IdentityExtractor:
 def main():
     """Main function"""
     parser = argparse.ArgumentParser(description="Extract identity features from video clips")
-    parser.add_argument("--video_path", type=str, default="identity_video.mp4",
-                       help="Path to video file (should contain 518x518 face frames)")
-    parser.add_argument("--output_path", type=str, required=True,
-                       help="Path to save JSON file with identity features")
-    parser.add_argument("--subject_id", type=int, default=1,
-                       help="Subject ID for this identity")
-    parser.add_argument("--device", type=str, default="cpu",
-                       help="Device to run models on (cpu/cuda)")
+    parser.add_argument("--video_path", type=str, required=True, help="Path to video file")
+    parser.add_argument("--output_path", type=str, required=True, help="Path to save JSON file")
+    parser.add_argument("--subject_id", type=int, default=1, help="Subject ID for this identity")
+    parser.add_argument("--expression_transformer_checkpoint", type=str, default=None, 
+                       help="Path to Expression Transformer checkpoint for subject embeddings")
+    parser.add_argument("--device", type=str, default="cpu", help="Device to use")
     
     args = parser.parse_args()
     
     # Create identity extractor
     extractor = IdentityExtractor(
-        device=args.device
+        device=args.device,
+        expression_transformer_checkpoint_path=args.expression_transformer_checkpoint
     )
     
     # Process video clip
     success = extractor.process_video_clip(args.video_path, args.output_path, subject_id=args.subject_id)
     
     if success:
-        logger.info("🎉 Identity feature extraction completed successfully!")
-        logger.info(f"📁 Output saved to: {args.output_path}")
-        logger.info(f"👤 Subject ID: {args.subject_id}")
-        logger.info("💡 You can now use this JSON file with the webcam demo")
+        logger.info("✅ Identity feature extraction completed successfully!")
+        return True
     else:
-        logger.error("❌ Identity feature extraction failed")
-        return 1
-    
-    return 0
+        logger.error("❌ Identity feature extraction failed!")
+        return False
 
 
 if __name__ == "__main__":

@@ -115,10 +115,15 @@ class ExpressionTransformerDecoder(nn.Module):
         for encoder_layer in self.encoder_layers:
             # Use causal mask for self-attention
             causal_mask = self.causal_mask[:seq_len, :seq_len]
-            hidden_states = encoder_layer(
+            encoder_output = encoder_layer(
                 src=hidden_states,
                 src_mask=causal_mask
             )
+            # Handle tuple return (output, attention_weights)
+            if isinstance(encoder_output, tuple):
+                hidden_states = encoder_output[0]
+            else:
+                hidden_states = encoder_output
         
         # Layer normalization
         hidden_states = self.layer_norm(hidden_states)

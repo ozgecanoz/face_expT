@@ -150,14 +150,13 @@ def test_token_buffer():
         
         # Add some dummy tokens
         for i in range(35):
-            face_id_token = torch.randn(1, 1, 384)
             expression_token = torch.randn(1, 1, 384)
-            buffer.add_frame_tokens(face_id_token, expression_token)
+            buffer.add_frame_tokens(expression_token)
             
             if buffer.is_ready_for_prediction():
-                face_id_seq, expr_seq = buffer.get_prediction_sequence()
-                if face_id_seq is not None and expr_seq is not None:
-                    print(f"✅ Frame {i}: Ready for prediction, sequence shape: {face_id_seq.shape}")
+                expr_seq, _ = buffer.get_prediction_sequence()
+                if expr_seq is not None:
+                    print(f"✅ Frame {i}: Ready for prediction, sequence shape: {expr_seq.shape}")
                 else:
                     print(f"❌ Frame {i}: Prediction sequence is None")
                     return False

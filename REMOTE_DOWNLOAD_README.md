@@ -114,6 +114,21 @@ curl https://sdk.cloud.google.com | bash
 exec -l $SHELL
 gcloud init
 
+##############################################
+* Commands that require authentication will use 152562060093-compute@developer.gserviceaccount.com by default
+* Commands will reference project `faceeqdemo` by default
+Run `gcloud help config` to learn how to change individual settings
+
+This gcloud configuration is called [default]. You can create additional configurations if you work with multiple accounts and/or projects.
+Run `gcloud topic configurations` to learn more.
+
+Some things to try next:
+
+* Run `gcloud --help` to see the Cloud Platform services you can interact with. And run `gcloud help COMMAND` to get help on any gcloud command.
+* Run `gcloud topic --help` to learn about advanced features of the CLI like arg files and output formatting
+* Run `gcloud cheat-sheet` to see a roster of go-to `gcloud` commands.
+#####################
+
 # Install Python dependencies
 pip3 install requests
 ```

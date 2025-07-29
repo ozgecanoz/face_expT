@@ -80,6 +80,54 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/face_model"
             }
+        },
+        {
+            "name": "Debug Webcam Demo",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/app_demo/webcam_demo.py",
+            "args": [
+                "--expression_transformer_checkpoint",
+                "/Users/ozgewhiting/Documents/projects/cloud_checkpoints_with_subject_ids/expression_transformer_epoch_5.pt",
+                "--expression_predictor_checkpoint",
+                "/Users/ozgewhiting/Documents/projects/cloud_checkpoints_with_subject_ids/transformer_decoder_epoch_5.pt",
+                "--face_reconstruction_checkpoint",
+                "/Users/ozgewhiting/Documents/projects/cloud_checkpoints_with_subject_ids/reconstruction_model_epoch_1.pt",
+                "--identity_features",
+                "/Users/ozgewhiting/Documents/projects/dataset_utils/app_demo/CCA_small_1176_14_faces_1_70_w_subj_id_37_w_embeddings.json",
+                "--subject_id",
+                "4"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false,
+            "stopOnEntry": false
+        },
+        {
+            "name": "Debug Webcam Demo (No Identity)",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/app_demo/webcam_demo.py",
+            "args": [
+                "--expression_transformer_checkpoint",
+                "../cloud_checkpoints_with_subject_ids/expression_transformer_epoch_5.pt",
+                "--expression_predictor_checkpoint",
+                "../cloud_checkpoints_with_subject_ids/transformer_decoder_epoch_5.pt",
+                "--face_reconstruction_checkpoint",
+                "../cloud_checkpoints_with_subject_ids/reconstruction_model_epoch_1.pt",
+                "--subject_id",
+                "4"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false,
+            "stopOnEntry": false
         }
     ]
 } 

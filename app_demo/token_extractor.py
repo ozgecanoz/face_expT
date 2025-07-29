@@ -19,16 +19,39 @@ logger = logging.getLogger(__name__)
 class TokenExtractor:
     """Extracts tokens from face images and predicts next expression token using subject embeddings"""
     
-    def __init__(self, expression_transformer, expression_predictor, face_reconstruction_model, tokenizer, device="cpu", subject_id=0):
+    def __init__(self, 
+                 expression_transformer,
+                 expression_predictor=None,  # Make optional
+                 face_reconstruction_model=None,
+                 tokenizer=None,
+                 device="cpu",
+                 subject_id=0):
+        """
+        Initialize TokenExtractor
+        
+        Args:
+            expression_transformer: Expression Transformer model
+            expression_predictor: Expression Predictor model (optional)
+            face_reconstruction_model: Face Reconstruction model (optional)
+            tokenizer: DINOv2 tokenizer
+            device: Device to run models on
+            subject_id: Subject ID for current session
+        """
         self.expression_transformer = expression_transformer
         self.expression_predictor = expression_predictor
         self.face_reconstruction_model = face_reconstruction_model
         self.tokenizer = tokenizer
         self.device = device
-        self.subject_id = subject_id  # Subject ID for the current user
+        self.subject_id = subject_id
         
-        # Initialize circular buffer for 30 frames
+        # Initialize token buffer for prediction
         self.token_buffer = TokenBuffer(buffer_size=30)
+        
+        logger.info(f"TokenExtractor initialized with subject_id: {subject_id}")
+        if expression_predictor is None:
+            logger.info("Expression Predictor not provided - prediction disabled")
+        if face_reconstruction_model is None:
+            logger.info("Face Reconstruction model not provided - reconstruction disabled")
     
     def extract_tokens_from_face(self, face_image: np.ndarray) -> Dict[str, torch.Tensor]:
         """
@@ -64,7 +87,8 @@ class TokenExtractor:
         subject_ids = torch.tensor([self.subject_id], dtype=torch.long, device=self.device)
         
         # Extract expression token and subject embeddings using inference method
-        expression_token, subject_embeddings = self.expression_transformer.inference(patch_tokens, pos_embeddings, subject_ids)
+        with torch.no_grad():
+            expression_token, subject_embeddings = self.expression_transformer.inference(patch_tokens, pos_embeddings, subject_ids)
         
         return {
             'expression_token': expression_token,
@@ -104,9 +128,19 @@ class TokenExtractor:
         Returns:
             Predicted expression token (1, 1, 384)
         """
+        if self.expression_predictor is None:
+            logger.warning("Expression Predictor is not initialized. Cannot predict next expression.")
+            return torch.zeros(1, 1, 384, device=self.device) # Return a dummy tensor
+
         with torch.no_grad():
+            # Debug: Print input shape
+            logger.info(f"Input expression_tokens shape: {expression_tokens.shape}")
+            
             # Use the existing _forward_single_clip method
             predicted_token = self.expression_predictor._forward_single_clip(expression_tokens)
+            
+            # Debug: Print output shape
+            logger.info(f"Output predicted_token shape: {predicted_token.shape}")
         
         return predicted_token
     
@@ -124,6 +158,10 @@ class TokenExtractor:
         Returns:
             reconstructed_face: (1, 3, 518, 518) - Reconstructed face image
         """
+        if self.face_reconstruction_model is None:
+            logger.warning("Face Reconstruction model is not initialized. Cannot reconstruct face.")
+            return torch.zeros(1, 3, 518, 518, device=self.device) # Return a dummy tensor
+
         with torch.no_grad():
             # Use actual DINOv2 tokens from the input frame and subject embeddings from Expression Transformer
             reconstructed_face = self.face_reconstruction_model(

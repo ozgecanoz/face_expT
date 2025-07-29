@@ -139,44 +139,50 @@ class ExpressionTransformer(nn.Module):
             expression_token: (B, 1, 384) - Expression token
             subject_embeddings: (B, 1, 384) - Subject embeddings used
         """
-        B, num_patches, embed_dim = patch_tokens.shape
-        
-        # Get subject embeddings for batch
-        subject_embeddings = self.subject_embeddings(subject_ids)  # (B, 384)
-        subject_embeddings = subject_embeddings.unsqueeze(1)  # (B, 1, 384)
-        
-        # Initialize expression query for batch
-        query = self.expression_query.expand(B, 1, embed_dim)
-        
-        # Prepare fixed K,V context (doesn't get updated)
-        # Add positional embeddings to patch tokens
-        patch_tokens_with_pos = patch_tokens + pos_embeddings
-        
-        # Combine subject_embeddings and patch_tokens for K, V
-        # subject_embeddings: (B, 1, 384), patch_tokens_with_pos: (B, 1369, 384)
-        kv_context = torch.cat([subject_embeddings, patch_tokens_with_pos], dim=1)  # (B, 1370, 384)
-        
-        # Apply cross-attention layers that only update the query
-        for i, (attention_layer, ffn_layer, query_norm) in enumerate(
-            zip(self.cross_attention_layers, self.ffn_layers, self.query_norms)
-        ):
-            # Cross-attention: query attends to kv_context
-            attended_query, _ = attention_layer(query, kv_context, kv_context)
+        with torch.no_grad():
+            B, num_patches, embed_dim = patch_tokens.shape
             
-            # Residual connection and normalization for query
-            query = query_norm(query + attended_query)
+            # Get subject embeddings for batch
+            subject_embeddings = self.subject_embeddings(subject_ids)  # (B, 384)
+            subject_embeddings = subject_embeddings.unsqueeze(1)  # (B, 1, 384)
             
-            # Feed-forward network for query
-            ffn_output = ffn_layer(query)
-            query = query + ffn_output
-        
-        # Final output projection
-        expression_token = self.output_proj(query)  # (B, 1, 384)
-        
-        # Final layer normalization
-        expression_token = self.layer_norm(expression_token)
-        
-        return expression_token, subject_embeddings
+            # Initialize expression query for batch
+            query = self.expression_query.expand(B, 1, embed_dim)
+            
+            # Prepare fixed K,V context (doesn't get updated)
+            # Add positional embeddings to patch tokens
+            patch_tokens_with_pos = patch_tokens + pos_embeddings
+            
+            # Combine subject_embeddings and patch_tokens for K, V
+            # subject_embeddings: (B, 1, 384), patch_tokens_with_pos: (B, 1369, 384)
+            kv_context = torch.cat([subject_embeddings, patch_tokens_with_pos], dim=1)  # (B, 1370, 384)
+            
+            # Apply cross-attention layers that only update the query
+            for i, (attention_layer, ffn_layer, query_norm) in enumerate(
+                zip(self.cross_attention_layers, self.ffn_layers, self.query_norms)
+            ):
+                # Cross-attention: query attends to kv_context
+                attention_output = attention_layer(query, kv_context, kv_context)
+                # Handle tuple return (output, attention_weights, ...)
+                if isinstance(attention_output, tuple):
+                    attended_query = attention_output[0]
+                else:
+                    attended_query = attention_output
+                
+                # Residual connection and normalization for query
+                query = query_norm(query + attended_query)
+                
+                # Feed-forward network for query
+                ffn_output = ffn_layer(query)
+                query = query + ffn_output
+            
+            # Final output projection
+            expression_token = self.output_proj(query)  # (B, 1, 384)
+            
+            # Final layer normalization
+            expression_token = self.layer_norm(expression_token)
+            
+            return expression_token, subject_embeddings
 
 
 def test_expression_transformer():

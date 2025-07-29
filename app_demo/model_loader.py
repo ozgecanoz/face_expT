@@ -32,14 +32,14 @@ class ModelLoader:
         
     def load_all_models(self, 
                         expression_transformer_checkpoint_path: str,
-                        expression_predictor_checkpoint_path: str,
-                        face_reconstruction_checkpoint_path: str) -> Dict[str, Any]:
+                        expression_predictor_checkpoint_path: str = None,
+                        face_reconstruction_checkpoint_path: str = None) -> Dict[str, Any]:
         """
         Load all models from checkpoints
         
         Args:
             expression_transformer_checkpoint_path: Path to Expression Transformer checkpoint
-            expression_predictor_checkpoint_path: Path to Expression Predictor checkpoint
+            expression_predictor_checkpoint_path: Path to Expression Predictor checkpoint (optional)
             face_reconstruction_checkpoint_path: Path to Face Reconstruction model checkpoint
             
         Returns:
@@ -58,17 +58,25 @@ class ModelLoader:
         self.models['expression_transformer'] = expression_transformer
         logger.info("✅ Expression Transformer loaded")
         
-        # Load Expression Predictor
-        logger.info("🔮 Loading Expression Predictor...")
-        expression_predictor = self._load_expression_predictor(expression_predictor_checkpoint_path)
-        self.models['expression_predictor'] = expression_predictor
-        logger.info("✅ Expression Predictor loaded")
+        # Load Expression Predictor (optional)
+        expression_predictor = None
+        if expression_predictor_checkpoint_path and expression_predictor_checkpoint_path != "dummy":
+            logger.info("🔮 Loading Expression Predictor...")
+            expression_predictor = self._load_expression_predictor(expression_predictor_checkpoint_path)
+            self.models['expression_predictor'] = expression_predictor
+            logger.info("✅ Expression Predictor loaded")
+        else:
+            logger.info("⏭️ Skipping Expression Predictor (not needed for reconstruction)")
         
         # Load Face Reconstruction model
-        logger.info("🎨 Loading Face Reconstruction model...")
-        face_reconstruction_model = self._load_face_reconstruction_model(face_reconstruction_checkpoint_path)
-        self.models['face_reconstruction'] = face_reconstruction_model
-        logger.info("✅ Face Reconstruction model loaded")
+        if face_reconstruction_checkpoint_path:
+            logger.info("🎨 Loading Face Reconstruction model...")
+            face_reconstruction_model = self._load_face_reconstruction_model(face_reconstruction_checkpoint_path)
+            self.models['face_reconstruction'] = face_reconstruction_model
+            logger.info("✅ Face Reconstruction model loaded")
+        else:
+            logger.warning("⚠️ No Face Reconstruction checkpoint provided")
+            face_reconstruction_model = None
         
         logger.info("🎉 All models loaded successfully!")
         
@@ -251,9 +259,9 @@ def test_model_loader():
     # Test with dummy checkpoint paths (these won't exist, but we can test the structure)
     try:
         models = loader.load_all_models(
-            expression_transformer_checkpoint_path="/Users/ozgewhiting/Documents/projects/dataset_utils/cloud_checkpoints/expression_transformer_epoch_5.pt",
-            expression_predictor_checkpoint_path="/Users/ozgewhiting/Documents/projects/dataset_utils/cloud_checkpoints/transformer_decoder_epoch_5.pt",
-            face_reconstruction_checkpoint_path="/Users/ozgewhiting/Documents/projects/dataset_utils/cloud_checkpoints/reconstruction_model_epoch_5.pt"
+            expression_transformer_checkpoint_path="/Users/ozgewhiting/Documents/projects/cloud_checkpoints_with_subject_ids/expression_transformer_epoch_5.pt",
+            expression_predictor_checkpoint_path="dummy", # Test skipping
+            face_reconstruction_checkpoint_path="/Users/ozgewhiting/Documents/projects/cloud_checkpoints_with_subject_ids/reconstruction_model_epoch_1.pt"
         )
         print("❌ Expected FileNotFoundError but got success")
     except FileNotFoundError as e:
