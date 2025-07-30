@@ -224,7 +224,7 @@ def train_expression_prediction(
     logger.info(f"Starting joint training on device: {device}")
     
     # CUDA memory optimization settings
-    if device == "cuda" or device.startswith("cuda"):
+    if device.type == "cuda":
         torch.cuda.empty_cache()  # Clear cache
         torch.backends.cudnn.benchmark = True  # Optimize for your GPU
         logger.info("Applied CUDA memory optimizations")
@@ -501,7 +501,7 @@ def train_expression_prediction(
         print(f"Epoch {epoch+1}/{num_epochs} - Train Loss: {avg_loss:.4f}")
         
         # CUDA memory cleanup after each epoch
-        if device == "cuda" or device.startswith("cuda"):
+        if device.type == "cuda":
             torch.cuda.empty_cache()
         
         # Log epoch metrics to TensorBoard
