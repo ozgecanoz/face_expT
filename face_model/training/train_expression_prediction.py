@@ -246,7 +246,7 @@ def train_expression_prediction(
     logger.info(f"Training dataset loaded with {len(dataloader)} batches")
     
     # Estimate training time (more realistic for CPU training)
-    estimated_time_per_epoch = len(dataloader) * 126  # 125 seconds per batch
+    estimated_time_per_epoch = len(dataloader) * 4  # 125 seconds per batch for CPU VM
     total_estimated_time = estimated_time_per_epoch * num_epochs / 3600  # Convert to hours
     
     print(f"📊 Training dataset loaded: {len(dataloader)} batches per epoch")
@@ -568,9 +568,18 @@ def train_expression_prediction(
             logger.info(f"Saved epoch checkpoints: {joint_epoch_path}, {expr_epoch_path}, {decoder_epoch_path}")
     
     # Log model parameters to TensorBoard
-    for name, param in joint_model.named_parameters():
-        if param.requires_grad:
-            writer.add_histogram(f'Parameters/{name}', param.data, 0)
+    # Commented out due to NumPy 2.x compatibility issues
+    # for name, param in joint_model.named_parameters():
+    #     if param.requires_grad:
+    #         writer.add_histogram(f'Parameters/{name}', param.data, 0)
+    
+    # Alternative: Try histogram logging with error handling
+    try:
+        for name, param in joint_model.named_parameters():
+            if param.requires_grad:
+                writer.add_histogram(f'Parameters/{name}', param.data, 0)
+    except Exception as e:
+        logger.warning(f"Could not log parameter histograms due to NumPy compatibility: {e}")
     
     # Close TensorBoard writer
     writer.close()
