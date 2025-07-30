@@ -221,7 +221,13 @@ def train_expression_prediction(
     Train the joint expression prediction model using subject embeddings
     No longer requires a pre-trained face ID model
     """
-    logger.info(f"Starting joint expression prediction training on device: {device}")
+    logger.info(f"Starting joint training on device: {device}")
+    
+    # CUDA memory optimization settings
+    if device == "cuda" or device.startswith("cuda"):
+        torch.cuda.empty_cache()  # Clear cache
+        torch.backends.cudnn.benchmark = True  # Optimize for your GPU
+        logger.info("Applied CUDA memory optimizations")
     
     # Create checkpoint directory
     os.makedirs(checkpoint_dir, exist_ok=True)
@@ -493,6 +499,10 @@ def train_expression_prediction(
         avg_loss = epoch_loss / num_batches
         logger.info(f"Epoch {epoch+1}/{num_epochs} - Avg Loss: {avg_loss:.4f}")
         print(f"Epoch {epoch+1}/{num_epochs} - Train Loss: {avg_loss:.4f}")
+        
+        # CUDA memory cleanup after each epoch
+        if device == "cuda" or device.startswith("cuda"):
+            torch.cuda.empty_cache()
         
         # Log epoch metrics to TensorBoard
         writer.add_scalar('Training/Epoch_Loss', avg_loss, epoch + 1)

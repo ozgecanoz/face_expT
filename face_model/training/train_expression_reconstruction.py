@@ -137,6 +137,12 @@ def train_expression_reconstruction(
     """
     logger.info(f"Starting joint training on device: {device}")
     
+    # CUDA memory optimization settings
+    if device == "cuda" or device.startswith("cuda"):
+        torch.cuda.empty_cache()  # Clear cache
+        torch.backends.cudnn.benchmark = True  # Optimize for your GPU
+        logger.info("Applied CUDA memory optimizations")
+    
     # Create checkpoint directory
     os.makedirs(checkpoint_dir, exist_ok=True)
     
@@ -455,6 +461,10 @@ def train_expression_reconstruction(
         logger.info(f"Epoch {epoch+1}/{num_epochs} - "
                    f"Avg Total Loss: {avg_loss:.4f}, "
                    f"Avg Recon Loss: {avg_recon_loss:.4f}")
+        
+        # CUDA memory cleanup after each epoch
+        if device == "cuda" or device.startswith("cuda"):
+            torch.cuda.empty_cache()
         
         # Validate if validation dataloader is provided
         if val_dataloader is not None:
