@@ -77,11 +77,6 @@ def authenticate_gcloud(key_file_path):
         adc_cmd = f"gcloud auth activate-service-account --key-file={key_file_path}"
         run_command(adc_cmd)
         
-        # Set the OAuth scopes for the current session
-        logger.info("🔐 Setting OAuth scopes for storage access...")
-        scope_cmd = "gcloud config set auth/scope https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/devstorage.full_control"
-        run_command(scope_cmd)
-        
         logger.info("✅ Authenticated with service account")
         return True
     except subprocess.CalledProcessError as e:
