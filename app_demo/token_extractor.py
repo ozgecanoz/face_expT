@@ -162,6 +162,13 @@ class TokenExtractor:
             logger.warning("Face Reconstruction model is not initialized. Cannot reconstruct face.")
             return torch.zeros(1, 3, 518, 518, device=self.device) # Return a dummy tensor
 
+        # Debug: Check tensor shapes
+        logger.debug(f"reconstruct_face input shapes:")
+        logger.debug(f"  subject_embeddings: {subject_embeddings.shape}")
+        logger.debug(f"  expression_token: {expression_token.shape}")
+        logger.debug(f"  patch_tokens: {patch_tokens.shape}")
+        logger.debug(f"  pos_embeddings: {pos_embeddings.shape}")
+
         with torch.no_grad():
             # Use actual DINOv2 tokens from the input frame and subject embeddings from Expression Transformer
             reconstructed_face = self.face_reconstruction_model(

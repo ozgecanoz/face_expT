@@ -128,6 +128,41 @@
             },
             "justMyCode": false,
             "stopOnEntry": false
+        },
+        {
+            "name": "Debug Serialize Dataset with Scoring",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/serialize_dataset_with_scoring.py",
+            "args": [
+                "--json_path",
+                "/Users/ozgewhiting/Documents/EQLabs/datasets/CasualConversations/CC_annotations/CasualConversations.json",
+                "--base_path",
+                "/Users/ozgewhiting/Documents/EQLabs/datasets/CasualConversations",
+                "--dataset_folder",
+                "CasualConversationsA",
+                "--output_path",
+                "/Users/ozgewhiting/Documents/EQLabs/datasets_serial/CCA_train_db3/",
+                "--expression_transformer_checkpoint",
+                "/Users/ozgewhiting/Documents/projects/cloud_checkpoints_with_subject_ids/expression_transformer_epoch_5.pt",
+                "--K",
+                "3",
+                "--N",
+                "10",
+                "--expression_weight",
+                "1.0",
+                "--position_weight",
+                "0.0",
+                "--max_videos",
+                "2"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false,
+            "stopOnEntry": false
         }
     ]
 } 

@@ -1,53 +1,39 @@
 {
   "datasets": [
-
     {
       "name": "CC_part_7_1.zip",
       "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An8PXawskvoLsnhqIRgSVCQzxuQjt9PRgcKDEnAVQ8adkVOJvH2dLD0hswUzQUNMghCb_KRbLDagvo5dM05f966vs2ppYAWdLhmp1lha3Go5BlaMj52V5Bjcg_pW.zip?_nc_gid=S1HUwhjjL1w9Fhw2PwjGMw&_nc_oc=AdmAgA91Y7i3SqKjomFH57S3CMUu74HeI-whBcB2YpUHQHB0820IfMXOqnFkDnZrDJszNGwQGzskujOwKCpaAyHw&ccb=10-5&oh=00_AfTr4d8DCHVliD8zheSpSmWaBKfab2Yic9zg8UYmMHbc2Q&oe=68AC5277&_nc_sid=005f0f",
       "remote_path": "face_training_datasets/casual_conversations_full"
-    }, --> no space left (129GB)
+    }, 
     {
       "name": "CC_part_7_2.zip",
       "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An8jV_wQs_JvPHWU7OtlBDXkHv6z0wAXvXMdmZk_7J9t-W6jEZknLEzjLlwWGXhOLDGCIivFcveW6OrmKGbrZ7lZwSVoJt58Z1KL0tD7cCmjpqn_eaTc_ixFk6NN.zip?_nc_gid=ZR-yiaf6Brehvdlyl9HwrQ&_nc_oc=AdmYhBpK4Xd1lJkpw21IoeEBOwkFMfkJ4UGV5_SaJFD7dFrjP0RmKzXtJBjzaPIadu9__Toiw-j3NgmgWIcEB5KS&ccb=10-5&oh=00_AfS3zvVfY2wUSYGPQKENPZWYl_vwXEKY_y9pXz5RRw9Z2A&oe=68AC4A4F&_nc_sid=005f0f",
       "remote_path": "face_training_datasets/casual_conversations_full"
-    }, --> no space left (138GB)  (7_3 was 122GB and completed)
-
-
-
-
- 
+    }, 
     {
       "name": "CC_part_10_1.zip",
       "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An97_ZAjx_RCoOBwumHpbYsg-3GUB4b6PLblMDGGzDoWD8yH3jTjISE1MTta-hb2LlnK35qHgNCuZKOL_VJgZ5mmhd0b_Svujn8PxdM1H5RUWCcEGMt6F24-kG8w4Q.zip?_nc_gid=lgNhAILVVdbdrm_IElKwTw&_nc_oc=Adl-I5ZH2pqD1D4b0bJh0haAvI_rMPHzY0BjvD7B66M1EFVBQ_1tTqzmgbxUT0S_6KXTC-ovL0f_8Go2bFWDq0Tc&ccb=10-5&oh=00_AfT75LmJe_s6tDZzaZyFBkuqL_4kEG0KFH1zYT5Y6D5Hrg&oe=68AC63C4&_nc_sid=005f0f",
       "remote_path": "face_training_datasets/casual_conversations_full"
-    }, --> extraction failed 143GB (no space left)
-
+    }, 
     {
       "name": "CC_part_15_4.zip",
       "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An_Oi0y6Nr_LhsK9BzWBiyRbegHDBELAoWjxVaAJSawM5IdNow9yI-41mywUtbvOX9746dEkA5yvHv15ZuIyj9FUYgQtF1czjBUa_X_rE4C5QbIdjQ22ivziHnAcCg.zip?_nc_gid=O2oKqc5T9z5WkUbT4uHAoA&_nc_oc=AdkZ4hjS9Dx3FZy8rh7yjcNVDirBJv5tq9tBG6soTGDlFSYX7l48atco0FMyhGygZJ70bXVIc3MewusfIgypYdt2&ccb=10-5&oh=00_AfRAyjV4XXUd_DHSCcRAx-yOpgU558aNQP7uDuhc_OL0lg&oe=68AC67B9&_nc_sid=005f0f",
       "remote_path": "face_training_datasets/casual_conversations_full"
-    }, --> extraction failed 135GB (no space left)
-
-
-
-
+    }, 
     {
       "name": "CC_part_16_3.zip",
       "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An-FSZ-vCREjGs9qe7dk63MDPCFg53RmKJ6PLq7TOdE14OgMkEStto_UzzBIqxCy1PWW8cKbNoL51dxl_Gj5ehduh2N-anP2vtzD6gfv5FWc-tRWNjk9DKwIaZ4XdA.zip?_nc_gid=QkDjzSxaM2hYHlm755oUXA&_nc_oc=AdnMtP4C64GqjBrGOOYA_f3noYh8k92B27FfsYzl6EaqGyAtOuuB6uxd6LOfndFjNoO-ns3CH8cdDxZ92UChlbKY&ccb=10-5&oh=00_AfRIEahCnl7HYojizDNuAVSWUzU4UDuXeGR6F1eugQJUrg&oe=68AC7549&_nc_sid=005f0f",
       "remote_path": "face_training_datasets/casual_conversations_full"
-    }, --> download failed but also large (145GB)
-
-
+    }, 
     {
       "name": "CC_part_18_2.zip",
       "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An__mzBwbtKDrERpPXdC80XgUNyChiQW4RPTsEOiO7_ZP_OvtSimU2W-2rxIRs1a9vV_bOHSm_lrqA91zQ0E_9FtnIleYvQMkzNLpqm_k8YDd9-10cRIS2acXXhbLw.zip?_nc_gid=IbWMud3_evRfg0MDIAJhHQ&_nc_oc=Adk-vbZbfDYKlLpnBHmWhq_ds4NYMZe5fZwJr83ylcHl9Erer6owOkAfxXngELl5TxcE40UFUP7eKr2_wTWp37qv&ccb=10-5&oh=00_AfSY8wsHNFhQDPzgRuJIm9EIrn7LYx24bzB5pzB2IsArpg&oe=68AC7814&_nc_sid=005f0f",
       "remote_path": "face_training_datasets/casual_conversations_full"
-    }, --> failed to extract(150GB)
+    }, 
     {
       "name": "CC_part_18_3.zip",
       "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An_ONqsU44kPesg-ljWUnuLgfig53Y685GxTnRuaENnC_pDsHCO7-kGSFKkZF17mL98py-15uKTyGnOZPps2BompuzsLBwGNBY2UwHT-1mj2MQlv04TZZo6MQBNm6g.zip?_nc_gid=CXFeDRSDq72PvTNhnHGJig&_nc_oc=Adkqx1H7rbezcgooBeQanJ9bB1CccP87j7GkjUJ7En6yP9n1ONXHpmrGRC-kpBW8i8z0O6wD0xlbSuc-3tKQW37G&ccb=10-5&oh=00_AfRwP-Uvhq1ewM3hIWSzy4aLiCzaLD-bjpcGtRAB28cMwQ&oe=68AC5147&_nc_sid=005f0f",
       "remote_path": "face_training_datasets/casual_conversations_full"
-    }, --> failed to extract(126GB)
-
+    }
   ]
 }

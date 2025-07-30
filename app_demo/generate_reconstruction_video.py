@@ -259,7 +259,7 @@ def main():
     help="Path to input video with 518x518 face frames")
     parser.add_argument("--subject_id", type=int, default=37, help="Subject ID for the input video")
     parser.add_argument("--output_video", type=str, 
-    default="/Users/ozgewhiting/Documents/EQLabs/datasets_serial/CCA_small/1176_14_faces_1_70_reconstructed2_w_subj_id_37.mp4", 
+    default="/Users/ozgewhiting/Documents/EQLabs/datasets_serial/CCA_small/1176_14_faces_1_70_reconstructed2_w_subj_id_37_w_epoch_3.mp4", 
     help="Path to save output video")
     parser.add_argument("--target_subject_id", type=int, default=None,
                        help="Target subject ID for reconstruction (if different from input)")
@@ -267,7 +267,7 @@ def main():
                        default="/Users/ozgewhiting/Documents/projects/cloud_checkpoints_with_subject_ids/expression_transformer_epoch_5.pt",
                        help="Path to Expression Transformer checkpoint")
     parser.add_argument("--face_reconstruction_checkpoint", type=str, 
-                       default="/Users/ozgewhiting/Documents/projects/cloud_checkpoints_with_subject_ids/reconstruction_model_epoch_2.pt",
+                       default="/Users/ozgewhiting/Documents/projects/cloud_checkpoints_with_subject_ids/reconstruction_model_epoch_3.pt",
                        help="Path to Face Reconstruction model checkpoint")
     parser.add_argument("--device", type=str, default="cpu", help="Device to run models on")
     parser.add_argument("--max_frames", type=int, default=None, help="Maximum frames to process (for testing)")

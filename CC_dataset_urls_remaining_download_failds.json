@@ -1,6 +1,6 @@
 {
   "datasets": [
-    {
+    { --> also done!!! all download faileds are done!!!
       "name": "CC_part_8_3.zip",
       "url": "https://scontent-bos5-1.xx.fbcdn.net/m1/v/t6/An-pqtzZmTVJkub09wro5pJnp_bFCIJLiFpYQzNkvt4K3wJmhbtGRvoH4_3ZgZStK5P7-qjQ8mXkR4TzNzMIA41hwOOLRz7al4j7uORJdjcD0nHjT1KLitVDLq1s.zip?_nc_gid=cMIYiWdPYKBfykCEDF-78Q&_nc_oc=AdnJknWEIMfZh0or01g-i57lC7snrESf94rFynoTWf-OzRJM4rPYk-Y3kAxiclGF4Yny03o88fufVSGuq5QqCOmm&ccb=10-5&oh=00_AfTMGStY_pCD6ii90SR2P6c1FZIOI_Ce1B7jI0PRqXykVw&oe=68AC59EB&_nc_sid=005f0f",
       "remote_path": "face_training_datasets/casual_conversations_full"
