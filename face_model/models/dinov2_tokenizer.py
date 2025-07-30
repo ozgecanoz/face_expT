@@ -18,13 +18,17 @@ class DINOv2Tokenizer(nn.Module):
     Output: 1,369 patch tokens (384-dim each) + 1 class token (384-dim)
     """
     
-    def __init__(self, model_name='vit_small_patch14_dinov2.lvd142m'):
+    def __init__(self, model_name='vit_small_patch14_dinov2.lvd142m', device='cpu'):
         super().__init__()
         
         logger.info(f"Loading DINOv2 model: {model_name}")
         
         # Load pre-trained DINOv2
         self.model = timm.create_model(model_name, pretrained=True)
+        
+        # Move model to specified device
+        self.model = self.model.to(device)
+        logger.info(f"DINOv2 model moved to device: {device}")
 
         # Check patch embed properties
         print(f"Model patch size: {self.model.patch_embed.patch_size}")
@@ -33,7 +37,7 @@ class DINOv2Tokenizer(nn.Module):
         print(f"Positional embedding shape: {self.model.pos_embed.shape}")
     
         # Check actual output
-        patch_embed = self.model.patch_embed(torch.randn(1, 3, 518, 518))
+        patch_embed = self.model.patch_embed(torch.randn(1, 3, 518, 518).to(device))
         print(f"Actual patch embed shape: {patch_embed.shape}")
         
         # Freeze all parameters
@@ -51,7 +55,7 @@ class DINOv2Tokenizer(nn.Module):
         self.num_patches = 1369
         self.embed_dim = 384
         
-        logger.info(f"DINOv2 tokenizer initialized with {self.num_patches} patches")
+        logger.info(f"DINOv2 tokenizer initialized with {self.num_patches} patches on device: {device}")
         
     def forward(self, x):
         """
