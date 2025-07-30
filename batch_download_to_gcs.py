@@ -30,6 +30,21 @@ def test_gcp_access(gcp_config, bucket_name):
     """
     logger.info("🧪 Testing GCP access and bucket permissions...")
     
+    # Debug: Show which key file is being used
+    key_file = gcp_config.get('key_file')
+    logger.info(f"🔑 Using key file: {key_file}")
+    if key_file:
+        if os.path.exists(key_file):
+            logger.info(f"✅ Key file exists: {key_file}")
+            # Show key file size
+            file_size = os.path.getsize(key_file)
+            logger.info(f"📏 Key file size: {file_size} bytes")
+        else:
+            logger.error(f"❌ Key file does not exist: {key_file}")
+            return False
+    else:
+        logger.info("🔑 No key file specified - using VM's built-in service account")
+    
     try:
         # Test 1: Check if gcloud is authenticated
         logger.info("📋 Test 1: Checking gcloud authentication...")
@@ -46,6 +61,13 @@ def test_gcp_access(gcp_config, bucket_name):
             return False
         
         logger.info(f"✅ Active gcloud account: {active_accounts[0]}")
+        
+        # Debug: Check if this matches the expected service account
+        expected_account = "dataset-uploader@faceeqdemo.iam.gserviceaccount.com"
+        if active_accounts[0] != expected_account:
+            logger.warning(f"⚠️ Active account ({active_accounts[0]}) doesn't match expected ({expected_account})")
+        else:
+            logger.info(f"✅ Active account matches expected service account")
         
         # Test 2: Check if bucket exists and is accessible
         logger.info(f"📋 Test 2: Checking bucket access: gs://{bucket_name}")
