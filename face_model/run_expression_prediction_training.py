@@ -39,11 +39,14 @@ def main():
             'log_dir': "/mnt/dataset-storage/face_model/logs",
             'checkpoint_dir': "/mnt/dataset-storage/face_model/checkpoints_with_subject_ids",
             'learning_rate': 1e-4,
-            'batch_size': 16,  # Optimized for 64GB RAM (cpu vm)
-            'num_epochs': 5,
+            #'batch_size': 16,  # Optimized for 64GB RAM (cpu vm)
+            'batch_size': 20,  # for L4 GPU train-gpu-co 
+            'num_epochs': 2,
             'save_every_epochs': 1,   # Save checkpoint every epoch
-            'num_workers': 4,  # Parallel data loading with 16 vCPUs
-            'pin_memory': False,  # Not needed for CPU
+            #'num_workers': 4,  # Parallel data loading with 16 vCPUs
+            'num_workers': 8,  # for L4 GPU (24 GB VRAM) train-gpu-co (it has 16 vCPUs), memory 64GB, 
+            #'pin_memory': False,  # Not needed for CPU
+            'pin_memory': True,  # for L4 GPU train-gpu-co 
             'persistent_workers': True,  # Keep workers alive for efficiency
             'drop_last': True  # Consistent batch sizes
         },

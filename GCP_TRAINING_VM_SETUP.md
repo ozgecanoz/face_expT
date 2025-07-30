@@ -1,5 +1,10 @@
 # Google Cloud VM Setup for Model Training
 
+gcloud auth list
+# make sure to use right account: owhiting@eqlabsai.com
+# gcloud auth login if now, this brings up the chrome browser
+
+
 ## 🎯 Recommended VM Configuration
 
 ### **For Face Model Training:**
@@ -58,18 +63,21 @@ gcloud compute instances create face-training-vm-cpu \
 ### **1. Connect to VM:**
 ```bash
 gcloud compute ssh face-training-vm --zone=us-central1-a
+## for eqlabs cloud account
+gcloud compute ssh --zone "us-central1-c" "trainer-gpu-co" --project "facedemo-467418"
 ```
 
 ### **2. Mount Additional Disk:** # didn't do this
 ```bash
 # Format and mount the dataset disk
-sudo mkfs.ext4 /dev/sdb
+lsblk  # command to see the discs (I see as 500GB) --> see it as nvme0n2 
+sudo mkfs.ext4 /dev/nvme0n2
 sudo mkdir /mnt/dataset-storage
-sudo mount /dev/sdb /mnt/dataset-storage
+sudo mount /dev/nvme0n2 /mnt/dataset-storage
 sudo chown $USER:$USER /mnt/dataset-storage
 
 # Make mount permanent
-echo "/dev/sdb /mnt/dataset-storage ext4 defaults 0 2" | sudo tee -a /etc/fstab
+echo "/dev/nvme0n2 /mnt/dataset-storage ext4 defaults 0 2" | sudo tee -a /etc/fstab
 ```
 
 ### **3. Install Dependencies:**
@@ -93,6 +101,15 @@ else
     sudo apt-get update
     sudo apt-get install -y cuda-toolkit-11-8
 fi
+(base) ozgewhiting@trainer-gpu-co:~$ nvcc --version
+nvcc: NVIDIA (R) Cuda compiler driver
+Copyright (c) 2005-2021 NVIDIA Corporation
+Built on Mon_May__3_19:15:13_PDT_2021
+Cuda compilation tools, release 11.3, V11.3.109
+Build cuda_11.3.r11.3/compiler.29920130_0
+
+ nvidia-smi --> shows the GPU
+
 
 # Install monitoring tools
 sudo apt-get install -y htop tmux
@@ -106,6 +123,8 @@ source face_training_env/bin/activate
 
 # Install PyTorch (CPU version for CPU VMs, GPU version for GPU VMs)
 pip install torch torchvision torchaudio
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu113
+python -c "import torch; print(f'CUDA: {torch.cuda.is_available()}, Version: {torch.version.cuda}')"
 
 # Install other dependencies
 pip install tensorboard matplotlib tqdm pillow
