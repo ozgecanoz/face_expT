@@ -34,7 +34,7 @@ class FaceIDEvaluator:
         self.data_dir = data_dir
         
         # Load models
-        self.dinov2_tokenizer = DINOv2Tokenizer()
+        self.dinov2_tokenizer = DINOv2Tokenizer(device=device)
         self.face_id_model = self._load_model()
         
         # Load dataset metadata

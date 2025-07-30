@@ -154,7 +154,7 @@ def train_expression_reconstruction(
     logger.info(f"Training dataset loaded with {len(dataloader)} batches")
     
     # Initialize DINOv2 tokenizer
-    dinov2_tokenizer = DINOv2Tokenizer()
+    dinov2_tokenizer = DINOv2Tokenizer(device=device)
     
     # Load expression transformer weights (required)
     if expression_transformer_checkpoint_path is None:
@@ -559,7 +559,7 @@ def test_joint_model():
     # face_id_model = FaceIDModel() # This line is removed as face ID model is no longer used
     
     # Initialize DINOv2 tokenizer
-    dinov2_tokenizer = DINOv2Tokenizer()
+    dinov2_tokenizer = DINOv2Tokenizer(device="cpu") # Changed to "cpu" for testing
     
     # Create dummy input simulating clips
     # Simulate 2 clips: first clip has 3 frames, second clip has 2 frames

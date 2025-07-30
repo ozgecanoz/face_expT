@@ -49,7 +49,7 @@ class ModelLoader:
         
         # Load DINOv2 tokenizer
         logger.info("📦 Loading DINOv2 tokenizer...")
-        self.tokenizer = DINOv2Tokenizer()
+        self.tokenizer = DINOv2Tokenizer(device=self.device)
         logger.info("✅ DINOv2 tokenizer loaded")
         
         # Load Expression Transformer

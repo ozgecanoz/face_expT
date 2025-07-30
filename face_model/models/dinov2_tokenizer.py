@@ -103,7 +103,7 @@ def test_dinov2_tokenizer():
     import torch
     
     # Create tokenizer
-    tokenizer = DINOv2Tokenizer()
+    tokenizer = DINOv2Tokenizer(device="cpu")
     
     # Create dummy input
     batch_size = 2

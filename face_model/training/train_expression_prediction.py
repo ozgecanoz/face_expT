@@ -248,7 +248,7 @@ def train_expression_prediction(
     print(f"💰 Estimated cost: ${total_estimated_time * 0.38:.1f} (at $0.38/hour)")
     
     # Initialize DINOv2 tokenizer
-    dinov2_tokenizer = DINOv2Tokenizer()
+    dinov2_tokenizer = DINOv2Tokenizer(device=device)
     
     # Load expression transformer checkpoint if provided to get architecture
     if expression_transformer_checkpoint_path is not None:
@@ -643,7 +643,7 @@ def test_joint_expression_prediction():
         decoder_dropout=0.1,
         max_sequence_length=50
     )
-    dinov2_tokenizer = DINOv2Tokenizer()
+    dinov2_tokenizer = DINOv2Tokenizer(device="cpu") # Changed to "cpu" for testing
     
     # Create dummy input simulating clips
     # Simulate 2 clips: first clip has 5 frames, second clip has 3 frames

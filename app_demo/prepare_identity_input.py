@@ -40,7 +40,7 @@ class IdentityExtractor:
         
         # Initialize DINOv2 tokenizer
         logger.info("📦 Loading DINOv2 tokenizer...")
-        self.tokenizer = DINOv2Tokenizer()
+        self.tokenizer = DINOv2Tokenizer(device=device)
         logger.info("✅ DINOv2 tokenizer loaded")
         
         # Initialize Expression Transformer for subject embeddings

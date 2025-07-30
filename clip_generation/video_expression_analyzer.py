@@ -79,7 +79,7 @@ class VideoExpressionAnalyzer:
         
         # Initialize DINOv2 tokenizer
         from face_model.models.dinov2_tokenizer import DINOv2Tokenizer
-        self.tokenizer = DINOv2Tokenizer()
+        self.tokenizer = DINOv2Tokenizer(device=device)
         
         # Load expression transformer
         import torch

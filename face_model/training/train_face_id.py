@@ -158,7 +158,7 @@ class FaceIDTrainer:
         self.dataset_metadata = load_dataset_metadata(config['training']['train_data_dir'])
         
         # Initialize models
-        self.dinov2_tokenizer = DINOv2Tokenizer()
+        self.dinov2_tokenizer = DINOv2Tokenizer(device=device)
         
         # Load checkpoint if provided
         checkpoint_path = config['training'].get('checkpoint_path')
