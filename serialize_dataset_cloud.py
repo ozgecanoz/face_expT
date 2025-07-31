@@ -609,7 +609,7 @@ def main():
     
     parser.add_argument('--annotations-path', 
     default='/mnt/dataset-storage/dbs/CC_annotations/CasualConversations.json', help='Path to CasualConversations.json (random mode)')
-    parser.add_argument('--clips-per-video', type=int, default=2, help='Number of random clips per video (random mode)')
+    parser.add_argument('--clips-per-video', type=int, default=3, help='Number of random clips per video (random mode)')
     
     args = parser.parse_args()
     
