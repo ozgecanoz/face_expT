@@ -36,9 +36,9 @@ def main():
             #'max_val_samples': 100,   # Limit validation samples for testing
             #'checkpoint_dir': "/mnt/dataset-storage/face_model/checkpoints_with_subject_ids",
             'train_data_dir': "/mnt/dataset-storage/dbs/CCA_train_db4_no_padding_keywords_offset_1.0/", # this is with keyword based clip generation
-            'max_train_samples': 100,  # pass None to use all samples for full training
+            'max_train_samples': 16,  # pass None to use all samples for full training
             'val_data_dir': "/mnt/dataset-storage/dbs/CCA_train_db4_no_padding/",   # this is with random clip generation
-            'max_val_samples': 10,   # Limit validation samples for testing
+            'max_val_samples': 16,   # Limit validation samples for testing
             'checkpoint_dir': "/mnt/dataset-storage/face_model/checkpoints_with_keywords",
             'expression_transformer_checkpoint_path': None,  # Set to path if you want to load expression transformer
             'transformer_decoder_checkpoint_path': None,  # Set to path if you want to load transformer decoder
