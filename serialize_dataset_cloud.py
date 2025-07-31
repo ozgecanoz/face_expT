@@ -700,8 +700,8 @@ def main():
     parser.add_argument('--temp-dir', default='/mnt/dataset-storage/tmp/', help='Directory for temporary downloads')
     parser.add_argument('--device', default='cpu', help='Processing device (cpu/cuda)')
     
-    parser.add_argument('--subject-id-min', type=int, default=1, help='Minimum subject ID to process (random mode)')
-    parser.add_argument('--subject-id-max', type=int, default=1000, help='Maximum subject ID to process (random mode)')
+    parser.add_argument('--subject-id-min', type=int, default=113, help='Minimum subject ID to process (random mode)')
+    parser.add_argument('--subject-id-max', type=int, default=500, help='Maximum subject ID to process (random mode)')
     
     # Mode-specific arguments
     parser.add_argument('--keyword-results', help='Path to out.json with keyword timestamps (keyword mode)')
