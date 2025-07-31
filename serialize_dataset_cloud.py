@@ -42,7 +42,8 @@ class CloudDatasetSerializer:
                  keyword_results_path: str = None,
                  annotations_path: str = None,
                  clips_per_video: int = 5,
-                 subject_id_range: Tuple[int, int] = None):
+                 subject_id_range: Tuple[int, int] = None,
+                 gcs_prefix: str = ""):
         """
         Initialize the cloud serializer
         
@@ -57,6 +58,7 @@ class CloudDatasetSerializer:
             annotations_path: Path to CasualConversations.json (random mode)
             clips_per_video: Number of random clips per video (random mode)
             subject_id_range: Tuple of (min_subject_id, max_subject_id) to filter subjects
+            gcs_prefix: Prefix path in GCS bucket where videos are stored (e.g., "datasets/CC/")
         """
         self.gcs_bucket = gcs_bucket
         self.output_base = output_base
@@ -68,6 +70,7 @@ class CloudDatasetSerializer:
         self.annotations_path = annotations_path
         self.clips_per_video = clips_per_video
         self.subject_id_range = subject_id_range
+        self.gcs_prefix = gcs_prefix.rstrip('/')  # Remove trailing slash if present
         
         # Determine operation mode
         if keyword_results_path and annotations_path:
@@ -94,6 +97,8 @@ class CloudDatasetSerializer:
         logger.info(f"Cloud Dataset Serializer initialized:")
         logger.info(f"  Mode: {self.mode}")
         logger.info(f"  GCS Bucket: {gcs_bucket}")
+        if self.gcs_prefix:
+            logger.info(f"  GCS Prefix: {self.gcs_prefix}")
         logger.info(f"  Threads: {num_threads}")
         logger.info(f"  Batch Size: {batch_size}")
         logger.info(f"  Output: {output_base}")
@@ -172,7 +177,13 @@ class CloudDatasetSerializer:
     def _download_video_from_gcs(self, gcs_path: str, local_path: str) -> bool:
         """Download a video from GCS to local storage"""
         try:
-            gcs_uri = f"gs://{self.gcs_bucket}/{gcs_path}"
+            # Construct full GCS path with prefix
+            if self.gcs_prefix:
+                full_gcs_path = f"{self.gcs_prefix}/{gcs_path}"
+            else:
+                full_gcs_path = gcs_path
+            
+            gcs_uri = f"gs://{self.gcs_bucket}/{full_gcs_path}"
             logger.debug(f"Downloading {gcs_uri} -> {local_path}")
             
             # Use gsutil to download
@@ -531,6 +542,7 @@ class CloudDatasetSerializer:
                 'date': datetime.now().isoformat(),
                 'processing_time_seconds': processing_time,
                 'gcs_bucket': self.gcs_bucket,
+                'gcs_prefix': self.gcs_prefix,
                 'mode': self.mode,
                 'num_threads': self.num_threads,
                 'batch_size': self.batch_size
@@ -580,6 +592,7 @@ def main():
     """Main function for cloud dataset serialization"""
     parser = argparse.ArgumentParser(description='Cloud-based dataset serialization from GCS')
     parser.add_argument('--gcs-bucket', default='face-training-datasets', help='GCS bucket name containing videos')
+    parser.add_argument('--gcs-prefix', default='face_training_datasets/casual_conversations_full/', help='Prefix path in GCS bucket where videos are stored (e.g., "datasets/CC/")')
     parser.add_argument('--output-base', 
     default='/mnt/dataset-storage/dbs/CCA_train_db3/', help='Base directory for output')
     parser.add_argument('--num-threads', type=int, default=8, help='Number of worker threads')
@@ -632,7 +645,8 @@ def main():
         keyword_results_path=args.keyword_results,
         annotations_path=args.annotations_path,
         clips_per_video=args.clips_per_video,
-        subject_id_range=subject_id_range
+        subject_id_range=subject_id_range,
+        gcs_prefix=args.gcs_prefix
     )
     
     # Run serialization
