@@ -30,14 +30,19 @@ def main():
     # Configuration - Optimized for CPU training
     config = {
         'training': {
-            'train_data_dir': "/mnt/dataset-storage/dbs/CCA_train_db2/",
-            'max_train_samples': None,  # pass None to use all samples for full training
-            'val_data_dir': "/mnt/dataset-storage/dbs/CCA_val_db2/",
-            'max_val_samples': 100,   # Limit validation samples for testing
-            'expression_transformer_checkpoint_path': "/mnt/dataset-storage/face_model/checkpoints_with_subject_ids/expression_transformer_epoch_2.pt",  # Set to path if you want to load expression transformer
-            'transformer_decoder_checkpoint_path': "/mnt/dataset-storage/face_model/checkpoints_with_subject_ids/transformer_decoder_epoch_2.pt",  # Set to path if you want to load transformer decoder
+            #'train_data_dir': "/mnt/dataset-storage/dbs/CCA_train_db2/",
+            #'max_train_samples': None,  # pass None to use all samples for full training
+            #'val_data_dir': "/mnt/dataset-storage/dbs/CCA_val_db2/",
+            #'max_val_samples': 100,   # Limit validation samples for testing
+            #'checkpoint_dir': "/mnt/dataset-storage/face_model/checkpoints_with_subject_ids",
+            'train_data_dir': "/mnt/dataset-storage/dbs/CCA_train_db4_no_padding_keywords_offset_1.0/", # this is with keyword based clip generation
+            'max_train_samples': 100,  # pass None to use all samples for full training
+            'val_data_dir': "/mnt/dataset-storage/dbs/CCA_train_db4_no_padding/",   # this is with random clip generation
+            'max_val_samples': 10,   # Limit validation samples for testing
+            'checkpoint_dir': "/mnt/dataset-storage/face_model/checkpoints_with_keywords",
+            'expression_transformer_checkpoint_path': None,  # Set to path if you want to load expression transformer
+            'transformer_decoder_checkpoint_path': None,  # Set to path if you want to load transformer decoder
             'log_dir': "/mnt/dataset-storage/face_model/logs",
-            'checkpoint_dir': "/mnt/dataset-storage/face_model/checkpoints_with_subject_ids",
             'learning_rate': 1e-4,
             #'batch_size': 16,  # Optimized for 64GB RAM (cpu vm)
             'batch_size': 4,  # for L4 GPU train-gpu-co 
@@ -52,15 +57,15 @@ def main():
         },
         'expression_transformer': {
             'embed_dim': 384,
-            'num_heads': 4,  # Optimized architecture
-            'num_layers': 2,  # Optimized architecture
+            'num_heads': 8,  # Optimized architecture
+            'num_layers': 4,  # Optimized architecture
             'dropout': 0.1,
             'max_subjects': 3500  # Added max_subjects parameter
         },
         'transformer_decoder': {
             'embed_dim': 384,
-            'num_heads': 4,  # Optimized architecture
-            'num_layers': 2,  # Optimized architecture
+            'num_heads': 8,  # Optimized architecture
+            'num_layers': 4,  # Optimized architecture
             'dropout': 0.1,
             'max_sequence_length': 50
         }
