@@ -341,7 +341,7 @@ def train_expression_reconstruction(
     else:
         logger.info(f"✅ Expression transformer parameters are properly frozen ({expr_trainable_params} trainable)")
     
-    optimizer = optim.Adam(trainable_params, lr=learning_rate)
+    optimizer = optim.AdamW(trainable_params, lr=learning_rate, weight_decay=0.01)
     
     # Count trainable parameters
     total_params = sum(p.numel() for p in trainable_params)

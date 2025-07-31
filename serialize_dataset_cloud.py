@@ -663,12 +663,12 @@ class CloudDatasetSerializer:
         
         # Initialize progress tracking
         total_batches = len(batches)
-        total_subjects = sum(len(batch) for batch in batches)
-        total_expected_clips = total_subjects * self.clips_per_video
+        total_videos = sum(len(batch) for batch in batches)
+        total_expected_clips = total_videos * self.clips_per_video
         
         logger.info(f"📊 Processing Summary:")
         logger.info(f"   Total batches: {total_batches}")
-        logger.info(f"   Total subjects: {total_subjects}")
+        logger.info(f"   Total videos from all subjects: {total_videos}")
         logger.info(f"   Expected clips: {total_expected_clips}")
         logger.info(f"   Threads: {self.num_threads}")
         logger.info(f"   Batch size: {self.batch_size}")

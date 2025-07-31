@@ -423,7 +423,7 @@ def train_expression_prediction(
     
     # Initialize optimizer (train both expression transformer and transformer decoder)
     trainable_params = list(joint_model.expression_transformer.parameters()) + list(joint_model.transformer_decoder.parameters())
-    optimizer = optim.Adam(trainable_params, lr=learning_rate)
+    optimizer = optim.AdamW(trainable_params, lr=learning_rate, weight_decay=0.01)
     
     logger.info("Expression transformer and transformer decoder parameters will be trained")
     

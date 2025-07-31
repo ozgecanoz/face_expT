@@ -214,9 +214,10 @@ class FaceIDTrainer:
         logger.info(f"  Loss Weights: Consistency={self.consistency_weight}, Contrastive={self.contrastive_weight}")
         
         # Initialize optimizer
-        self.optimizer = optim.Adam(
+        self.optimizer = optim.AdamW(
             self.face_id_model.parameters(),
-            lr=config['training']['learning_rate']
+            lr=config['training']['learning_rate'],
+            weight_decay=0.01
         )
         
         # Initialize TensorBoard with unique job ID

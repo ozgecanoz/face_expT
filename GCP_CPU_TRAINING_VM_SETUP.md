@@ -63,6 +63,13 @@ sudo apt-get install -y git openssh-client
 sudo apt-get install -y htop tmux
 ```
 
+# we ran into an import cv2 problem and had to install missing OpenGL libraries
+sudo apt install -y libgl1-mesa-glx libglib2.0-0 libsm6 libxext6 libxrender-dev libgomp1
+sudo apt install -y libglib2.0-0 libsm6 libxext6 libxrender1 libxrandr2 libxss1 libxtst6 libx11-xcb1 libxcb1 libxcomposite1 libxcursor1 libxdamage1 libxfixes3 libxi6 libxrandr2 libxrender1 libxss1 libxtst6 libxxf86vm1 libxrandr2 libasound2 libatk1.0-0 libc6 libcairo2 libcups2 libdbus-1-3 libexpat1 libfontconfig1 libfreetype6 libgcc1 libgconf-2-4 libgdk-pixbuf2.0-0 libglib2.0-0 libgtk-3-0 libnspr4 libpango-1.0-0 libpangocairo-1.0-0 libstdc++6 libx11-6 libx11-xcb1 libxcb1 libxcomposite1 libxcursor1 libxdamage1 libxext6 libxfixes3 libxi6 libxrandr2 libxrender1 libxss1 libxtst6 libxxf86vm1
+# test if opencv works:
+python -c "import cv2; print('OpenCV version:', cv2.__version__)"
+
+
 ### **4. Setup SSH Key for GitHub:**
 ```bash
 # Generate SSH key
