@@ -255,6 +255,9 @@ class CloudDatasetSerializer:
     def _process_video_batch(self, batch_tasks: List[Dict[str, Any]], 
                            thread_id: int) -> Dict[str, Any]:
         """Process a batch of video tasks in a single thread"""
+        import gc
+        import psutil
+        
         batch_results = {
             'processed': 0,
             'successful': 0,
@@ -268,8 +271,18 @@ class CloudDatasetSerializer:
         thread_temp_dir = os.path.join(self.temp_dir, f"thread_{thread_id}")
         os.makedirs(thread_temp_dir, exist_ok=True)
         
-        for task in batch_tasks:
+        for i, task in enumerate(batch_tasks):
             try:
+                # Memory cleanup before processing each video
+                if i > 0:  # Skip first iteration
+                    gc.collect()  # Force garbage collection
+                    
+                    # Log memory usage every 5 videos
+                    if i % 5 == 0:
+                        process = psutil.Process()
+                        memory_info = process.memory_info()
+                        logger.info(f"Thread {thread_id}: Memory usage after {i} videos: {memory_info.rss / 1024 / 1024:.1f} MB")
+                
                 video_path = task['video_path']
                 subject_id = task['subject_id']
                 subject_label = task['subject_label']
@@ -348,6 +361,9 @@ class CloudDatasetSerializer:
                 logger.error(f"Thread {thread_id}: Error processing video {task.get('video_path', 'unknown')}: {e}")
                 batch_results['failed'] += 1
                 batch_results['errors'].append(f"{task.get('video_path', 'unknown')}: {str(e)}")
+        
+        # Final memory cleanup for this batch
+        gc.collect()
         
         # Clean up thread temp directory
         try:
@@ -478,6 +494,9 @@ class CloudDatasetSerializer:
         Returns:
             Dictionary with processing results
         """
+        import gc
+        import psutil
+        
         if self.mode == "keyword":
             if keywords is None:
                 keywords = ['smile', 'natural', 'neutral', 'sad', 'surprised', 'expressions', 'happy', 'angry']
@@ -504,6 +523,39 @@ class CloudDatasetSerializer:
         logger.info("⚡ Phase 3: Starting multithreaded processing...")
         start_time = time.time()
         
+        # Initialize progress tracking
+        total_batches = len(batches)
+        total_subjects = sum(len(batch) for batch in batches)
+        total_expected_clips = total_subjects * self.clips_per_video
+        
+        logger.info(f"📊 Processing Summary:")
+        logger.info(f"   Total batches: {total_batches}")
+        logger.info(f"   Total subjects: {total_subjects}")
+        logger.info(f"   Expected clips: {total_expected_clips}")
+        logger.info(f"   Threads: {self.num_threads}")
+        logger.info(f"   Batch size: {self.batch_size}")
+        logger.info(f"   Mode: {self.mode}")
+        if self.subject_id_range:
+            logger.info(f"   Subject range: {self.subject_id_range[0]}-{self.subject_id_range[1]}")
+        
+        # Create progress bar with custom time formatting
+        from tqdm import tqdm
+        
+        # Custom time formatter for hours:minutes:seconds
+        def format_time(seconds):
+            hours = int(seconds // 3600)
+            minutes = int((seconds % 3600) // 60)
+            secs = int(seconds % 60)
+            return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+        
+        progress_bar = tqdm(
+            total=total_batches,
+            desc="Processing batches",
+            unit="batch",
+            bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} batches | "
+                      "Subjects: {postfix[0]}/{postfix[1]} | Clips: {postfix[2]}/{postfix[3]}"
+        )
+        
         with ThreadPoolExecutor(max_workers=self.num_threads) as executor:
             # Submit all batches
             future_to_batch = {
@@ -520,14 +572,45 @@ class CloudDatasetSerializer:
                     self._update_global_stats(batch_results)
                     completed_batches += 1
                     
+                    # Update progress bar with detailed statistics and custom time
+                    subjects_processed = self.processed_videos
+                    clips_created = self.successful_clips
+                    elapsed_time = time.time() - start_time
+                    
+                    progress_bar.set_postfix([
+                        f"{subjects_processed}/{total_subjects}",
+                        f"{total_subjects}",
+                        f"{clips_created}",
+                        f"{total_expected_clips}",
+                        f"Time: {format_time(elapsed_time)}"
+                    ])
+                    progress_bar.update(1)
+                    
                     logger.info(f"Batch {batch_id} completed: "
                               f"{batch_results['successful']} successful, "
                               f"{batch_results['failed']} failed, "
                               f"{batch_results['clips_created']} clips created")
                     
+                    # Memory cleanup after every 10 batches
+                    if completed_batches % 10 == 0:
+                        gc.collect()
+                        process = psutil.Process()
+                        memory_info = process.memory_info()
+                        logger.info(f"Memory cleanup after {completed_batches} batches: {memory_info.rss / 1024 / 1024:.1f} MB")
+                    
                 except Exception as e:
                     logger.error(f"Batch {batch_id} failed: {e}")
                     self.failed_videos += len(batches[batch_id])
+                    progress_bar.update(1)
+        
+        # Close progress bar
+        progress_bar.close()
+        
+        # Final memory cleanup
+        gc.collect()
+        process = psutil.Process()
+        memory_info = process.memory_info()
+        logger.info(f"Final memory usage: {memory_info.rss / 1024 / 1024:.1f} MB")
         
         end_time = time.time()
         processing_time = end_time - start_time
@@ -535,8 +618,17 @@ class CloudDatasetSerializer:
         # Create metadata file
         metadata = self._create_metadata(keywords, processing_time)
         
-        logger.info(f"🎉 Cloud serialization completed in {processing_time:.2f} seconds")
+        logger.info(f"🎉 Cloud serialization completed in {format_time(processing_time)}")
         logger.info(f"📊 Results: {self.successful_clips} clips created, {self.failed_videos} videos failed, {self.skipped_clips} clips skipped (insufficient frames)")
+        
+        # Print detailed final summary
+        logger.info(f"📈 Final Summary:")
+        logger.info(f"   ✅ Successful clips: {self.successful_clips}/{total_expected_clips} ({self.successful_clips/total_expected_clips*100:.1f}%)")
+        logger.info(f"   ❌ Failed videos: {self.failed_videos}/{total_subjects}")
+        logger.info(f"   ⏭️ Skipped clips: {self.skipped_clips}")
+        logger.info(f"   ⏱️ Processing time: {format_time(processing_time)}")
+        logger.info(f"   🚀 Processing rate: {self.successful_clips/processing_time:.1f} clips/second")
+        logger.info(f"   💾 Memory usage: {memory_info.rss / 1024 / 1024:.1f} MB")
         
         return metadata
     
@@ -604,6 +696,7 @@ def main():
     default='/mnt/dataset-storage/dbs/CCA_train_db4_no_padding/', help='Base directory for output')
     parser.add_argument('--num-threads', type=int, default=8, help='Number of worker threads')
     parser.add_argument('--batch-size', type=int, default=5, help='Videos per thread batch')
+    parser.add_argument('--memory-safe-batch-size', type=int, default=None, help='Override batch size for memory-constrained environments (e.g., 2)')
     parser.add_argument('--temp-dir', default='/mnt/dataset-storage/tmp/', help='Directory for temporary downloads')
     parser.add_argument('--device', default='cpu', help='Processing device (cpu/cuda)')
     
@@ -637,6 +730,11 @@ def main():
         logger.error(f"Annotations file not found: {args.annotations_path}")
         return False
     
+    # Use memory-safe batch size if specified
+    batch_size = args.memory_safe_batch_size if args.memory_safe_batch_size is not None else args.batch_size
+    if args.memory_safe_batch_size is not None:
+        logger.info(f"Using memory-safe batch size: {batch_size} (reduced from {args.batch_size})")
+    
     # Create serializer
     subject_id_range = None
     if args.subject_id_min is not None and args.subject_id_max is not None:
@@ -646,7 +744,7 @@ def main():
         gcs_bucket=args.gcs_bucket,
         output_base=args.output_base,
         num_threads=args.num_threads,
-        batch_size=args.batch_size,
+        batch_size=batch_size,
         temp_dir=args.temp_dir,
         device=args.device,
         keyword_results_path=args.keyword_results,

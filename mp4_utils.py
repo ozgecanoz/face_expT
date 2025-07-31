@@ -95,14 +95,14 @@ def extract_frames(
                 cv2.imwrite(frame_path, frame, [cv2.IMWRITE_JPEG_QUALITY, quality])
                 extracted_frames.append(frame_path)
                 
-                logger.info(f"Extracted frame {current_frame} -> {frame_path}")
+                #logger.info(f"Extracted frame {current_frame} -> {frame_path}")
             
             frame_count += 1
             
     finally:
         cap.release()
     
-    logger.info(f"Extracted {len(extracted_frames)} frames to {output_dir}")
+    #logger.info(f"Extracted {len(extracted_frames)} frames to {output_dir}")
     return extracted_frames
 
 
@@ -272,7 +272,7 @@ def extract_frames_at_timestamps(
                 cv2.imwrite(frame_path, frame, [cv2.IMWRITE_JPEG_QUALITY, quality])
                 extracted_frames.append(frame_path)
                 
-                logger.info(f"Extracted frame at {timestamp}s -> {frame_path}")
+                #logger.info(f"Extracted frame at {timestamp}s -> {frame_path}")
             else:
                 logger.warning(f"Could not extract frame at timestamp {timestamp}s")
                 
@@ -327,7 +327,7 @@ def create_video_thumbnail(
             # Save thumbnail
             cv2.imwrite(output_path, resized_frame, [cv2.IMWRITE_JPEG_QUALITY, quality])
             
-            logger.info(f"Thumbnail created: {output_path}")
+            #logger.info(f"Thumbnail created: {output_path}")
             return output_path
         else:
             raise ValueError(f"Could not extract frame at timestamp {timestamp}s")
@@ -557,7 +557,7 @@ def extract_face_sequence(
             face_sequences.append(frame_faces)
             
             # Log progress
-            logger.info(f"Processed frame {frame_number} at {frame_timestamp:.2f}s - Found {len(frame_faces)} faces")
+            #logger.info(f"Processed frame {frame_number} at {frame_timestamp:.2f}s - Found {len(frame_faces)} faces")
         
         # Close video writer
         face_video_writer.release()
@@ -567,8 +567,8 @@ def extract_face_sequence(
         frames_with_single_face = sum(1 for frame_faces in face_sequences if len(frame_faces) == 1)
         expected_frames = num_frames  # Should be 30 frames when frame_skip=0
         
-        logger.info(f"Total faces found: {total_faces} across {len(face_sequences)} frames")
-        logger.info(f"Frames with single face: {frames_with_single_face} out of {expected_frames}")
+        #logger.info(f"Total faces found: {total_faces} across {len(face_sequences)} frames")
+        #logger.info(f"Frames with single face: {frames_with_single_face} out of {expected_frames}")
         
         # Check if we have enough frames with single faces
         if frames_with_single_face < expected_frames:
@@ -623,12 +623,12 @@ def extract_face_sequence(
                 if isinstance(value, (int, float, str)):
                     metadata_group.create_dataset(f'video_{key}', data=str(value))
         
-        logger.info(f"Face sequence extracted successfully:")
-        logger.info(f"  HDF5 file: {hdf5_path}")
-        logger.info(f"  MP4 file: {mp4_path}")
-        logger.info(f"  Total frames processed: {len(face_sequences)}")
-        logger.info(f"  Frames with single face: {frames_with_single_face}")
-        logger.info(f"  Total faces found: {total_faces}")
+        #logger.info(f"Face sequence extracted successfully:")
+        #logger.info(f"  HDF5 file: {hdf5_path}")
+        #logger.info(f"  MP4 file: {mp4_path}")
+        #logger.info(f"  Total frames processed: {len(face_sequences)}")
+        #logger.info(f"  Frames with single face: {frames_with_single_face}")
+        #logger.info(f"  Total faces found: {total_faces}")
         
         return {
             'hdf5_path': hdf5_path,
@@ -643,7 +643,11 @@ def extract_face_sequence(
         }
         
     finally:
+        # Clean up resources
         cap.release()
+        face_detection.close()
+        import gc
+        gc.collect()  # Force garbage collection
 
 
 if __name__ == "__main__":

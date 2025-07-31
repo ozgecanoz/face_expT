@@ -13,4 +13,5 @@ tqdm
 matplotlib
 tensorboard
 scikit-learn
-seaborn 
+seaborn
+psutil>=5.8.0 
