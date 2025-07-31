@@ -120,23 +120,53 @@ class CloudDatasetSerializer:
             with open(self.annotations_path, 'r') as f:
                 annotations = json.load(f)
             
-            # Extract video data from annotations
+            # Handle the original CasualConversations JSON format
+            # Format: {subject_id: {files: [...], dark_files: [...], label: {...}}}
             videos_data = []
-            for video_info in annotations:
-                video_data = {
-                    'video_path': video_info.get('video_path', ''),
-                    'subject_id': video_info.get('subject_id', 'unknown'),
-                    'age': video_info.get('age', 'unknown'),
-                    'gender': video_info.get('gender', 'unknown'),
-                    'skin_type': video_info.get('skin-type', 'unknown'),
-                    'is_dark': video_info.get('is_dark', False)
-                }
-                videos_data.append(video_data)
             
-            logger.info(f"Loaded annotations: {len(videos_data)} videos")
+            if isinstance(annotations, dict):
+                for subject_id, subject_data in annotations.items():
+                    if isinstance(subject_data, dict):
+                        # Get files list (excluding dark_files)
+                        files = subject_data.get('files', [])
+                        dark_files = subject_data.get('dark_files', [])
+                        label = subject_data.get('label', {})
+                        
+                        # Process each file for this subject
+                        for video_file in files:
+                            # Skip dark files
+                            if video_file in dark_files:
+                                logger.debug(f"Skipping dark file: {video_file}")
+                                continue
+                            
+                            # Create video data entry
+                            video_data = {
+                                'video_path': video_file,  # This is the relative path
+                                'subject_id': subject_id,
+                                'age': label.get('age', 'unknown'),
+                                'gender': label.get('gender', 'unknown'),
+                                'skin_type': label.get('skin-type', 'unknown'),
+                                'is_dark': False
+                            }
+                            videos_data.append(video_data)
+                    else:
+                        logger.warning(f"Skipping non-dict subject data for {subject_id}: {type(subject_data)}")
+            else:
+                raise ValueError(f"Expected dict format, got {type(annotations)}")
+            
+            logger.info(f"Loaded annotations: {len(videos_data)} videos from {len(annotations)} subjects")
             return videos_data
         except Exception as e:
             logger.error(f"Failed to load annotations: {e}")
+            # Log the first few lines of the file for debugging
+            try:
+                with open(self.annotations_path, 'r') as f:
+                    first_lines = [next(f) for _ in range(5)]
+                logger.error(f"First 5 lines of annotations file:")
+                for i, line in enumerate(first_lines):
+                    logger.error(f"  Line {i+1}: {line.strip()}")
+            except Exception as debug_e:
+                logger.error(f"Could not read file for debugging: {debug_e}")
             raise
     
     def _download_video_from_gcs(self, gcs_path: str, local_path: str) -> bool:
