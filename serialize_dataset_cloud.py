@@ -601,7 +601,7 @@ def main():
     parser.add_argument('--gcs-prefix', default='face_training_datasets/casual_conversations_full/', help='Prefix path in GCS bucket where videos are stored (e.g., "datasets/CC/")')
     parser.add_argument('--padding-factor', type=float, default=0.0, help='Padding factor for face cropping (default: 0.1 = 10%%)')
     parser.add_argument('--output-base', 
-    default='/mnt/dataset-storage/dbs/CCA_train_db3/', help='Base directory for output')
+    default='/mnt/dataset-storage/dbs/CCA_train_db4/', help='Base directory for output')
     parser.add_argument('--num-threads', type=int, default=8, help='Number of worker threads')
     parser.add_argument('--batch-size', type=int, default=5, help='Videos per thread batch')
     parser.add_argument('--temp-dir', default='/mnt/dataset-storage/tmp/', help='Directory for temporary downloads')
