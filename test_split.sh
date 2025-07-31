@@ -28,7 +28,8 @@ if [[ $total_files -eq 0 ]]; then
 fi
 
 # Step 2: Calculate split
-train_count=$(echo "$total_files * $TRAIN_RATIO" | bc | cut -d. -f1)
+# Calculate 70% of total files using integer arithmetic
+train_count=$((total_files * 7 / 10))
 val_count=$((total_files - train_count))
 
 echo "Split calculation:"
