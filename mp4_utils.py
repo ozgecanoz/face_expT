@@ -382,7 +382,8 @@ def extract_face_sequence(
     frame_skip: int = 1,
     confidence_threshold: float = 0.5,
     subject_id: str = None,
-    subject_label: Dict = None
+    subject_label: Dict = None,
+    padding_factor: float = 0.1
 ) -> dict:
     """
     Extract face sequences from an MP4 video at a specific timestamp.
@@ -397,6 +398,7 @@ def extract_face_sequence(
         confidence_threshold (float): Minimum confidence for face detection (default: 0.5)
         subject_id (str): Subject ID from JSON annotations
         subject_label (Dict): Subject label information (age, gender, skin-type)
+        padding_factor (float): Padding factor for face cropping (default: 0.1 = 10%)
     
     Returns:
         dict: Dictionary containing output paths and metadata
@@ -519,7 +521,7 @@ def extract_face_sequence(
                 
                 if confidence >= confidence_threshold:
                     # Extract face region with padding
-                    padding = int(min(w, h) * 0.1)  # 10% padding
+                    padding = int(min(w, h) * padding_factor)
                     x1 = max(0, x - padding)
                     y1 = max(0, y - padding)
                     x2 = min(width, x + w + padding)

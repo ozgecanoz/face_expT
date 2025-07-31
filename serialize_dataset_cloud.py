@@ -43,7 +43,8 @@ class CloudDatasetSerializer:
                  annotations_path: str = None,
                  clips_per_video: int = 5,
                  subject_id_range: Tuple[int, int] = None,
-                 gcs_prefix: str = ""):
+                 gcs_prefix: str = "",
+                 padding_factor: float = 0.1):
         """
         Initialize the cloud serializer
         
@@ -59,6 +60,7 @@ class CloudDatasetSerializer:
             clips_per_video: Number of random clips per video (random mode)
             subject_id_range: Tuple of (min_subject_id, max_subject_id) to filter subjects
             gcs_prefix: Prefix path in GCS bucket where videos are stored (e.g., "datasets/CC/")
+            padding_factor: Padding factor for face cropping (default: 0.1 = 10%, 0.0 = no padding: exact face bounding box, 0.2 = 20%)
         """
         self.gcs_bucket = gcs_bucket
         self.output_base = output_base
@@ -71,6 +73,7 @@ class CloudDatasetSerializer:
         self.clips_per_video = clips_per_video
         self.subject_id_range = subject_id_range
         self.gcs_prefix = gcs_prefix.rstrip('/')  # Remove trailing slash if present
+        self.padding_factor = padding_factor
         
         # Determine operation mode
         if keyword_results_path and annotations_path:
@@ -102,6 +105,7 @@ class CloudDatasetSerializer:
         logger.info(f"  Threads: {num_threads}")
         logger.info(f"  Batch Size: {batch_size}")
         logger.info(f"  Output: {output_base}")
+        logger.info(f"  Padding Factor: {self.padding_factor}")
         if self.subject_id_range:
             logger.info(f"  Subject ID Range: {self.subject_id_range[0]} to {self.subject_id_range[1]}")
         logger.info(f"  Videos to process: {len(self.videos_data)}")
@@ -309,7 +313,8 @@ class CloudDatasetSerializer:
                             frame_skip=0,   # No skipping for better quality
                             confidence_threshold=0.5,
                             subject_id=str(subject_id),
-                            subject_label=subject_label
+                            subject_label=subject_label,
+                            padding_factor=self.padding_factor
                         )
                         
                         if result is not None:
@@ -543,6 +548,7 @@ class CloudDatasetSerializer:
                 'processing_time_seconds': processing_time,
                 'gcs_bucket': self.gcs_bucket,
                 'gcs_prefix': self.gcs_prefix,
+                'padding_factor': self.padding_factor,
                 'mode': self.mode,
                 'num_threads': self.num_threads,
                 'batch_size': self.batch_size
@@ -593,6 +599,7 @@ def main():
     parser = argparse.ArgumentParser(description='Cloud-based dataset serialization from GCS')
     parser.add_argument('--gcs-bucket', default='face-training-datasets', help='GCS bucket name containing videos')
     parser.add_argument('--gcs-prefix', default='face_training_datasets/casual_conversations_full/', help='Prefix path in GCS bucket where videos are stored (e.g., "datasets/CC/")')
+    parser.add_argument('--padding-factor', type=float, default=0.0, help='Padding factor for face cropping (default: 0.1 = 10%%)')
     parser.add_argument('--output-base', 
     default='/mnt/dataset-storage/dbs/CCA_train_db3/', help='Base directory for output')
     parser.add_argument('--num-threads', type=int, default=8, help='Number of worker threads')
@@ -646,7 +653,8 @@ def main():
         annotations_path=args.annotations_path,
         clips_per_video=args.clips_per_video,
         subject_id_range=subject_id_range,
-        gcs_prefix=args.gcs_prefix
+        gcs_prefix=args.gcs_prefix,
+        padding_factor=args.padding_factor
     )
     
     # Run serialization
