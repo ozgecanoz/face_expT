@@ -607,8 +607,8 @@ def main():
     parser.add_argument('--temp-dir', default='/mnt/dataset-storage/tmp/', help='Directory for temporary downloads')
     parser.add_argument('--device', default='cpu', help='Processing device (cpu/cuda)')
     
-    parser.add_argument('--subject-id-min', type=int, default=1, help='Minimum subject ID to process (random mode)')
-    parser.add_argument('--subject-id-max', type=int, default=5, help='Maximum subject ID to process (random mode)')
+    parser.add_argument('--subject-id-min', type=int, default=6, help='Minimum subject ID to process (random mode)')
+    parser.add_argument('--subject-id-max', type=int, default=7, help='Maximum subject ID to process (random mode)')
     
     # Mode-specific arguments
     parser.add_argument('--keyword-results', help='Path to out.json with keyword timestamps (keyword mode)')
@@ -616,7 +616,7 @@ def main():
     
     parser.add_argument('--annotations-path', 
     default='/mnt/dataset-storage/dbs/CC_annotations/CasualConversations.json', help='Path to CasualConversations.json (random mode)')
-    parser.add_argument('--clips-per-video', type=int, default=3, help='Number of random clips per video (random mode)')
+    parser.add_argument('--clips-per-video', type=int, default=1, help='Number of random clips per video (random mode)')
     
     args = parser.parse_args()
     
