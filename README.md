@@ -66,3 +66,33 @@ python example_usage.py
 ## License
 
 [Add your license information here] 
+
+## Cursor Prompts
+After a restart, start with:
+"Context: Face expression system with subject embeddings. Working on serialize_dataset_cloud.py progress bar and mp4_utils.py logging reduction. Current issue: tqdm last_print_t errors resolved by simplifying progress bar."
+
+Key Design Summary:
+We're building a face expression system with Components A (Face ID), C (Expression Transformer), D (Expression Predictor), and E (Face Reconstruction). We switched from face ID tokens to learnable subject embeddings. We're using DINOv2 tokenization, MediaPipe face detection, and training on cloud VMs. Current focus is on dataset serialization with keyword-based and random clip generation modes.
+
+Model architecture: 
+ExpressionTransformer uses subject embeddings instead of face ID tokens, FaceReconstructionModel takes subject embeddings directly, and we have a webcam demo that loads these models from checkpoints.
+
+File Structure Reference:
+Key files: serialize_dataset_cloud.py (main cloud processing), mp4_utils.py (face extraction), face_model/ (training scripts). 
+
+We're working on reducing mp4_utils logging output.
+
+"Current task: Fixing tqdm progress bar issues in serialize_dataset_cloud.py and reducing verbose logging in mp4_utils.py. We just simplified the progress bar to avoid last_print_t errors."
+
+Best Practices for Speed:
+Start with a 1-2 sentence context summary before asking new questions
+Reference specific file names rather than asking me to read them
+Use "remind me of..." instead of "read this file..."
+Keep new requests focused on one specific change
+Mention key design decisions that are relevant to your request
+
+When I'm Getting Slow:
+Restart the conversation with a brief design summary
+Ask for specific file sections rather than entire files
+Use "continue from where we left off" with key context points
+The key is giving me the essential context without overwhelming me with full file contents. A few sentences about the current design state and what you're working on is usually enough to keep me fast and accurate.

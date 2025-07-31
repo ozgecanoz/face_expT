@@ -39,12 +39,15 @@ class CloudDatasetSerializer:
                  batch_size: int = 5,
                  temp_dir: str = "/tmp",
                  device: str = "cpu",
+                 mode: str = "keyword",
                  keyword_results_path: str = None,
                  annotations_path: str = None,
                  clips_per_video: int = 5,
                  subject_id_range: Tuple[int, int] = None,
                  gcs_prefix: str = "",
-                 padding_factor: float = 0.1):
+                 padding_factor: float = 0.1,
+                 keyword_offset_seconds: float = 0.0,
+                 video_infos_path: str = None):
         """
         Initialize the cloud serializer
         
@@ -74,24 +77,41 @@ class CloudDatasetSerializer:
         self.subject_id_range = subject_id_range
         self.gcs_prefix = gcs_prefix.rstrip('/')  # Remove trailing slash if present
         self.padding_factor = padding_factor
+        self.keyword_offset_seconds = keyword_offset_seconds
+        self.video_infos_path = video_infos_path
+        self.mode = mode
         
-        # Determine operation mode
-        if keyword_results_path and annotations_path:
-            raise ValueError("Cannot specify both keyword_results_path and annotations_path")
-        elif keyword_results_path:
-            self.mode = "keyword"
+        # Validate mode
+        if mode not in ["keyword", "random"]:
+            raise ValueError("Mode must be either 'keyword' or 'random'")
+        
+        # Load videos data based on mode
+        if mode == "keyword":
+            if not keyword_results_path:
+                raise ValueError("keyword_results_path is required for keyword mode")
             self.videos_data = self._load_keyword_results()
-        elif annotations_path:
-            self.mode = "random"
+        else:  # random mode
+            if not annotations_path:
+                raise ValueError("annotations_path is required for random mode")
             self.videos_data = self._load_annotations()
+        
+        # Initialize video duration cache
+        self._video_durations = {}
+        if self.video_infos_path and os.path.exists(self.video_infos_path):
+            logger.info("Loading pre-computed video information...")
+            self._load_video_infos()
         else:
-            raise ValueError("Must specify either keyword_results_path or annotations_path")
+            logger.warning("No video infos file provided, will skip duration validation")
+            logger.info("Provide --video-infos-path with CasualConversations_transcriptions.json for duration validation")
         
         # Thread-safe counters
         self.processed_videos = 0
         self.successful_clips = 0
         self.failed_videos = 0
         self.skipped_clips = 0  # Track clips that don't have 30 frames
+        self.forward_offsets_used = 0  # Track offset direction usage
+        self.reverse_offsets_used = 0
+        self.invalid_offsets_skipped = 0
         self.lock = threading.Lock()
         
         # Create output directory
@@ -106,8 +126,12 @@ class CloudDatasetSerializer:
         logger.info(f"  Batch Size: {batch_size}")
         logger.info(f"  Output: {output_base}")
         logger.info(f"  Padding Factor: {self.padding_factor}")
+        if self.mode == "keyword" and self.keyword_offset_seconds != 0.0:
+            logger.info(f"  Keyword Offset: {self.keyword_offset_seconds} seconds")
         if self.subject_id_range:
             logger.info(f"  Subject ID Range: {self.subject_id_range[0]} to {self.subject_id_range[1]}")
+        if self.video_infos_path:
+            logger.info(f"  Video Info File: {self.video_infos_path}")
         logger.info(f"  Videos to process: {len(self.videos_data)}")
         if self.mode == "random":
             logger.info(f"  Clips per video: {clips_per_video}")
@@ -122,6 +146,46 @@ class CloudDatasetSerializer:
         except Exception as e:
             logger.error(f"Failed to load keyword results: {e}")
             raise
+    
+    def _load_video_infos(self):
+        """Load video information from JSON file (supports both CC_video_infos.json and CasualConversations_transcriptions.json)"""
+        try:
+            with open(self.video_infos_path, 'r') as f:
+                video_data = json.load(f)
+            
+            # Check if this is the transcriptions file format (list of objects with duration_ms)
+            if isinstance(video_data, list):
+                logger.info("Detected transcriptions file format")
+                for video_entry in video_data:
+                    video_path = video_entry.get('video_path')
+                    duration_ms = video_entry.get('duration_ms')
+                    
+                    if video_path and duration_ms:
+                        # Convert milliseconds to seconds
+                        duration_seconds = float(duration_ms) / 1000.0
+                        self._video_durations[video_path] = duration_seconds
+                
+                logger.info(f"Loaded video durations from transcriptions: {len(self._video_durations)} videos")
+                
+            else:
+                # Assume it's the CC_video_infos.json format
+                logger.info("Detected video infos file format")
+                video_infos = video_data.get('video_infos', {})
+                
+                # Extract durations for offset validation
+                for video_path, video_info in video_infos.items():
+                    duration = video_info.get('duration_seconds')
+                    if duration is not None:
+                        self._video_durations[video_path] = duration
+                
+                collection_info = video_data.get('collection_info', {})
+                logger.info(f"Loaded video information: {len(self._video_durations)} videos with durations")
+                logger.info(f"Collection info: {collection_info.get('processed_videos', 0)} processed, "
+                           f"{collection_info.get('failed_videos', 0)} failed")
+            
+        except Exception as e:
+            logger.error(f"Failed to load video information: {e}")
+            self._video_durations = {}
     
     def _load_annotations(self) -> List[Dict[str, Any]]:
         """Load annotations from CasualConversations.json file"""
@@ -207,41 +271,113 @@ class CloudDatasetSerializer:
             return False
     
     def _extract_timestamps_from_keywords(self, video_data: Dict[str, Any], keywords: List[str]) -> List[float]:
-        """Extract timestamps from video's keyword data"""
+        """Extract timestamps from video's keyword data with optional offset"""
         timestamps = []
         keywords_data = video_data.get('keywords', {})
+        
+        # Get video duration for validation (if available)
+        video_path = video_data.get('video_path', '')
+        video_duration = None
+        if video_path and hasattr(self, '_video_durations') and video_path in self._video_durations:
+            video_duration = self._video_durations[video_path]
         
         for keyword in keywords:
             if keyword in keywords_data:
                 keyword_timestamps = keywords_data[keyword]
                 if isinstance(keyword_timestamps, list):
-                    timestamps.extend(keyword_timestamps)
+                    # Apply offset to each timestamp
+                    for ts in keyword_timestamps:
+                        offset_ts = self._apply_offset_with_validation(ts, video_duration)
+                        if offset_ts is not None:
+                            timestamps.append(offset_ts)
                 else:
                     # Handle single timestamp
-                    timestamps.append(keyword_timestamps)
+                    offset_ts = self._apply_offset_with_validation(keyword_timestamps, video_duration)
+                    if offset_ts is not None:
+                        timestamps.append(offset_ts)
         
         # Remove duplicates and sort
         timestamps = sorted(list(set(timestamps)))
         return timestamps
     
+    def _apply_offset_with_validation(self, original_ts: float, video_duration: float = None) -> Optional[float]:
+        """Apply offset to timestamp with validation and fallback strategy"""
+        if self.keyword_offset_seconds == 0.0:
+            return original_ts
+        
+        # Try forward offset first
+        forward_offset_ts = original_ts + self.keyword_offset_seconds
+        
+        # Check if forward offset is valid
+        if forward_offset_ts >= 0:
+            # If we have video duration, check if forward offset would exceed safe bounds
+            if video_duration is not None:
+                safe_end_time = video_duration - 2.0  # Leave 2 seconds for 30-frame clip
+                if forward_offset_ts <= safe_end_time:
+                    with self.lock:
+                        self.forward_offsets_used += 1
+                    return forward_offset_ts
+                else:
+                    # Forward offset would exceed safe bounds, try reverse offset
+                    reverse_offset_ts = original_ts - self.keyword_offset_seconds
+                    if reverse_offset_ts >= 0:
+                        logger.info(f"Forward offset {forward_offset_ts:.1f}s exceeds video bounds ({video_duration:.1f}s), "
+                                  f"using reverse offset: {original_ts:.1f}s -> {reverse_offset_ts:.1f}s")
+                        with self.lock:
+                            self.reverse_offsets_used += 1
+                        return reverse_offset_ts
+                    else:
+                        logger.warning(f"Both forward and reverse offsets invalid for timestamp {original_ts:.1f}s "
+                                     f"(forward: {forward_offset_ts:.1f}s, reverse: {reverse_offset_ts:.1f}s)")
+                        with self.lock:
+                            self.invalid_offsets_skipped += 1
+                        return None
+            else:
+                # No video duration available, use forward offset if non-negative
+                with self.lock:
+                    self.forward_offsets_used += 1
+                return forward_offset_ts
+        else:
+            # Forward offset is negative, try reverse offset
+            reverse_offset_ts = original_ts - self.keyword_offset_seconds
+            if reverse_offset_ts >= 0:
+                logger.info(f"Forward offset {forward_offset_ts:.1f}s is negative, "
+                          f"using reverse offset: {original_ts:.1f}s -> {reverse_offset_ts:.1f}s")
+                with self.lock:
+                    self.reverse_offsets_used += 1
+                return reverse_offset_ts
+            else:
+                logger.warning(f"Both forward and reverse offsets negative for timestamp {original_ts:.1f}s "
+                             f"(forward: {forward_offset_ts:.1f}s, reverse: {reverse_offset_ts:.1f}s)")
+                with self.lock:
+                    self.invalid_offsets_skipped += 1
+                return None
+    
     def _generate_random_timestamps(self, video_path: str, num_clips: int = 5, min_duration: float = 5.0) -> List[float]:
-        """Generate random timestamps for video clips"""
+        """Generate random timestamps for video clips with duration validation"""
         try:
-            # Get video info to determine duration
-            video_info = mp4_utils.get_video_info(video_path)
-            duration = video_info['duration_seconds']
+            # Get video duration from cache if available, otherwise from video file
+            duration = None
+            if video_path in self._video_durations:
+                duration = self._video_durations[video_path]
+                logger.debug(f"Using cached duration for {video_path}: {duration}s")
+            else:
+                # Fallback to getting video info from file
+                video_info = mp4_utils.get_video_info(video_path)
+                duration = video_info['duration_seconds']
+                logger.debug(f"Got duration from video file for {video_path}: {duration}s")
             
             if duration < min_duration:
                 logger.warning(f"Video {video_path} duration ({duration}s) is shorter than minimum ({min_duration}s)")
                 return []
             
-            # Generate random timestamps
+            # Generate random timestamps with safe margin
             timestamps = []
-            max_start_time = duration - min_duration
+            safe_end_time = duration - 2.0  # Leave 2 seconds for 30-frame clip
             
             for _ in range(num_clips):
-                # Generate random start time
-                start_time = random.uniform(0, max_start_time)
+                # Generate random start time within safe bounds
+                start_time = random.uniform(0, safe_end_time)
                 timestamps.append(start_time)
             
             # Sort timestamps
@@ -421,7 +557,7 @@ class CloudDatasetSerializer:
                 'skin-type': video_data.get('skin_type', 'unknown')
             }
             
-            # Filter by subject_id_range if provided
+            # Filter by subject_id_range if provided (applies to both modes)
             if self.subject_id_range:
                 subject_id_int = self._convert_subject_id_to_int(subject_id)
                 if not (self.subject_id_range[0] <= subject_id_int <= self.subject_id_range[1]):
@@ -502,6 +638,8 @@ class CloudDatasetSerializer:
                 keywords = ['smile', 'natural', 'neutral', 'sad', 'surprised', 'expressions', 'happy', 'angry']
             logger.info(f"Starting keyword-based serialization")
             logger.info(f"Keywords: {keywords}")
+            if self.keyword_offset_seconds != 0.0:
+                logger.info(f"Applying keyword offset: {self.keyword_offset_seconds} seconds")
         else:  # random mode
             keywords = None  # Not used in random mode
             logger.info(f"Starting random clip serialization")
@@ -620,6 +758,11 @@ class CloudDatasetSerializer:
         logger.info(f"   ✅ Successful clips: {self.successful_clips}/{total_expected_clips} ({self.successful_clips/total_expected_clips*100:.1f}%)")
         logger.info(f"   ❌ Failed videos: {self.failed_videos}/{total_subjects}")
         logger.info(f"   ⏭️ Skipped clips: {self.skipped_clips}")
+        if self.mode == "keyword" and self.keyword_offset_seconds != 0.0:
+            logger.info(f"   📊 Offset statistics:")
+            logger.info(f"      Forward offsets: {self.forward_offsets_used}")
+            logger.info(f"      Reverse offsets: {self.reverse_offsets_used}")
+            logger.info(f"      Invalid offsets skipped: {self.invalid_offsets_skipped}")
         logger.info(f"   ⏱️ Processing time: {format_time(processing_time)}")
         logger.info(f"   🚀 Processing rate: {self.successful_clips/processing_time:.1f} clips/second")
         logger.info(f"   💾 Memory usage: {memory_info.rss / 1024 / 1024:.1f} MB")
@@ -660,6 +803,18 @@ class CloudDatasetSerializer:
         if self.mode == "keyword":
             metadata['serialization_info']['keyword_results_file'] = self.keyword_results_path
             metadata['serialization_info']['keywords_used'] = keywords
+            metadata['serialization_info']['keyword_offset_seconds'] = self.keyword_offset_seconds
+            metadata['serialization_info']['offset_validation'] = {
+                'video_durations_loaded': len(self._video_durations),
+                'safe_margin_seconds': 2.0,
+                'fallback_strategy': 'reverse_offset_when_bounds_exceeded',
+                'video_infos_file': self.video_infos_path,
+                'offset_statistics': {
+                    'forward_offsets_used': self.forward_offsets_used,
+                    'reverse_offsets_used': self.reverse_offsets_used,
+                    'invalid_offsets_skipped': self.invalid_offsets_skipped
+                }
+            }
         else:  # random mode
             metadata['serialization_info']['annotations_file'] = self.annotations_path
             metadata['serialization_info']['clips_per_video'] = self.clips_per_video
@@ -686,20 +841,34 @@ def main():
     parser.add_argument('--gcs-bucket', default='face-training-datasets', help='GCS bucket name containing videos')
     parser.add_argument('--gcs-prefix', default='face_training_datasets/casual_conversations_full/', help='Prefix path in GCS bucket where videos are stored (e.g., "datasets/CC/")')
     parser.add_argument('--padding-factor', type=float, default=0.0, help='Padding factor for face cropping (default: 0.1 = 10%%)')
+    
+    parser.add_argument('--mode', choices=['keyword', 'random'],
+    default='keyword', help='Processing mode: keyword or random')
+    
     parser.add_argument('--output-base', 
-    default='/mnt/dataset-storage/dbs/CCA_train_db4_no_padding/', help='Base directory for output')
+    #default='/mnt/dataset-storage/dbs/CCA_train_db4_no_padding/', help='Base directory for output')
+    default='/mnt/dataset-storage/dbs/CCA_train_db4_no_padding_keywords_offset_1.0/', help='Base directory for output')
+
+    #parser.add_argument('--subject-id-min', type=int, default=113, help='Minimum subject ID to process (random mode)')
+    parser.add_argument('--subject-id-min', type=int, default=1, help='Minimum subject ID to process (random mode)')
+    parser.add_argument('--subject-id-max', type=int, default=500, help='Maximum subject ID to process (random mode)')
+    parser.add_argument('--video-infos-path', 
+    default='/mnt/dataset-storage/dbs/CC_annotations/CasualConversations_transcriptions.json', help='Path to video info file (CC_video_infos.json or CasualConversations_transcriptions.json)')
+    
     parser.add_argument('--num-threads', type=int, default=8, help='Number of worker threads')
     parser.add_argument('--batch-size', type=int, default=5, help='Videos per thread batch')
     parser.add_argument('--memory-safe-batch-size', type=int, default=None, help='Override batch size for memory-constrained environments (e.g., 2)')
     parser.add_argument('--temp-dir', default='/mnt/dataset-storage/tmp/', help='Directory for temporary downloads')
     parser.add_argument('--device', default='cpu', help='Processing device (cpu/cuda)')
     
-    parser.add_argument('--subject-id-min', type=int, default=113, help='Minimum subject ID to process (random mode)')
-    parser.add_argument('--subject-id-max', type=int, default=500, help='Maximum subject ID to process (random mode)')
-    
     # Mode-specific arguments
-    parser.add_argument('--keyword-results', help='Path to out.json with keyword timestamps (keyword mode)')
-    parser.add_argument('--keywords', nargs='+', default=None, help='Keywords to process (keyword mode, default: all from JSON)')
+    parser.add_argument('--keyword-results', 
+    default='/mnt/dataset-storage/dataset_utils/out.json', help='Path to out.json with keyword timestamps (keyword mode)')
+    parser.add_argument('--keywords', nargs='+', 
+    #default=None, help='Keywords to process (keyword mode, default: all from JSON)')
+    default=['smile', 'sad', 'surprised', 'expressions', 'happy', 'angry'], help='Keywords to process (keyword mode, default: all from JSON)')
+    parser.add_argument('--keyword-offset-seconds', type=float, 
+    default=1.0, help='Offset to add to keyword timestamps (seconds, can be negative)')
     
     parser.add_argument('--annotations-path', 
     default='/mnt/dataset-storage/dbs/CC_annotations/CasualConversations.json', help='Path to CasualConversations.json (random mode)')
@@ -708,21 +877,20 @@ def main():
     args = parser.parse_args()
     
     # Validate mode-specific inputs
-    if args.keyword_results and args.annotations_path:
-        logger.error("Cannot specify both --keyword-results and --annotations-path")
-        return False
-    elif not args.keyword_results and not args.annotations_path:
-        logger.error("Must specify either --keyword-results (keyword mode) or --annotations-path (random mode)")
-        return False
-    
-    # Validate file existence
-    if args.keyword_results and not os.path.exists(args.keyword_results):
-        logger.error(f"Keyword results file not found: {args.keyword_results}")
-        return False
-    
-    if args.annotations_path and not os.path.exists(args.annotations_path):
-        logger.error(f"Annotations file not found: {args.annotations_path}")
-        return False
+    if args.mode == "keyword":
+        if not args.keyword_results:
+            logger.error("--keyword-results is required for keyword mode")
+            return False
+        if not os.path.exists(args.keyword_results):
+            logger.error(f"Keyword results file not found: {args.keyword_results}")
+            return False
+    else:  # random mode
+        if not args.annotations_path:
+            logger.error("--annotations-path is required for random mode")
+            return False
+        if not os.path.exists(args.annotations_path):
+            logger.error(f"Annotations file not found: {args.annotations_path}")
+            return False
     
     # Use memory-safe batch size if specified
     batch_size = args.memory_safe_batch_size if args.memory_safe_batch_size is not None else args.batch_size
@@ -741,12 +909,15 @@ def main():
         batch_size=batch_size,
         temp_dir=args.temp_dir,
         device=args.device,
+        mode=args.mode,
         keyword_results_path=args.keyword_results,
         annotations_path=args.annotations_path,
         clips_per_video=args.clips_per_video,
         subject_id_range=subject_id_range,
         gcs_prefix=args.gcs_prefix,
-        padding_factor=args.padding_factor
+        padding_factor=args.padding_factor,
+        keyword_offset_seconds=args.keyword_offset_seconds,
+        video_infos_path=args.video_infos_path
     )
     
     # Run serialization
