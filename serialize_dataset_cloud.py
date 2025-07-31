@@ -538,10 +538,10 @@ class CloudDatasetSerializer:
         if self.subject_id_range:
             logger.info(f"   Subject range: {self.subject_id_range[0]}-{self.subject_id_range[1]}")
         
-        # Create progress bar with custom time formatting
+        # Create progress bar with standard formatting
         from tqdm import tqdm
         
-        # Custom time formatter for hours:minutes:seconds
+        # Custom time formatter for hours:minutes:seconds (used elsewhere)
         def format_time(seconds):
             hours = int(seconds // 3600)
             minutes = int((seconds % 3600) // 60)
@@ -551,9 +551,7 @@ class CloudDatasetSerializer:
         progress_bar = tqdm(
             total=total_batches,
             desc="Processing batches",
-            unit="batch",
-            bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} batches | "
-                      "Subjects: {postfix[0]}/{postfix[1]} | Clips: {postfix[2]}/{postfix[3]}"
+            unit="batch"
         )
         
         with ThreadPoolExecutor(max_workers=self.num_threads) as executor:
@@ -572,18 +570,14 @@ class CloudDatasetSerializer:
                     self._update_global_stats(batch_results)
                     completed_batches += 1
                     
-                    # Update progress bar with detailed statistics and custom time
+                    # Update progress bar with simple statistics
                     subjects_processed = self.processed_videos
                     clips_created = self.successful_clips
-                    elapsed_time = time.time() - start_time
                     
-                    progress_bar.set_postfix([
-                        f"{subjects_processed}/{total_subjects}",
-                        f"{total_subjects}",
-                        f"{clips_created}",
-                        f"{total_expected_clips}",
-                        f"Time: {format_time(elapsed_time)}"
-                    ])
+                    progress_bar.set_postfix({
+                        'subjects': f"{subjects_processed}/{total_subjects}",
+                        'clips': f"{clips_created}/{total_expected_clips}"
+                    })
                     progress_bar.update(1)
                     
                     logger.info(f"Batch {batch_id} completed: "
