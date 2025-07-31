@@ -4,6 +4,13 @@ gcloud auth list
 # make sure to use right account: owhiting@eqlabsai.com
 # gcloud auth login if now, this brings up the chrome browser
 
+## myenv on the machine trainer-gpu-co
+(base) ozgewhiting@trainer-gpu-co:/$ cd /home/ozgewhiting/
+(base) ozgewhiting@trainer-gpu-co:~$ ls -la | grep -E "(myenv|venv|env|\.venv)"
+drwxr-xr-x 6 ozgewhiting ozgewhiting 4096 Jul 30 19:17 myenv
+(base) ozgewhiting@trainer-gpu-co:~$ source ./myenv/bin/activate
+(myenv) (base) ozgewhiting@trainer-gpu-co:~$ 
+
 
 ## 🎯 Recommended VM Configuration
 
@@ -147,6 +154,10 @@ gcloud compute scp --recurse ./face_model/* face-training-vm:/mnt/dataset-storag
 ```bash
 # Download CCv2 datasets from GCS
 gsutil -m cp -r gs://your-bucket/datasets/CCv2/* /mnt/dataset-storage/datasets/
+
+## use with a service key:
+gcloud auth activate-service-account --key-file=/path/to/your/service-account-key.json
+gsutil -m cp -r gs://face-training-datasets/CCA_train_db2/* /mnt/dataset-storage/face_model/datasets/CCA_train_db2/
 
 # Or use your multithreaded download script
 python3 batch_download_to_gcs_multithreaded.py --dataset-config CCV2_dataset_urls.json --max-workers 4
