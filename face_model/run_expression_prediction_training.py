@@ -44,6 +44,8 @@ def main():
             'transformer_decoder_checkpoint_path': None,  # Set to path if you want to load transformer decoder
             'log_dir': "/mnt/dataset-storage/face_model/logs",
             'learning_rate': 5e-5,
+            'warmup_steps': 1000,  # Learning rate warmup steps
+            'min_lr': 1e-6,  # Minimum learning rate after decay
             #'batch_size': 16,  # Optimized for 64GB RAM (cpu vm)
             'batch_size': 4,  # for L4 GPU train-gpu-co 
             'num_epochs': 6,
@@ -77,6 +79,8 @@ def main():
     print(f"📊 Validation Dataset: {config['training']['val_data_dir']}")
     print(f"📈 Logs: {config['training']['log_dir']}")
     print(f"🎯 Learning rate: {config['training']['learning_rate']}")
+    print(f"🔥 Warmup steps: {config['training']['warmup_steps']}")
+    print(f"📉 Min LR: {config['training']['min_lr']}")
     print(f"📦 Batch size: {config['training']['batch_size']}")
     print(f"🔄 Epochs: {config['training']['num_epochs']}")
     print(f"🧠 Expression Transformer: {config['expression_transformer']['num_layers']} layers, {config['expression_transformer']['num_heads']} heads")
@@ -131,6 +135,8 @@ def main():
         batch_size=config['training']['batch_size'],
         num_epochs=config['training']['num_epochs'],
         learning_rate=config['training']['learning_rate'],
+        warmup_steps=config['training']['warmup_steps'],
+        min_lr=config['training']['min_lr'],
         max_samples=config['training']['max_train_samples'],
         val_dataset_path=config['training']['val_data_dir'],
         max_val_samples=config['training']['max_val_samples'],

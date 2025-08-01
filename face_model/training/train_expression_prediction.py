@@ -13,6 +13,7 @@ import os
 import logging
 import sys
 import uuid
+import math
 from datetime import datetime
 sys.path.append('.')
 
@@ -205,6 +206,9 @@ def train_expression_prediction(
     pin_memory=False,
     persistent_workers=False,
     drop_last=True,
+    # Learning rate scheduler parameters
+    warmup_steps=1000,
+    min_lr=1e-6,
     # Architecture configuration parameters
     expr_embed_dim=384,
     expr_num_heads=4,  # Changed from 8 to 4 to match your config
@@ -425,6 +429,33 @@ def train_expression_prediction(
     trainable_params = list(joint_model.expression_transformer.parameters()) + list(joint_model.transformer_decoder.parameters())
     optimizer = optim.AdamW(trainable_params, lr=learning_rate, weight_decay=0.01)
     
+    # Initialize learning rate scheduler with warmup and cosine decay
+    def get_lr_scheduler(optimizer, num_training_steps, warmup_steps, min_lr):
+        """
+        Create a learning rate scheduler with warmup and cosine decay
+        """
+        def lr_lambda(current_step):
+            if current_step < warmup_steps:
+                # Linear warmup from min_lr to learning_rate
+                warmup_factor = float(current_step) / float(max(1, warmup_steps - 1))
+                return min_lr / learning_rate + warmup_factor * (1 - min_lr / learning_rate)
+            else:
+                # Cosine decay
+                progress = float(current_step - warmup_steps) / float(max(1, num_training_steps - warmup_steps))
+                cosine_decay = 0.5 * (1.0 + math.cos(math.pi * progress))
+                return max(min_lr / learning_rate, cosine_decay)
+        
+        return optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
+    
+    # Calculate total training steps for scheduler
+    total_training_steps = len(dataloader) * num_epochs
+    scheduler = get_lr_scheduler(optimizer, total_training_steps, warmup_steps, min_lr)
+    
+    logger.info(f"Learning rate scheduler initialized:")
+    logger.info(f"  Initial LR: {learning_rate}")
+    logger.info(f"  Warmup steps: {warmup_steps}")
+    logger.info(f"  Min LR: {min_lr}")
+    logger.info(f"  Total training steps: {total_training_steps}")
     logger.info("Expression transformer and transformer decoder parameters will be trained")
     
     # Initialize TensorBoard with unique job ID
@@ -479,6 +510,7 @@ def train_expression_prediction(
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+            scheduler.step()  # Step the learning rate scheduler after optimizer step
             
             # Update metrics
             epoch_loss += loss.item()
@@ -487,11 +519,14 @@ def train_expression_prediction(
             # Log to TensorBoard
             writer.add_scalar('Training/Batch_Loss', loss.item(), total_steps)
             writer.add_scalar('Training/Avg_Loss', epoch_loss / num_batches, total_steps)
+            writer.add_scalar('Training/Learning_Rate', scheduler.get_last_lr()[0], total_steps)
             
             # Update progress bar
+            current_lr = scheduler.get_last_lr()[0]
             progress_bar.set_postfix({
                 'Loss': f'{loss.item():.4f}',
-                'Avg Loss': f'{epoch_loss / num_batches:.4f}'
+                'Avg Loss': f'{epoch_loss / num_batches:.4f}',
+                'LR': f'{current_lr:.2e}'
             })
             
             total_steps += 1
