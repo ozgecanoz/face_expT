@@ -1,0 +1,322 @@
+#!/usr/bin/env python3
+"""
+Checkpoint utilities for saving and loading model configurations
+Provides reusable functions for consistent checkpoint handling across the codebase
+"""
+
+import torch
+import os
+import logging
+from typing import Dict, Any, Optional, Tuple
+
+logger = logging.getLogger(__name__)
+
+
+def save_checkpoint(
+    model_state_dict: Dict[str, torch.Tensor],
+    optimizer_state_dict: Dict[str, Any],
+    scheduler_state_dict: Dict[str, Any],
+    epoch: int,
+    avg_loss: float,
+    total_steps: int,
+    config: Dict[str, Any],
+    checkpoint_path: str,
+    checkpoint_type: str = "joint"
+) -> None:
+    """
+    Save a checkpoint with comprehensive configuration
+    
+    Args:
+        model_state_dict: Model state dictionary
+        optimizer_state_dict: Optimizer state dictionary
+        scheduler_state_dict: Scheduler state dictionary
+        epoch: Current epoch number
+        avg_loss: Average loss for this epoch
+        total_steps: Total training steps completed
+        config: Configuration dictionary containing model and training parameters
+        checkpoint_path: Path where to save the checkpoint
+        checkpoint_type: Type of checkpoint ("joint", "expression_transformer", "transformer_decoder")
+    """
+    # Ensure checkpoint directory exists
+    os.makedirs(os.path.dirname(checkpoint_path), exist_ok=True)
+    
+    # Prepare checkpoint data
+    checkpoint_data = {
+        'epoch': epoch,
+        'avg_loss': avg_loss,
+        'total_steps': total_steps,
+        'optimizer_state_dict': optimizer_state_dict,
+        'scheduler_state_dict': scheduler_state_dict,
+        'config': config
+    }
+    
+    # Add model state dict with appropriate key
+    if checkpoint_type == "joint":
+        checkpoint_data['joint_model_state_dict'] = model_state_dict
+    elif checkpoint_type == "expression_transformer":
+        checkpoint_data['expression_transformer_state_dict'] = model_state_dict
+    elif checkpoint_type == "transformer_decoder":
+        checkpoint_data['transformer_decoder_state_dict'] = model_state_dict
+    else:
+        raise ValueError(f"Unknown checkpoint type: {checkpoint_type}")
+    
+    # Save checkpoint
+    torch.save(checkpoint_data, checkpoint_path)
+    logger.info(f"Saved {checkpoint_type} checkpoint to: {checkpoint_path}")
+
+
+def load_checkpoint_config(
+    checkpoint_path: str,
+    device: str = "cpu"
+) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    """
+    Load configuration from a checkpoint file
+    
+    Args:
+        checkpoint_path: Path to the checkpoint file
+        device: Device to load the checkpoint on
+        
+    Returns:
+        Tuple of (checkpoint_data, extracted_config)
+    """
+    if not os.path.exists(checkpoint_path):
+        raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
+    
+    # Load checkpoint
+    checkpoint_data = torch.load(checkpoint_path, map_location=device)
+    
+    # Extract configuration
+    config = checkpoint_data.get('config', {})
+    
+    logger.info(f"Loaded checkpoint from: {checkpoint_path}")
+    logger.info(f"Checkpoint epoch: {checkpoint_data.get('epoch', 'unknown')}")
+    
+    return checkpoint_data, config
+
+
+def extract_model_config(
+    config: Dict[str, Any],
+    default_params: Dict[str, Any]
+) -> Dict[str, Any]:
+    """
+    Extract model configuration from checkpoint config
+    
+    Args:
+        config: Configuration dictionary from checkpoint
+        default_params: Default parameters to use as fallback
+        
+    Returns:
+        Dictionary of extracted model parameters
+    """
+    extracted_params = default_params.copy()
+    
+    # Extract expression transformer parameters
+    if 'expression_model' in config:
+        expr_config = config['expression_model']
+        for param_name in ['embed_dim', 'num_heads', 'num_layers', 'dropout', 'max_subjects']:
+            if param_name in expr_config:
+                extracted_params[f'expr_{param_name}'] = expr_config[param_name]
+                logger.info(f"Using expression transformer {param_name}: {expr_config[param_name]}")
+    
+    # Extract transformer decoder parameters
+    if 'transformer_decoder' in config:
+        decoder_config = config['transformer_decoder']
+        for param_name in ['embed_dim', 'num_heads', 'num_layers', 'dropout', 'max_sequence_length']:
+            if param_name in decoder_config:
+                if param_name == 'max_sequence_length':
+                    extracted_params[param_name] = decoder_config[param_name]
+                else:
+                    extracted_params[f'decoder_{param_name}'] = decoder_config[param_name]
+                logger.info(f"Using transformer decoder {param_name}: {decoder_config[param_name]}")
+    
+    # Extract loss function parameters
+    if 'loss_function' in config:
+        loss_config = config['loss_function']
+        for param_name in ['lambda_prediction', 'lambda_temporal', 'lambda_diversity']:
+            if param_name in loss_config:
+                extracted_params[param_name] = loss_config[param_name]
+                logger.info(f"Using loss function {param_name}: {loss_config[param_name]}")
+    
+    # Extract training parameters (for logging)
+    if 'training' in config:
+        train_config = config['training']
+        logger.info(f"Training parameters from checkpoint: "
+                   f"LR={train_config.get('learning_rate', 'unknown')}, "
+                   f"Batch={train_config.get('batch_size', 'unknown')}, "
+                   f"Epochs={train_config.get('num_epochs', 'unknown')}")
+    
+    return extracted_params
+
+
+def create_comprehensive_config(
+    expr_embed_dim: int,
+    expr_num_heads: int,
+    expr_num_layers: int,
+    expr_dropout: float,
+    expr_max_subjects: int,
+    decoder_embed_dim: int,
+    decoder_num_heads: int,
+    decoder_num_layers: int,
+    decoder_dropout: float,
+    max_sequence_length: int,
+    lambda_prediction: float,
+    lambda_temporal: float,
+    lambda_diversity: float,
+    learning_rate: float,
+    batch_size: int,
+    num_epochs: int,
+    warmup_steps: int,
+    min_lr: float,
+    # Scheduler parameters (optional)
+    initial_lambda_prediction: float = None,
+    initial_lambda_temporal: float = None,
+    initial_lambda_diversity: float = None,
+    warmup_lambda_prediction: float = None,
+    warmup_lambda_temporal: float = None,
+    warmup_lambda_diversity: float = None,
+    final_lambda_prediction: float = None,
+    final_lambda_temporal: float = None,
+    final_lambda_diversity: float = None
+) -> Dict[str, Any]:
+    """
+    Create a comprehensive configuration dictionary for checkpoint saving
+    
+    Args:
+        All model and training parameters
+        
+    Returns:
+        Comprehensive configuration dictionary
+    """
+    config = {
+        'expression_model': {
+            'embed_dim': expr_embed_dim,
+            'num_heads': expr_num_heads,
+            'num_layers': expr_num_layers,
+            'dropout': expr_dropout,
+            'max_subjects': expr_max_subjects
+        },
+        'transformer_decoder': {
+            'embed_dim': decoder_embed_dim,
+            'num_heads': decoder_num_heads,
+            'num_layers': decoder_num_layers,
+            'dropout': decoder_dropout,
+            'max_sequence_length': max_sequence_length
+        },
+        'loss_function': {
+            'lambda_prediction': lambda_prediction,
+            'lambda_temporal': lambda_temporal,
+            'lambda_diversity': lambda_diversity
+        },
+        'training': {
+            'learning_rate': learning_rate,
+            'batch_size': batch_size,
+            'num_epochs': num_epochs,
+            'warmup_steps': warmup_steps,
+            'min_lr': min_lr
+        }
+    }
+    
+    # Add scheduler parameters if provided
+    if all(param is not None for param in [
+        initial_lambda_prediction, initial_lambda_temporal, initial_lambda_diversity,
+        warmup_lambda_prediction, warmup_lambda_temporal, warmup_lambda_diversity,
+        final_lambda_prediction, final_lambda_temporal, final_lambda_diversity
+    ]):
+        config['scheduler'] = {
+            'initial_weights': {
+                'lambda_prediction': initial_lambda_prediction,
+                'lambda_temporal': initial_lambda_temporal,
+                'lambda_diversity': initial_lambda_diversity
+            },
+            'warmup_weights': {
+                'lambda_prediction': warmup_lambda_prediction,
+                'lambda_temporal': warmup_lambda_temporal,
+                'lambda_diversity': warmup_lambda_diversity
+            },
+            'final_weights': {
+                'lambda_prediction': final_lambda_prediction,
+                'lambda_temporal': final_lambda_temporal,
+                'lambda_diversity': final_lambda_diversity
+            }
+        }
+    
+    return config
+
+
+def validate_checkpoint_compatibility(
+    checkpoint_path: str,
+    expected_params: Dict[str, Any],
+    device: str = "cpu"
+) -> bool:
+    """
+    Validate that a checkpoint contains the expected parameters
+    
+    Args:
+        checkpoint_path: Path to checkpoint file
+        expected_params: Dictionary of expected parameter values
+        device: Device to load checkpoint on
+        
+    Returns:
+        True if checkpoint is compatible, False otherwise
+    """
+    try:
+        checkpoint_data, config = load_checkpoint_config(checkpoint_path, device)
+        extracted_params = extract_model_config(config, {})
+        
+        # Check that all expected parameters match
+        for param_name, expected_value in expected_params.items():
+            if param_name in extracted_params:
+                actual_value = extracted_params[param_name]
+                if actual_value != expected_value:
+                    logger.warning(f"Parameter mismatch: {param_name} expected {expected_value}, got {actual_value}")
+                    return False
+            else:
+                logger.warning(f"Missing parameter in checkpoint: {param_name}")
+                return False
+        
+        logger.info("✅ Checkpoint compatibility validation passed")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Checkpoint validation failed: {e}")
+        return False
+
+
+def get_checkpoint_info(checkpoint_path: str, device: str = "cpu") -> Dict[str, Any]:
+    """
+    Get information about a checkpoint without loading the full model
+    
+    Args:
+        checkpoint_path: Path to checkpoint file
+        device: Device to load checkpoint on
+        
+    Returns:
+        Dictionary containing checkpoint information
+    """
+    try:
+        checkpoint_data, config = load_checkpoint_config(checkpoint_path, device)
+        
+        info = {
+            'epoch': checkpoint_data.get('epoch', 'unknown'),
+            'avg_loss': checkpoint_data.get('avg_loss', 'unknown'),
+            'total_steps': checkpoint_data.get('total_steps', 'unknown'),
+            'has_optimizer': 'optimizer_state_dict' in checkpoint_data,
+            'has_scheduler': 'scheduler_state_dict' in checkpoint_data,
+            'config_sections': list(config.keys()) if config else []
+        }
+        
+        # Add model-specific info
+        if 'joint_model_state_dict' in checkpoint_data:
+            info['checkpoint_type'] = 'joint'
+        elif 'expression_transformer_state_dict' in checkpoint_data:
+            info['checkpoint_type'] = 'expression_transformer'
+        elif 'transformer_decoder_state_dict' in checkpoint_data:
+            info['checkpoint_type'] = 'transformer_decoder'
+        else:
+            info['checkpoint_type'] = 'unknown'
+        
+        return info
+        
+    except Exception as e:
+        logger.error(f"Failed to get checkpoint info: {e}")
+        return {'error': str(e)} 

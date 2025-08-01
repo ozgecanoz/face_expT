@@ -373,13 +373,13 @@ class IdentitySwapVideoGenerator:
                    cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
         
         # Add cosine similarity
-        cos_sim_text = f"Cosine Sim: {cosine_similarity:.3f}"
+        cos_sim_text = f"Cosine Sim: {cosine_similarity:.8f}"
         cv2.putText(comparison_frame, cos_sim_text, (50, 100), 
                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
         
         # Add expression token values if provided
         if expression_values is not None:
-            expr_text = f"Expr: [{expression_values[0]:.2f}, {expression_values[1]:.2f}, {expression_values[2]:.2f}]"
+            expr_text = f"Expr: [{expression_values[0]:.5f}, {expression_values[1]:.5f}, {expression_values[2]:.5f}]"
             cv2.putText(comparison_frame, expr_text, (50, 130), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
         
@@ -394,13 +394,13 @@ def main():
     help="Path to input video with 518x518 face frames")
     parser.add_argument("--input_subject_id", type=int, default=81, help="Subject ID for the input video")
     parser.add_argument("--output_video", type=str, 
-    default="/Users/ozgewhiting/Documents/EQLabs/datasets_serial/CCA_small/1220_08_faces_53_07_reconstructed_w_subj_id_37_w_epoch_3.mp4", 
+    default="/Users/ozgewhiting/Documents/projects/cloud_checkpoints_with_keywords/1220_08_faces_53_07_reconstructed_w_subj_id_37_w_epoch_3.mp4", 
     help="Path to save output video")
     parser.add_argument("--identity_json", type=str, 
     default="/Users/ozgewhiting/Documents/projects/dataset_utils/app_demo/CCA_small_1176_14_faces_1_70_w_subj_id_37_w_embeddings.json",
     help="Path to JSON file with target identity features")
     parser.add_argument("--expression_transformer_checkpoint", type=str, 
-                       default="/Users/ozgewhiting/Documents/projects/cloud_checkpoints_with_subject_ids/expression_transformer_epoch_5.pt",
+                       default="/Users/ozgewhiting/Documents/projects/cloud_checkpoints_with_keywords/expression_transformer_epoch_2.pt",
                        help="Path to Expression Transformer checkpoint")
     parser.add_argument("--face_reconstruction_checkpoint", type=str, 
                        default="/Users/ozgewhiting/Documents/projects/cloud_checkpoints_with_subject_ids/reconstruction_model_epoch_3.pt",

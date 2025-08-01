@@ -39,17 +39,18 @@ def main():
             'max_train_samples': None,  # pass None to use all samples for full training
             'val_data_dir': "/mnt/dataset-storage/dbs/CCA_train_db4_no_padding/",   # this is with random clip generation
             'max_val_samples': 2000,   # Limit validation samples for testing
-            'checkpoint_dir': "/mnt/dataset-storage/face_model/checkpoints_with_keywords",
-            'expression_transformer_checkpoint_path': "/mnt/dataset-storage/face_model/checkpoints_with_keywords/expression_transformer_epoch_2.pt",  # Set to path if you want to load expression transformer
-            'transformer_decoder_checkpoint_path': "/mnt/dataset-storage/face_model/checkpoints_with_keywords/transformer_decoder_epoch_2.pt",  # Set to path if you want to load transformer decoder
+            'checkpoint_dir': "/mnt/dataset-storage/face_model/checkpoints_with_keywords2",
+            'expression_transformer_checkpoint_path': None,  # Set to path if you want to load expression transformer
+            'transformer_decoder_checkpoint_path': None,  # Set to path if you want to load transformer decoder
+            'joint_checkpoint_path': None,  # Set to path if you want to load joint checkpoint (preferred)
             'log_dir': "/mnt/dataset-storage/face_model/logs",
             'learning_rate': 5e-5,
             'warmup_steps': 1000,  # Learning rate warmup steps
             'min_lr': 1e-6,  # Minimum learning rate after decay
             #'batch_size': 16,  # Optimized for 64GB RAM (cpu vm)
             'batch_size': 4,  # for L4 GPU train-gpu-co 
-            'num_epochs': 6,
-            'save_every_epochs': 2,   # Save checkpoint every epoch
+            'num_epochs': 5,
+            'save_every_epochs': 1,   # Save checkpoint every epoch
             #'num_workers': 4,  # Parallel data loading with 16 vCPUs
             'num_workers': 8,  # for L4 GPU (24 GB VRAM) train-gpu-co (it has 16 vCPUs), memory 64GB, 
             #'pin_memory': False,  # Not needed for CPU
@@ -57,12 +58,24 @@ def main():
             'persistent_workers': True,  # Keep workers alive for efficiency
             'drop_last': True  # Consistent batch sizes
         },
+        'scheduler': {
+            # Loss weight scheduling parameters
+            'initial_lambda_prediction': 0.1,  # Start with low prediction weight
+            'initial_lambda_temporal': 0.5,    # Start with high temporal weight
+            'initial_lambda_diversity': 0.5,   # Start with high diversity weight
+            'warmup_lambda_prediction': 0.3,   # Prediction weight at warmup
+            'warmup_lambda_temporal': 0.4,     # Temporal weight at warmup
+            'warmup_lambda_diversity': 0.4,    # Diversity weight at warmup
+            'final_lambda_prediction': 0.5,    # Final prediction weight (highest)
+            'final_lambda_temporal': 0.3,      # Final temporal weight
+            'final_lambda_diversity': 0.3      # Final diversity weight
+        },
         'expression_transformer': {
             'embed_dim': 384,
             'num_heads': 8,  # Optimized architecture
             'num_layers': 4,  # Optimized architecture
             'dropout': 0.1,
-            'max_subjects': 3500  # Added max_subjects parameter
+            'max_subjects': 3011  # Added max_subjects parameter
         },
         'transformer_decoder': {
             'embed_dim': 384,
@@ -87,12 +100,27 @@ def main():
     print(f"🧠 Transformer Decoder: {config['transformer_decoder']['num_layers']} layers, {config['transformer_decoder']['num_heads']} heads")
     print(f"🧵 Num workers: {config['training']['num_workers']}")
     print(f"💾 Memory optimization: drop_last={config['training']['drop_last']}")
+    print(f"⚖️  Loss Weight Schedule:")
+    print(f"   Initial: λ_pred={config['scheduler']['initial_lambda_prediction']}, λ_temp={config['scheduler']['initial_lambda_temporal']}, λ_div={config['scheduler']['initial_lambda_diversity']}")
+    print(f"   Warmup: λ_pred={config['scheduler']['warmup_lambda_prediction']}, λ_temp={config['scheduler']['warmup_lambda_temporal']}, λ_div={config['scheduler']['warmup_lambda_diversity']}")
+    print(f"   Final: λ_pred={config['scheduler']['final_lambda_prediction']}, λ_temp={config['scheduler']['final_lambda_temporal']}, λ_div={config['scheduler']['final_lambda_diversity']}")
     
 
     
     
     # Log checkpoint status
-    if config['training']['expression_transformer_checkpoint_path'] is not None:
+    if config['training']['joint_checkpoint_path'] is not None:
+        print(f"🔒 Joint Model: Will load from {config['training']['joint_checkpoint_path']}")
+        # Try to load and display architecture info
+        try:
+            checkpoint = torch.load(config['training']['joint_checkpoint_path'], map_location='cpu')
+            if 'total_steps' in checkpoint:
+                print(f"   📊 Training step: {checkpoint['total_steps']}")
+            if 'epoch' in checkpoint:
+                print(f"   📅 Epoch: {checkpoint['epoch']}")
+        except Exception as e:
+            print(f"   ⚠️  Could not read checkpoint info: {str(e)}")
+    elif config['training']['expression_transformer_checkpoint_path'] is not None:
         print(f"🔒 Expression Transformer: Will load from {config['training']['expression_transformer_checkpoint_path']}")
         # Try to load and display architecture info
         try:
@@ -130,6 +158,7 @@ def main():
         dataset_path=config['training']['train_data_dir'],
         expression_transformer_checkpoint_path=config['training']['expression_transformer_checkpoint_path'],
         transformer_decoder_checkpoint_path=config['training']['transformer_decoder_checkpoint_path'],
+        joint_checkpoint_path=config['training']['joint_checkpoint_path'],
         checkpoint_dir=config['training']['checkpoint_dir'],
         save_every_epochs=config['training']['save_every_epochs'],
         batch_size=config['training']['batch_size'],
@@ -145,6 +174,16 @@ def main():
         pin_memory=config['training']['pin_memory'],
         persistent_workers=config['training']['persistent_workers'],
         drop_last=config['training']['drop_last'],
+        # Loss weight scheduling parameters
+        initial_lambda_prediction=config['scheduler']['initial_lambda_prediction'],
+        initial_lambda_temporal=config['scheduler']['initial_lambda_temporal'],
+        initial_lambda_diversity=config['scheduler']['initial_lambda_diversity'],
+        warmup_lambda_prediction=config['scheduler']['warmup_lambda_prediction'],
+        warmup_lambda_temporal=config['scheduler']['warmup_lambda_temporal'],
+        warmup_lambda_diversity=config['scheduler']['warmup_lambda_diversity'],
+        final_lambda_prediction=config['scheduler']['final_lambda_prediction'],
+        final_lambda_temporal=config['scheduler']['final_lambda_temporal'],
+        final_lambda_diversity=config['scheduler']['final_lambda_diversity'],
         # Architecture configuration
         expr_embed_dim=config['expression_transformer']['embed_dim'],
         expr_num_heads=config['expression_transformer']['num_heads'],

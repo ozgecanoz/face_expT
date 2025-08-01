@@ -11,6 +11,11 @@ drwxr-xr-x 6 ozgewhiting ozgewhiting 4096 Jul 30 19:17 myenv
 (base) ozgewhiting@trainer-gpu-co:~$ source ./myenv/bin/activate
 (myenv) (base) ozgewhiting@trainer-gpu-co:~$ 
 
+# Download checkpoints from VM, just from the terminal on Mac:
+gcloud compute scp --recurse trainer-gpu-co:/mnt/dataset-storage/face_model/checkpoints_with_keywords ./local_checkpoints/
+
+# Download data from VM, just from the terminal on Mac:
+gcloud compute scp --recurse trainer-gpu-co:/mnt/dataset-storage/dbs/CCA_train_db4_no_padding_keywords_offset_1.0 /Users/ozgewhiting/Documents/projects/cloud_dbs/CCA_train_db4_no_padding_keywords_offset_1.0/
 
 ## 🎯 Recommended VM Configuration
 

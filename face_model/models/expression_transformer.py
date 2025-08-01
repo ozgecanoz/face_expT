@@ -26,39 +26,30 @@ class ExpressionTransformer(nn.Module):
         self.embed_dim = embed_dim
         self.num_heads = num_heads
         self.max_subjects = max_subjects
+        self.num_layers = num_layers
+        self.dropout = dropout
+        self.num_heads = num_heads
         
         # Learnable subject embeddings (replaces face ID model)
         # Typical usage: 100-1000 subjects for academic datasets, 1000-10000 for commercial
         self.subject_embeddings = nn.Embedding(max_subjects, embed_dim)
         
         # Expression query initialization (learnable)
-        self.expression_query = nn.Parameter(torch.randn(1, 1, embed_dim))
+        self.expression_query = nn.Parameter(torch.randn(1, 1, embed_dim) * 0.02)
+
+        # delta position embeddings (learnable) will be added to Dino's positional embeddings
+        self.delta_pos_embed = nn.Parameter(torch.zeros(1, 1369, embed_dim))
+        nn.init.trunc_normal_(self.delta_pos_embed, std=0.02)
         
-        # Cross-attention layers that only update the query
-        self.cross_attention_layers = nn.ModuleList([
-            nn.MultiheadAttention(
-                embed_dim=embed_dim,
-                num_heads=num_heads,
-                dropout=dropout,
-                batch_first=True
-            ) for _ in range(num_layers)
-        ])
-        
-        # Feed-forward networks for query updates
-        self.ffn_layers = nn.ModuleList([
-            nn.Sequential(
-                nn.Linear(embed_dim, embed_dim * 4),
-                nn.GELU(),
-                nn.Dropout(dropout),
-                nn.Linear(embed_dim * 4, embed_dim),
-                nn.Dropout(dropout)
-            ) for _ in range(num_layers)
-        ])
-        
-        # Layer normalization for query updates
-        self.query_norms = nn.ModuleList([
-            nn.LayerNorm(embed_dim) for _ in range(num_layers)
-        ])
+        # Transformer decoder stack (cross-attends to memory only)
+        decoder_layer = nn.TransformerDecoderLayer(
+            d_model=embed_dim,
+            nhead=num_heads,
+            dim_feedforward=4 * embed_dim,
+            dropout=dropout,
+            batch_first=True
+        )
+        self.decoder = nn.TransformerDecoder(decoder_layer, num_layers=num_layers)
         
         # Output projection
         self.output_proj = nn.Linear(embed_dim, embed_dim)
@@ -90,38 +81,18 @@ class ExpressionTransformer(nn.Module):
         
         # Prepare fixed K,V context (doesn't get updated)
         # Add positional embeddings to patch tokens
-        patch_tokens_with_pos = patch_tokens + pos_embeddings
+        #patch_tokens_with_pos = patch_tokens + pos_embeddings
+        patch_tokens_with_pos = patch_tokens + pos_embeddings + self.delta_pos_embed
         
         # Combine subject_embeddings and patch_tokens for K, V
         # subject_embeddings: (B, 1, 384), patch_tokens_with_pos: (B, 1369, 384)
         kv_context = torch.cat([subject_embeddings, patch_tokens_with_pos], dim=1)  # (B, 1370, 384)
         
-        # Apply cross-attention layers that only update the query
-        for i, (attention_layer, ffn_layer, query_norm) in enumerate(
-            zip(self.cross_attention_layers, self.ffn_layers, self.query_norms)
-        ):
-            # Cross-attention: query attends to fixed kv_context
-            # query: (B, 1, 384), kv_context: (B, 1370, 384)
-            attn_output, _ = attention_layer(
-                query=query,
-                key=kv_context,
-                value=kv_context
-            )
-            
-            # Residual connection for query
-            query = query + attn_output
-            
-            # Layer normalization
-            query = query_norm(query)
-            
-            # Feed-forward network
-            ffn_output = ffn_layer(query)
-            
-            # Residual connection for query
-            query = query + ffn_output
+        # Cross-attend: decoder updates query based on memory
+        decoded = self.decoder(tgt=query, memory=kv_context)  # (B, 1, D)
         
         # Final output projection and normalization
-        expression_token = self.output_proj(query)
+        expression_token = self.output_proj(decoded)
         expression_token = self.layer_norm(expression_token)
         
         return expression_token
@@ -151,33 +122,18 @@ class ExpressionTransformer(nn.Module):
             
             # Prepare fixed K,V context (doesn't get updated)
             # Add positional embeddings to patch tokens
-            patch_tokens_with_pos = patch_tokens + pos_embeddings
+            #patch_tokens_with_pos = patch_tokens + pos_embeddings
+            patch_tokens_with_pos = patch_tokens + pos_embeddings + self.delta_pos_embed
             
             # Combine subject_embeddings and patch_tokens for K, V
             # subject_embeddings: (B, 1, 384), patch_tokens_with_pos: (B, 1369, 384)
             kv_context = torch.cat([subject_embeddings, patch_tokens_with_pos], dim=1)  # (B, 1370, 384)
             
-            # Apply cross-attention layers that only update the query
-            for i, (attention_layer, ffn_layer, query_norm) in enumerate(
-                zip(self.cross_attention_layers, self.ffn_layers, self.query_norms)
-            ):
-                # Cross-attention: query attends to kv_context
-                attention_output = attention_layer(query, kv_context, kv_context)
-                # Handle tuple return (output, attention_weights, ...)
-                if isinstance(attention_output, tuple):
-                    attended_query = attention_output[0]
-                else:
-                    attended_query = attention_output
-                
-                # Residual connection and normalization for query
-                query = query_norm(query + attended_query)
-                
-                # Feed-forward network for query
-                ffn_output = ffn_layer(query)
-                query = query + ffn_output
+            # Cross-attend: decoder updates query based on memory
+            decoded = self.decoder(tgt=query, memory=kv_context)  # (B, 1, D)
             
             # Final output projection
-            expression_token = self.output_proj(query)  # (B, 1, 384)
+            expression_token = self.output_proj(decoded)  # (B, 1, 384)
             
             # Final layer normalization
             expression_token = self.layer_norm(expression_token)
