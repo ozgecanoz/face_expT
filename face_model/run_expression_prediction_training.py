@@ -40,8 +40,8 @@ def main():
             'val_data_dir': "/mnt/dataset-storage/dbs/CCA_train_db4_no_padding/",   # this is with random clip generation
             'max_val_samples': 2000,   # Limit validation samples for testing
             'checkpoint_dir': "/mnt/dataset-storage/face_model/checkpoints_with_keywords",
-            'expression_transformer_checkpoint_path': None,  # Set to path if you want to load expression transformer
-            'transformer_decoder_checkpoint_path': None,  # Set to path if you want to load transformer decoder
+            'expression_transformer_checkpoint_path': "/mnt/dataset-storage/face_model/checkpoints_with_keywords/expression_transformer_epoch_2.pt",  # Set to path if you want to load expression transformer
+            'transformer_decoder_checkpoint_path': "/mnt/dataset-storage/face_model/checkpoints_with_keywords/transformer_decoder_epoch_2.pt",  # Set to path if you want to load transformer decoder
             'log_dir': "/mnt/dataset-storage/face_model/logs",
             'learning_rate': 5e-5,
             'warmup_steps': 1000,  # Learning rate warmup steps
