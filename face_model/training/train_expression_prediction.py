@@ -33,6 +33,7 @@ from utils.checkpoint_utils import (
 )
 from utils.scheduler_utils import CombinedLRLossWeightScheduler
 from utils.visualization_utils import compute_cosine_similarity_distribution, plot_cosine_similarity_distribution
+from utils.tensorboard_utils import log_model_parameters
 
 logger = logging.getLogger(__name__)
 
@@ -969,13 +970,12 @@ def train_expression_prediction(
     #     if param.requires_grad:
     #         writer.add_histogram(f'Parameters/{name}', param.data, 0)
     
-    # Alternative: Try histogram logging with error handling
+    # Use robust parameter logging with fallback options
     try:
-        for name, param in joint_model.named_parameters():
-            if param.requires_grad:
-                writer.add_histogram(f'Parameters/{name}', param.data, 0)
+        logging_results = log_model_parameters(writer, joint_model, global_step=0)
+        logger.info(f"Parameter logging completed: {logging_results['histograms_successful']} histograms, {logging_results['statistics_successful']} statistics")
     except Exception as e:
-        logger.warning(f"Could not log parameter histograms due to NumPy compatibility: {e}")
+        logger.warning(f"Could not log model parameters: {e}")
     
     # Close TensorBoard writer
     writer.close()
