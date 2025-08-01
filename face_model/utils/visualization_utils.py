@@ -32,25 +32,35 @@ def compute_cosine_similarity_distribution(expression_tokens_by_clip: List[torch
         if clip_tokens.shape[0] < 2:
             continue  # Skip clips with only one token
             
-        # Reshape to (num_tokens, embed_dim)
-        tokens = clip_tokens.squeeze(1)  # (num_tokens, embed_dim)
-        
-        # Compute pairwise cosine similarities
-        # Normalize tokens for cosine similarity
-        tokens_norm = F.normalize(tokens, p=2, dim=1)
-        
-        # Compute similarity matrix
-        similarity_matrix = torch.mm(tokens_norm, tokens_norm.t())  # (num_tokens, num_tokens)
-        
-        # Get upper triangle (excluding diagonal) to avoid self-similarities
-        upper_triangle = torch.triu(similarity_matrix, diagonal=1)
-        
-        # Extract non-zero similarities
-        similarities = upper_triangle[upper_triangle > 0]
-        
-        if len(similarities) > 0:
-            all_similarities.extend(similarities.cpu().numpy())
-            clip_similarities.append(similarities.cpu().numpy())
+        try:
+            # Detach tokens to avoid gradient issues
+            tokens_detached = clip_tokens.detach()
+            
+            # Reshape to (num_tokens, embed_dim)
+            tokens = tokens_detached.squeeze(1)  # (num_tokens, embed_dim)
+            
+            # Compute pairwise cosine similarities
+            # Normalize tokens for cosine similarity
+            tokens_norm = F.normalize(tokens, p=2, dim=1)
+            
+            # Compute similarity matrix
+            similarity_matrix = torch.mm(tokens_norm, tokens_norm.t())  # (num_tokens, num_tokens)
+            
+            # Get upper triangle (excluding diagonal) to avoid self-similarities
+            upper_triangle = torch.triu(similarity_matrix, diagonal=1)
+            
+            # Extract non-zero similarities
+            similarities = upper_triangle[upper_triangle > 0]
+            
+            if len(similarities) > 0:
+                # Convert to numpy (already detached)
+                similarities_np = similarities.cpu().numpy()
+                all_similarities.extend(similarities_np)
+                clip_similarities.append(similarities_np)
+                
+        except Exception as e:
+            logger.warning(f"Failed to compute similarities for clip: {e}")
+            continue
     
     if not all_similarities:
         return {

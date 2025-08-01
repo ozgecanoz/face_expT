@@ -829,36 +829,49 @@ def train_expression_prediction(
             # Compute and log cosine similarity distribution (every 100 steps to avoid overhead)
             if current_training_step % 100 == 0 and expression_tokens_by_clip:
                 try:
-                    similarity_data = compute_cosine_similarity_distribution(expression_tokens_by_clip)
-                    
-                    # Log similarity statistics to TensorBoard
-                    writer.add_scalar('Training/Similarity/Mean', similarity_data['mean_similarity'], current_training_step)
-                    writer.add_scalar('Training/Similarity/Std', similarity_data['std_similarity'], current_training_step)
-                    writer.add_scalar('Training/Similarity/Min', similarity_data['min_similarity'], current_training_step)
-                    writer.add_scalar('Training/Similarity/Max', similarity_data['max_similarity'], current_training_step)
-                    writer.add_scalar('Training/Similarity/Count', len(similarity_data['similarities']), current_training_step)
-                    
-                    # Save similarity plot every 500 steps
-                    if current_training_step % 500 == 0:
-                        plot_path = os.path.join(log_dir, f'similarity_step_{current_training_step}.png')
-                        plot_cosine_similarity_distribution(
-                            similarity_data,
-                            save_path=plot_path,
-                            title=f"Cosine Similarity Distribution - Step {current_training_step}"
-                        )
-                        logger.info(f"Saved similarity plot to: {plot_path}")
+                    # Ensure we have enough clips for meaningful analysis
+                    if len(expression_tokens_by_clip) >= 2:
+                        similarity_data = compute_cosine_similarity_distribution(expression_tokens_by_clip)
+                        
+                        # Log similarity statistics to TensorBoard
+                        writer.add_scalar('Training/Similarity/Mean', similarity_data['mean_similarity'], current_training_step)
+                        writer.add_scalar('Training/Similarity/Std', similarity_data['std_similarity'], current_training_step)
+                        writer.add_scalar('Training/Similarity/Min', similarity_data['min_similarity'], current_training_step)
+                        writer.add_scalar('Training/Similarity/Max', similarity_data['max_similarity'], current_training_step)
+                        writer.add_scalar('Training/Similarity/Count', len(similarity_data['similarities']), current_training_step)
+                        
+                        # Save similarity plot every 500 steps
+                        if current_training_step % 500 == 0:
+                            plot_path = os.path.join(log_dir, f'similarity_step_{current_training_step}.png')
+                            plot_cosine_similarity_distribution(
+                                similarity_data,
+                                save_path=plot_path,
+                                title=f"Cosine Similarity Distribution - Step {current_training_step}"
+                            )
+                            logger.info(f"Saved similarity plot to: {plot_path}")
+                    else:
+                        logger.debug(f"Skipping similarity computation: only {len(expression_tokens_by_clip)} clips available")
                         
                 except Exception as e:
                     logger.warning(f"Failed to compute similarity distribution: {e}")
+                    # Continue training without similarity analysis
             
-            # Update progress bar
+            # Update progress bar with detailed loss breakdown
+            # Loss: Current batch total loss
+            # Avg Loss: Running average loss for the epoch
+            # Cosine: Cosine similarity loss component
+            # Temporal: Temporal contrastive loss component  
+            # Diversity: Diversity loss component
             progress_bar.set_postfix({
-                'Loss': f'{loss.item():.4f}',
-                'Avg Loss': f'{epoch_loss / num_batches:.4f}',
+                'Loss': f'{loss.item():.5f}',
+                'Avg Loss': f'{epoch_loss / num_batches:.5f}',
+                'Cosine': f'{loss_components["cosine"].item():.5f}',
+                'Temporal': f'{loss_components["temporal"].item():.5f}',
+                'Diversity': f'{loss_components["diversity"].item():.5f}',
                 'LR': f'{current_lr:.2e}',
-                'λ_pred': f'{current_weights["lambda_prediction"]:.3f}',
-                'λ_temp': f'{current_weights["lambda_temporal"]:.3f}',
-                'λ_div': f'{current_weights["lambda_diversity"]:.3f}',
+                'λ_pred': f'{current_weights["lambda_prediction"]:.2f}',
+                'λ_temp': f'{current_weights["lambda_temporal"]:.2f}',
+                'λ_div': f'{current_weights["lambda_diversity"]:.2f}',
                 'Step': f'{current_training_step}'
             })
             
