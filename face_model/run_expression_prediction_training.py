@@ -36,18 +36,18 @@ def main():
             #'max_val_samples': 100,   # Limit validation samples for testing
             #'checkpoint_dir': "/mnt/dataset-storage/face_model/checkpoints_with_subject_ids",
             'train_data_dir': "/mnt/dataset-storage/dbs/CCA_train_db4_no_padding_keywords_offset_1.0/", # this is with keyword based clip generation
-            'max_train_samples': 16,  # pass None to use all samples for full training
+            'max_train_samples': None,  # pass None to use all samples for full training
             'val_data_dir': "/mnt/dataset-storage/dbs/CCA_train_db4_no_padding/",   # this is with random clip generation
-            'max_val_samples': 16,   # Limit validation samples for testing
+            'max_val_samples': 2000,   # Limit validation samples for testing
             'checkpoint_dir': "/mnt/dataset-storage/face_model/checkpoints_with_keywords",
             'expression_transformer_checkpoint_path': None,  # Set to path if you want to load expression transformer
             'transformer_decoder_checkpoint_path': None,  # Set to path if you want to load transformer decoder
             'log_dir': "/mnt/dataset-storage/face_model/logs",
-            'learning_rate': 1e-4,
+            'learning_rate': 5e-5,
             #'batch_size': 16,  # Optimized for 64GB RAM (cpu vm)
             'batch_size': 4,  # for L4 GPU train-gpu-co 
-            'num_epochs': 3,
-            'save_every_epochs': 1,   # Save checkpoint every epoch
+            'num_epochs': 6,
+            'save_every_epochs': 2,   # Save checkpoint every epoch
             #'num_workers': 4,  # Parallel data loading with 16 vCPUs
             'num_workers': 8,  # for L4 GPU (24 GB VRAM) train-gpu-co (it has 16 vCPUs), memory 64GB, 
             #'pin_memory': False,  # Not needed for CPU

@@ -135,6 +135,7 @@ git clone git@github.com:ozgecanoz/dataset_utils.git .
 git clone git@github.com:ozgecanoz/dataset_utils.git dataset_utils
 ```
 
+$ ls -1 /mnt/dataset-storage/dbs/CCA_train_db4_no_padding_keywords_offset_1.0/*.h5 | wc -l
 
 ### **2. Download Datasets:**
 ```bash
