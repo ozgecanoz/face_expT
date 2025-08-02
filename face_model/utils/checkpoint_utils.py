@@ -154,19 +154,28 @@ def create_comprehensive_config(
     expr_num_layers: int,
     expr_dropout: float,
     expr_max_subjects: int,
-    decoder_embed_dim: int,
-    decoder_num_heads: int,
-    decoder_num_layers: int,
-    decoder_dropout: float,
-    max_sequence_length: int,
-    lambda_prediction: float,
-    lambda_temporal: float,
-    lambda_diversity: float,
-    learning_rate: float,
-    batch_size: int,
-    num_epochs: int,
-    warmup_steps: int,
-    min_lr: float,
+    decoder_embed_dim: int = None,
+    decoder_num_heads: int = None,
+    decoder_num_layers: int = None,
+    decoder_dropout: float = None,
+    max_sequence_length: int = None,
+    lambda_prediction: float = None,
+    lambda_temporal: float = None,
+    lambda_diversity: float = None,
+    learning_rate: float = None,
+    batch_size: int = None,
+    num_epochs: int = None,
+    warmup_steps: int = None,
+    min_lr: float = None,
+    # Reconstruction model parameters (optional)
+    recon_embed_dim: int = None,
+    recon_num_cross_layers: int = None,
+    recon_num_self_layers: int = None,
+    recon_num_heads: int = None,
+    recon_ff_dim: int = None,
+    recon_dropout: float = None,
+    # Loss parameters (optional)
+    lambda_reconstruction: float = None,
     # Scheduler parameters (optional)
     initial_lambda_prediction: float = None,
     initial_lambda_temporal: float = None,
@@ -176,7 +185,11 @@ def create_comprehensive_config(
     warmup_lambda_diversity: float = None,
     final_lambda_prediction: float = None,
     final_lambda_temporal: float = None,
-    final_lambda_diversity: float = None
+    final_lambda_diversity: float = None,
+    # Reconstruction scheduler parameters (optional)
+    initial_lambda_reconstruction: float = None,
+    warmup_lambda_reconstruction: float = None,
+    final_lambda_reconstruction: float = None
 ) -> Dict[str, Any]:
     """
     Create a comprehensive configuration dictionary for checkpoint saving
@@ -194,35 +207,64 @@ def create_comprehensive_config(
             'num_layers': expr_num_layers,
             'dropout': expr_dropout,
             'max_subjects': expr_max_subjects
-        },
-        'transformer_decoder': {
+        }
+    }
+    
+    # Add transformer decoder config if provided
+    if all(param is not None for param in [decoder_embed_dim, decoder_num_heads, decoder_num_layers, decoder_dropout, max_sequence_length]):
+        config['transformer_decoder'] = {
             'embed_dim': decoder_embed_dim,
             'num_heads': decoder_num_heads,
             'num_layers': decoder_num_layers,
             'dropout': decoder_dropout,
             'max_sequence_length': max_sequence_length
-        },
-        'loss_function': {
-            'lambda_prediction': lambda_prediction,
-            'lambda_temporal': lambda_temporal,
-            'lambda_diversity': lambda_diversity
-        },
-        'training': {
+        }
+    
+    # Add reconstruction model config if provided
+    if all(param is not None for param in [recon_embed_dim, recon_num_cross_layers, recon_num_self_layers, recon_num_heads, recon_ff_dim, recon_dropout]):
+        config['expression_reconstruction'] = {
+            'embed_dim': recon_embed_dim,
+            'num_cross_attention_layers': recon_num_cross_layers,
+            'num_self_attention_layers': recon_num_self_layers,
+            'num_heads': recon_num_heads,
+            'ff_dim': recon_ff_dim,
+            'dropout': recon_dropout
+        }
+    
+    # Add loss function config
+    loss_config = {}
+    if lambda_prediction is not None:
+        loss_config['lambda_prediction'] = lambda_prediction
+    if lambda_temporal is not None:
+        loss_config['lambda_temporal'] = lambda_temporal
+    if lambda_diversity is not None:
+        loss_config['lambda_diversity'] = lambda_diversity
+    if lambda_reconstruction is not None:
+        loss_config['lambda_reconstruction'] = lambda_reconstruction
+    
+    if loss_config:
+        config['loss_function'] = loss_config
+    
+    # Add training config if provided
+    if all(param is not None for param in [learning_rate, batch_size, num_epochs, warmup_steps, min_lr]):
+        config['training'] = {
             'learning_rate': learning_rate,
             'batch_size': batch_size,
             'num_epochs': num_epochs,
             'warmup_steps': warmup_steps,
             'min_lr': min_lr
         }
-    }
     
     # Add scheduler parameters if provided
+    scheduler_config = {}
+    
+    # Check if prediction scheduler parameters are provided
     if all(param is not None for param in [
         initial_lambda_prediction, initial_lambda_temporal, initial_lambda_diversity,
         warmup_lambda_prediction, warmup_lambda_temporal, warmup_lambda_diversity,
         final_lambda_prediction, final_lambda_temporal, final_lambda_diversity
     ]):
-        config['scheduler'] = {
+        scheduler_config['prediction'] = {
             'initial_weights': {
                 'lambda_prediction': initial_lambda_prediction,
                 'lambda_temporal': initial_lambda_temporal,
@@ -239,6 +281,33 @@ def create_comprehensive_config(
                 'lambda_diversity': final_lambda_diversity
             }
         }
+    
+    # Check if reconstruction scheduler parameters are provided
+    if all(param is not None for param in [
+        initial_lambda_reconstruction, initial_lambda_temporal, initial_lambda_diversity,
+        warmup_lambda_reconstruction, warmup_lambda_temporal, warmup_lambda_diversity,
+        final_lambda_reconstruction, final_lambda_temporal, final_lambda_diversity
+    ]):
+        scheduler_config['reconstruction'] = {
+            'initial_weights': {
+                'lambda_reconstruction': initial_lambda_reconstruction,
+                'lambda_temporal': initial_lambda_temporal,
+                'lambda_diversity': initial_lambda_diversity
+            },
+            'warmup_weights': {
+                'lambda_reconstruction': warmup_lambda_reconstruction,
+                'lambda_temporal': warmup_lambda_temporal,
+                'lambda_diversity': warmup_lambda_diversity
+            },
+            'final_weights': {
+                'lambda_reconstruction': final_lambda_reconstruction,
+                'lambda_temporal': final_lambda_temporal,
+                'lambda_diversity': final_lambda_diversity
+            }
+        }
+    
+    if scheduler_config:
+        config['scheduler'] = scheduler_config
     
     return config
 

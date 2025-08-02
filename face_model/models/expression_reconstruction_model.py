@@ -5,71 +5,10 @@ import math
 from typing import Optional, Tuple
 
 
-class TransformerBlock(nn.Module):
-    """Transformer block with self-attention and feed-forward layers"""
-    
-    def __init__(self, embed_dim: int, num_heads: int, ff_dim: int, dropout: float = 0.1):
-        super().__init__()
-        self.attention = nn.MultiheadAttention(embed_dim, num_heads, dropout=dropout, batch_first=True)
-        self.norm1 = nn.LayerNorm(embed_dim)
-        self.norm2 = nn.LayerNorm(embed_dim)
-        self.ff = nn.Sequential(
-            nn.Linear(embed_dim, ff_dim),
-            nn.GELU(),
-            nn.Dropout(dropout),
-            nn.Linear(ff_dim, embed_dim),
-            nn.Dropout(dropout)
-        )
-        
-    def forward(self, x: torch.Tensor, attn_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
-        # Self-attention
-        attn_out, _ = self.attention(x, x, x, attn_mask=attn_mask)
-        x = self.norm1(x + attn_out)
-        
-        # Feed-forward
-        ff_out = self.ff(x)
-        x = self.norm2(x + ff_out)
-        
-        return x
+# TransformerBlock removed - now using nn.TransformerDecoder for both cross and self attention
 
 
-class CrossAttentionBlock(nn.Module):
-    """Cross-attention block where query attends to fixed key-value pairs with FFN"""
-    
-    def __init__(self, embed_dim: int, num_heads: int, ff_dim: int = None, dropout: float = 0.1):
-        super().__init__()
-        self.embed_dim = embed_dim
-        self.ff_dim = ff_dim if ff_dim is not None else embed_dim * 4
-        
-        # Cross-attention
-        self.cross_attention = nn.MultiheadAttention(embed_dim, num_heads, dropout=dropout, batch_first=True)
-        self.norm1 = nn.LayerNorm(embed_dim)
-        
-        # Position-wise feedforward network
-        self.ffn = nn.Sequential(
-            nn.Linear(embed_dim, self.ff_dim),
-            nn.GELU(),
-            nn.Dropout(dropout),
-            nn.Linear(self.ff_dim, embed_dim),
-            nn.Dropout(dropout)
-        )
-        self.norm2 = nn.LayerNorm(embed_dim)
-        
-    def forward(self, query: torch.Tensor, key_value: torch.Tensor) -> torch.Tensor:
-        """
-        Args:
-            query: (B, L, embed_dim) - patch embeddings
-            key_value: (B, 2, embed_dim) - [subject_embedding, expression_token]
-        """
-        # Cross-attention: patches attend to subject + expression
-        attn_out, _ = self.cross_attention(query, key_value, key_value)
-        query = self.norm1(query + attn_out)
-        
-        # Position-wise feedforward network
-        ff_out = self.ffn(query)
-        query = self.norm2(query + ff_out)
-        
-        return query
+# CrossAttentionBlock removed - now using nn.TransformerDecoder with fixed memory
 
 
 # Import the OptimizedCNNDecoder from the existing face reconstruction model
@@ -80,7 +19,7 @@ from face_reconstruction_model import OptimizedCNNDecoder
 
 
 class ExpressionReconstructionModel(nn.Module):
-    """Expression reconstruction model with learnable patch embeddings and transformer blocks"""
+    """Expression reconstruction model using TransformerDecoder with fixed memory"""
     
     def __init__(self, 
                  embed_dim: int = 384,
@@ -108,17 +47,27 @@ class ExpressionReconstructionModel(nn.Module):
         # Learnable patch embeddings (Q vectors)
         self.patch_embeddings = nn.Parameter(torch.randn(1, num_patches, embed_dim) * 0.02)
         
-        # Cross-attention layers (patches attend to subject + expression)
-        self.cross_attention_layers = nn.ModuleList([
-            CrossAttentionBlock(embed_dim, num_heads, ff_dim, dropout)
-            for _ in range(num_cross_attention_layers)
-        ])
+        # Cross-attention decoder layers (patches attend to subject + expression)
+        # Using TransformerDecoderLayer for cross-attention with fixed memory
+        cross_decoder_layer = nn.TransformerDecoderLayer(
+            d_model=embed_dim,
+            nhead=num_heads,
+            dim_feedforward=ff_dim,
+            dropout=dropout,
+            batch_first=True
+        )
+        self.cross_decoder = nn.TransformerDecoder(cross_decoder_layer, num_layers=num_cross_attention_layers)
         
-        # Self-attention layers (patches attend to each other)
-        self.self_attention_layers = nn.ModuleList([
-            TransformerBlock(embed_dim, num_heads, ff_dim, dropout)
-            for _ in range(num_self_attention_layers)
-        ])
+        # Self-attention encoder layers (patches attend to each other)
+        # Using TransformerEncoderLayer for pure intra-patch attention
+        self_attention_encoder_layer = nn.TransformerEncoderLayer(
+            d_model=embed_dim,
+            nhead=num_heads,
+            dim_feedforward=ff_dim,
+            dropout=dropout,
+            batch_first=True
+        )
+        self.self_attention_encoder = nn.TransformerEncoder(self_attention_encoder_layer, num_layers=num_self_attention_layers)
         
         # CNN decoder (reusing OptimizedCNNDecoder)
         self.decoder = OptimizedCNNDecoder(embed_dim)
@@ -143,16 +92,16 @@ class ExpressionReconstructionModel(nn.Module):
         # Add positional embeddings
         patch_vectors = patch_vectors + pos_embeddings
         
-        # Combine subject and expression tokens for cross-attention
+        # Combine subject and expression tokens for fixed memory (K,V context)
         identity_expression = torch.cat([subject_embedding, expression_token], dim=1)  # (B, 2, embed_dim)
         
-        # Cross-attention layers: patches attend to subject + expression
-        for cross_layer in self.cross_attention_layers:
-            patch_vectors = cross_layer(patch_vectors, identity_expression)
+        # Cross-attention using TransformerDecoder: patches (query) attend to subject + expression (memory)
+        # This follows the same pattern as ExpressionTransformer
+        patch_vectors = self.cross_decoder(tgt=patch_vectors, memory=identity_expression)
         
-        # Self-attention layers: patches attend to each other
-        for self_layer in self.self_attention_layers:
-            patch_vectors = self_layer(patch_vectors)
+        # Self-attention using TransformerEncoder: patches attend to each other
+        # Pure intra-patch attention without external memory
+        patch_vectors = self.self_attention_encoder(patch_vectors)
         
         # Reshape patch vectors to spatial grid for CNN decoder
         # (B, 1369, 384) -> (B, 37, 37, 384) -> (B, 384, 37, 37)
