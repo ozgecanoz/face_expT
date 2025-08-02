@@ -299,7 +299,7 @@ def train_expression_prediction(
     transformer_decoder_checkpoint_path=None,
     joint_checkpoint_path=None,  # New parameter for joint checkpoint
     checkpoint_dir="checkpoints",
-    save_every_epochs=2,
+    save_every_step=500,  # Control both similarity plots and checkpoints
     batch_size=8,
     num_epochs=10,
     learning_rate=1e-4,
@@ -858,8 +858,9 @@ def train_expression_prediction(
                         writer.add_scalar('Training/Similarity/Max', similarity_data['max_similarity'], current_training_step)
                         writer.add_scalar('Training/Similarity/Count', len(similarity_data['similarities']), current_training_step)
                         
-                        # Save similarity plot every 300 steps
-                        if current_training_step % 300 == 0:
+                        # Save similarity plot and checkpoints every save_every_step steps
+                        if current_training_step % save_every_step == 0:
+                            # Save similarity plot
                             plot_path = os.path.join(log_dir, f'similarity_step_{current_training_step}.png')
                             plot_cosine_similarity_distribution(
                                 similarity_data,
@@ -867,6 +868,83 @@ def train_expression_prediction(
                                 title=f"Cosine Similarity Distribution - Step {current_training_step}"
                             )
                             logger.info(f"Saved similarity plot to: {plot_path}")
+                            
+                            # Save checkpoints
+                            # Create comprehensive config
+                            config = create_comprehensive_config(
+                                expr_embed_dim=expr_embed_dim,
+                                expr_num_heads=expr_num_heads,
+                                expr_num_layers=expr_num_layers,
+                                expr_dropout=expr_dropout,
+                                expr_max_subjects=expr_max_subjects,
+                                decoder_embed_dim=decoder_embed_dim,
+                                decoder_num_heads=decoder_num_heads,
+                                decoder_num_layers=decoder_num_layers,
+                                decoder_dropout=decoder_dropout,
+                                max_sequence_length=max_sequence_length,
+                                lambda_prediction=initial_lambda_prediction,  # Use initial weight for config
+                                lambda_temporal=initial_lambda_temporal,
+                                lambda_diversity=initial_lambda_diversity,
+                                learning_rate=learning_rate,
+                                batch_size=batch_size,
+                                num_epochs=num_epochs,
+                                warmup_steps=warmup_steps,
+                                min_lr=min_lr,
+                                # Scheduler parameters
+                                initial_lambda_prediction=initial_lambda_prediction,
+                                initial_lambda_temporal=initial_lambda_temporal,
+                                initial_lambda_diversity=initial_lambda_diversity,
+                                warmup_lambda_prediction=warmup_lambda_prediction,
+                                warmup_lambda_temporal=warmup_lambda_temporal,
+                                warmup_lambda_diversity=warmup_lambda_diversity,
+                                final_lambda_prediction=final_lambda_prediction,
+                                final_lambda_temporal=final_lambda_temporal,
+                                final_lambda_diversity=final_lambda_diversity
+                            )
+                            
+                            # Joint model
+                            joint_step_path = os.path.join(checkpoint_dir, f"joint_expression_prediction_step_{current_training_step}.pt")
+                            save_checkpoint(
+                                model_state_dict=joint_model.state_dict(),
+                                optimizer_state_dict=optimizer.state_dict(),
+                                scheduler_state_dict=scheduler.state_dict(),
+                                epoch=epoch + 1,
+                                avg_loss=loss.item(),  # Use current batch loss instead of epoch average
+                                total_steps=current_training_step,
+                                config=config,
+                                checkpoint_path=joint_step_path,
+                                checkpoint_type="joint"
+                            )
+                            
+                            # Expression transformer
+                            expr_step_path = os.path.join(checkpoint_dir, f"expression_transformer_step_{current_training_step}.pt")
+                            save_checkpoint(
+                                model_state_dict=joint_model.expression_transformer.state_dict(),
+                                optimizer_state_dict=optimizer.state_dict(),
+                                scheduler_state_dict=scheduler.state_dict(),
+                                epoch=epoch + 1,
+                                avg_loss=loss.item(),  # Use current batch loss instead of epoch average
+                                total_steps=current_training_step,
+                                config=config,
+                                checkpoint_path=expr_step_path,
+                                checkpoint_type="expression_transformer"
+                            )
+                            
+                            # Transformer decoder
+                            decoder_step_path = os.path.join(checkpoint_dir, f"transformer_decoder_step_{current_training_step}.pt")
+                            save_checkpoint(
+                                model_state_dict=joint_model.transformer_decoder.state_dict(),
+                                optimizer_state_dict=optimizer.state_dict(),
+                                scheduler_state_dict=scheduler.state_dict(),
+                                epoch=epoch + 1,
+                                avg_loss=loss.item(),  # Use current batch loss instead of epoch average
+                                total_steps=current_training_step,
+                                config=config,
+                                checkpoint_path=decoder_step_path,
+                                checkpoint_type="transformer_decoder"
+                            )
+                            
+                            logger.info(f"Saved step checkpoints: {joint_step_path}, {expr_step_path}, {decoder_step_path}")
                     else:
                         logger.debug(f"Skipping similarity computation: only {len(expression_tokens_by_clip)} clips available")
                         
@@ -916,84 +994,6 @@ def train_expression_prediction(
             
             # Log validation metrics to TensorBoard
             writer.add_scalar('Validation/Epoch_Loss', val_loss, epoch + 1)
-        
-        # Save epoch checkpoints
-        if (epoch + 1) % save_every_epochs == 0:
-            # Create comprehensive config
-            config = create_comprehensive_config(
-                expr_embed_dim=expr_embed_dim,
-                expr_num_heads=expr_num_heads,
-                expr_num_layers=expr_num_layers,
-                expr_dropout=expr_dropout,
-                expr_max_subjects=expr_max_subjects,
-                decoder_embed_dim=decoder_embed_dim,
-                decoder_num_heads=decoder_num_heads,
-                decoder_num_layers=decoder_num_layers,
-                decoder_dropout=decoder_dropout,
-                max_sequence_length=max_sequence_length,
-                lambda_prediction=initial_lambda_prediction,  # Use initial weight for config
-                lambda_temporal=initial_lambda_temporal,
-                lambda_diversity=initial_lambda_diversity,
-                learning_rate=learning_rate,
-                batch_size=batch_size,
-                num_epochs=num_epochs,
-                warmup_steps=warmup_steps,
-                min_lr=min_lr,
-                # Scheduler parameters
-                initial_lambda_prediction=initial_lambda_prediction,
-                initial_lambda_temporal=initial_lambda_temporal,
-                initial_lambda_diversity=initial_lambda_diversity,
-                warmup_lambda_prediction=warmup_lambda_prediction,
-                warmup_lambda_temporal=warmup_lambda_temporal,
-                warmup_lambda_diversity=warmup_lambda_diversity,
-                final_lambda_prediction=final_lambda_prediction,
-                final_lambda_temporal=final_lambda_temporal,
-                final_lambda_diversity=final_lambda_diversity
-            )
-            
-            # Joint model
-            joint_epoch_path = os.path.join(checkpoint_dir, f"joint_expression_prediction_epoch_{epoch+1}.pt")
-            save_checkpoint(
-                model_state_dict=joint_model.state_dict(),
-                optimizer_state_dict=optimizer.state_dict(),
-                scheduler_state_dict=scheduler.state_dict(),
-                epoch=epoch + 1,
-                avg_loss=avg_loss,
-                total_steps=current_training_step,
-                config=config,
-                checkpoint_path=joint_epoch_path,
-                checkpoint_type="joint"
-            )
-            
-            # Expression transformer
-            expr_epoch_path = os.path.join(checkpoint_dir, f"expression_transformer_epoch_{epoch+1}.pt")
-            save_checkpoint(
-                model_state_dict=joint_model.expression_transformer.state_dict(),
-                optimizer_state_dict=optimizer.state_dict(),
-                scheduler_state_dict=scheduler.state_dict(),
-                epoch=epoch + 1,
-                avg_loss=avg_loss,
-                total_steps=current_training_step,
-                config=config,
-                checkpoint_path=expr_epoch_path,
-                checkpoint_type="expression_transformer"
-            )
-            
-            # Transformer decoder
-            decoder_epoch_path = os.path.join(checkpoint_dir, f"transformer_decoder_epoch_{epoch+1}.pt")
-            save_checkpoint(
-                model_state_dict=joint_model.transformer_decoder.state_dict(),
-                optimizer_state_dict=optimizer.state_dict(),
-                scheduler_state_dict=scheduler.state_dict(),
-                epoch=epoch + 1,
-                avg_loss=avg_loss,
-                total_steps=current_training_step,
-                config=config,
-                checkpoint_path=decoder_epoch_path,
-                checkpoint_type="transformer_decoder"
-            )
-            
-            logger.info(f"Saved epoch checkpoints: {joint_epoch_path}, {expr_epoch_path}, {decoder_epoch_path}")
     
     # Log model parameters to TensorBoard
     # Commented out due to NumPy 2.x compatibility issues

@@ -45,12 +45,12 @@ def main():
             'joint_checkpoint_path': None,  # Set to path if you want to load joint checkpoint (preferred)
             'log_dir': "/mnt/dataset-storage/face_model/logs",
             'learning_rate': 5e-5,
-            'warmup_steps': 750,  # Learning rate warmup steps
+            'warmup_steps': 3000,  # Learning rate warmup steps
             'min_lr': 1e-6,  # Minimum learning rate after decay
             #'batch_size': 16,  # Optimized for 64GB RAM (cpu vm)
             'batch_size': 4,  # for L4 GPU train-gpu-co 
-            'num_epochs': 5,
-            'save_every_epochs': 1,   # Save checkpoint every epoch
+            'num_epochs': 2,
+            'save_every_step': 300,   # Save similarity plots and checkpoints every 500 steps
             #'num_workers': 4,  # Parallel data loading with 16 vCPUs
             'num_workers': 8,  # for L4 GPU (24 GB VRAM) train-gpu-co (it has 16 vCPUs), memory 64GB, 
             #'pin_memory': False,  # Not needed for CPU
@@ -96,6 +96,7 @@ def main():
     print(f"📉 Min LR: {config['training']['min_lr']}")
     print(f"📦 Batch size: {config['training']['batch_size']}")
     print(f"🔄 Epochs: {config['training']['num_epochs']}")
+    print(f"💾 Save every: {config['training']['save_every_step']} steps")
     print(f"🧠 Expression Transformer: {config['expression_transformer']['num_layers']} layers, {config['expression_transformer']['num_heads']} heads")
     print(f"🧠 Transformer Decoder: {config['transformer_decoder']['num_layers']} layers, {config['transformer_decoder']['num_heads']} heads")
     print(f"🧵 Num workers: {config['training']['num_workers']}")
@@ -160,7 +161,7 @@ def main():
         transformer_decoder_checkpoint_path=config['training']['transformer_decoder_checkpoint_path'],
         joint_checkpoint_path=config['training']['joint_checkpoint_path'],
         checkpoint_dir=config['training']['checkpoint_dir'],
-        save_every_epochs=config['training']['save_every_epochs'],
+        save_every_step=config['training']['save_every_step'],
         batch_size=config['training']['batch_size'],
         num_epochs=config['training']['num_epochs'],
         learning_rate=config['training']['learning_rate'],
