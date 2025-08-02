@@ -94,6 +94,7 @@ class ExpressionTransformer(nn.Module):
         # Final output projection and normalization
         expression_token = self.output_proj(decoded)
         expression_token = self.layer_norm(expression_token)
+        expression_token = F.normalize(expression_token, dim=-1)  # (B, 1, D)
         
         return expression_token
     
@@ -137,6 +138,7 @@ class ExpressionTransformer(nn.Module):
             
             # Final layer normalization
             expression_token = self.layer_norm(expression_token)
+            expression_token = F.normalize(expression_token, dim=-1)  # (B, 1, D)
             
             return expression_token, subject_embeddings
 

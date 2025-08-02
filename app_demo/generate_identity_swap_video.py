@@ -390,9 +390,9 @@ def main():
     """Main function"""
     parser = argparse.ArgumentParser(description="Generate identity swap video using pre-prepared identity features")
     parser.add_argument("--input_video", type=str, 
-    default="/Users/ozgewhiting/Documents/EQLabs/datasets_serial/CCA_small/1220_08_faces_53_07.mp4",
-    help="Path to input video with 518x518 face frames")
+    default="/Users/ozgewhiting/Documents/EQLabs/datasets_serial/CCA_small/1220_08_faces_53_07.mp4", help="Path to input video with 518x518 face frames")
     parser.add_argument("--input_subject_id", type=int, default=81, help="Subject ID for the input video")
+    
     parser.add_argument("--output_video", type=str, 
     default="/Users/ozgewhiting/Documents/projects/cloud_checkpoints_with_keywords/1220_08_faces_53_07_reconstructed_w_subj_id_37_w_epoch_3.mp4", 
     help="Path to save output video")

@@ -211,8 +211,9 @@ class ExpressionPredictionLoss_v2(nn.Module):
                 temporal_losses.append(temporal_loss)
 
                 # ---- 3. Diversity Loss (within-clip token dissimilarity) ----
-                normed = F.normalize(clip_tokens.squeeze(1), dim=-1)  # (T, D)
-                sim_matrix = normed @ normed.T  # (T, T)
+                # clip_tokens are already normalized from ExpressionTransformer
+                tokens = clip_tokens.squeeze(1)  # (T, D) - already normalized
+                sim_matrix = tokens @ tokens.T  # (T, T)
                 diversity_loss = sim_matrix.mean()  # High if tokens are similar
                 diversity_losses.append(diversity_loss)
 
