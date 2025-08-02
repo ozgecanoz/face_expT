@@ -40,11 +40,11 @@ def main():
             'joint_checkpoint_path': None,  # Set to path if you want to load joint checkpoint (preferred)
             'log_dir': "/mnt/dataset-storage/face_model/logs_with_keywords4",
             'learning_rate': 5e-5,
-            'warmup_steps': 3000,  # Learning rate warmup steps
+            'warmup_steps': 6000,  # Learning rate warmup steps
             'min_lr': 1e-6,  # Minimum learning rate after decay
-            'batch_size': 2,  # for L4 GPU train-gpu-co 
+            'batch_size': 1,  # for L4 GPU train-gpu-co 
             'num_epochs': 3,
-            'save_every_step': 600,   # Save similarity plots and checkpoints every 300 steps
+            'save_every_step': 1200,   # Save similarity plots and checkpoints every 300 steps
             'num_workers': 8,  # for L4 GPU (24 GB VRAM) train-gpu-co (it has 16 vCPUs), memory 64GB, 
             'pin_memory': True,  # for L4 GPU train-gpu-co 
             'persistent_workers': True,  # Keep workers alive for efficiency
