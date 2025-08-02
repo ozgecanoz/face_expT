@@ -850,8 +850,8 @@ def train_expression_prediction(
                         writer.add_scalar('Training/Similarity/Max', similarity_data['max_similarity'], current_training_step)
                         writer.add_scalar('Training/Similarity/Count', len(similarity_data['similarities']), current_training_step)
                         
-                        # Save similarity plot every 500 steps
-                        if current_training_step % 500 == 0:
+                        # Save similarity plot every 300 steps
+                        if current_training_step % 300 == 0:
                             plot_path = os.path.join(log_dir, f'similarity_step_{current_training_step}.png')
                             plot_cosine_similarity_distribution(
                                 similarity_data,
