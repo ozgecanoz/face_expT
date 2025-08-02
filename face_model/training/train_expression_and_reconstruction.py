@@ -524,20 +524,18 @@ def train_expression_and_reconstruction(
         min_lr=min_lr
     )
     
-    # Load optimizer and scheduler state from checkpoint if provided
+    # Load optimizer state from checkpoint if provided
     if joint_checkpoint_path is not None and joint_checkpoint is not None:
         try:
             if 'optimizer_state_dict' in joint_checkpoint:
                 optimizer.load_state_dict(joint_checkpoint['optimizer_state_dict'])
                 logger.info("✅ Successfully loaded optimizer state from checkpoint")
             
-            if 'scheduler_state_dict' in joint_checkpoint:
-                scheduler.load_state_dict(joint_checkpoint['scheduler_state_dict'])
-                logger.info("✅ Successfully loaded scheduler state from checkpoint")
-                logger.info("📊 Note: Your new weight scheduling parameters will override the checkpoint scheduler weights")
+            # Don't load scheduler state - use new parameters instead
+            logger.info("📊 Using new weight scheduling parameters (not loading checkpoint scheduler state)")
             
         except Exception as e:
-            logger.warning(f"Failed to load optimizer/scheduler state: {str(e)}")
+            logger.warning(f"Failed to load optimizer state: {str(e)}")
     
     # Initialize TensorBoard
     job_id = str(uuid.uuid4())[:8]
