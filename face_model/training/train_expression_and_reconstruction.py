@@ -41,7 +41,7 @@ class JointExpressionReconstructionModel(nn.Module):
     """
     
     def __init__(self, 
-                 expr_embed_dim=384, expr_num_heads=4, expr_num_layers=2, expr_dropout=0.1, expr_max_subjects=3500,
+                 expr_embed_dim=384, expr_num_heads=4, expr_num_layers=2, expr_dropout=0.1, expr_max_subjects=3500, expr_ff_dim=1536,
                  recon_embed_dim=384, recon_num_cross_layers=2, recon_num_self_layers=2, recon_num_heads=8, recon_ff_dim=1536, recon_dropout=0.1):
         super().__init__()
         
@@ -51,7 +51,8 @@ class JointExpressionReconstructionModel(nn.Module):
             num_heads=expr_num_heads,
             num_layers=expr_num_layers,
             dropout=expr_dropout,
-            max_subjects=expr_max_subjects
+            max_subjects=expr_max_subjects,
+            ff_dim=expr_ff_dim
         )
         
         # Expression Reconstruction Model
@@ -341,6 +342,7 @@ def train_expression_and_reconstruction(
     expr_num_layers=2,
     expr_dropout=0.1,
     expr_max_subjects=3500,
+    expr_ff_dim=1536,  # Feed-forward dimension for expression transformer
     recon_embed_dim=384,
     recon_num_cross_layers=2,
     recon_num_self_layers=2,
@@ -397,6 +399,7 @@ def train_expression_and_reconstruction(
         expr_num_layers=expr_num_layers,
         expr_dropout=expr_dropout,
         expr_max_subjects=expr_max_subjects,
+        expr_ff_dim=expr_ff_dim,
         recon_embed_dim=recon_embed_dim,
         recon_num_cross_layers=recon_num_cross_layers,
         recon_num_self_layers=recon_num_self_layers,
@@ -558,6 +561,7 @@ def train_expression_and_reconstruction(
                                 expr_num_layers=expr_num_layers,
                                 expr_dropout=expr_dropout,
                                 expr_max_subjects=expr_max_subjects,
+                                expr_ff_dim=expr_ff_dim,
                                 recon_embed_dim=recon_embed_dim,
                                 recon_num_cross_layers=recon_num_cross_layers,
                                 recon_num_self_layers=recon_num_self_layers,

@@ -67,14 +67,15 @@ def main():
             'num_heads': 4,  # Optimized architecture
             'num_layers': 4,  # Optimized architecture
             'dropout': 0.1,
-            'max_subjects': 501  # Added max_subjects parameter
+            'max_subjects': 501,  # Added max_subjects parameter
+            'ff_dim': 768  # Feed-forward dimension (4 * embed_dim)
         },
         'expression_reconstruction': {
             'embed_dim': 384,
             'num_cross_attention_layers': 2,
             'num_self_attention_layers': 2,
             'num_heads': 4,
-            'ff_dim': 1536,
+            'ff_dim': 768,   # 1536 is 4x384, 768 is 2x384
             'dropout': 0.1
         }
     }
@@ -181,6 +182,7 @@ def main():
         expr_num_layers=config['expression_transformer']['num_layers'],
         expr_dropout=config['expression_transformer']['dropout'],
         expr_max_subjects=config['expression_transformer']['max_subjects'],
+        expr_ff_dim=config['expression_transformer']['ff_dim'],
         recon_embed_dim=config['expression_reconstruction']['embed_dim'],
         recon_num_cross_layers=config['expression_reconstruction']['num_cross_attention_layers'],
         recon_num_self_layers=config['expression_reconstruction']['num_self_attention_layers'],

@@ -113,7 +113,7 @@ def extract_model_config(
     # Extract expression transformer parameters
     if 'expression_model' in config:
         expr_config = config['expression_model']
-        for param_name in ['embed_dim', 'num_heads', 'num_layers', 'dropout', 'max_subjects']:
+        for param_name in ['embed_dim', 'num_heads', 'num_layers', 'dropout', 'max_subjects', 'ff_dim']:
             if param_name in expr_config:
                 extracted_params[f'expr_{param_name}'] = expr_config[param_name]
                 logger.info(f"Using expression transformer {param_name}: {expr_config[param_name]}")
@@ -154,6 +154,7 @@ def create_comprehensive_config(
     expr_num_layers: int,
     expr_dropout: float,
     expr_max_subjects: int,
+    expr_ff_dim: int,
     decoder_embed_dim: int = None,
     decoder_num_heads: int = None,
     decoder_num_layers: int = None,
@@ -206,7 +207,8 @@ def create_comprehensive_config(
             'num_heads': expr_num_heads,
             'num_layers': expr_num_layers,
             'dropout': expr_dropout,
-            'max_subjects': expr_max_subjects
+            'max_subjects': expr_max_subjects,
+            'ff_dim': expr_ff_dim
         }
     }
     

@@ -21,7 +21,7 @@ class ExpressionTransformer(nn.Module):
     while K,V context remains fixed and doesn't get updated.
     """
     
-    def __init__(self, embed_dim=384, num_heads=8, num_layers=2, dropout=0.1, max_subjects=3500):
+    def __init__(self, embed_dim=384, num_heads=8, num_layers=2, dropout=0.1, max_subjects=3500, ff_dim=1536):
         super().__init__()
         self.embed_dim = embed_dim
         self.num_heads = num_heads
@@ -29,6 +29,7 @@ class ExpressionTransformer(nn.Module):
         self.num_layers = num_layers
         self.dropout = dropout
         self.num_heads = num_heads
+        self.ff_dim = ff_dim
         
         # Learnable subject embeddings (replaces face ID model)
         # Typical usage: 100-1000 subjects for academic datasets, 1000-10000 for commercial
@@ -45,7 +46,7 @@ class ExpressionTransformer(nn.Module):
         decoder_layer = nn.TransformerDecoderLayer(
             d_model=embed_dim,
             nhead=num_heads,
-            dim_feedforward=4 * embed_dim,
+            dim_feedforward=ff_dim,
             dropout=dropout,
             batch_first=True
         )
@@ -58,6 +59,7 @@ class ExpressionTransformer(nn.Module):
         self.layer_norm = nn.LayerNorm(embed_dim)
         
         logger.info(f"Expression Transformer initialized with {num_layers} layers, {num_heads} heads")
+        logger.info(f"Feed-forward dimension: {ff_dim}")
         logger.info(f"Subject embeddings: {max_subjects} subjects, {embed_dim} dimensions")
         
     def forward(self, patch_tokens, pos_embeddings, subject_ids):

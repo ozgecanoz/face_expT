@@ -46,7 +46,7 @@ class JointExpressionPredictionModel(nn.Module):
     """
     
     def __init__(self, 
-                 expr_embed_dim=384, expr_num_heads=4, expr_num_layers=2, expr_dropout=0.1, expr_max_subjects=3500,  # Added max_subjects
+                 expr_embed_dim=384, expr_num_heads=4, expr_num_layers=2, expr_dropout=0.1, expr_max_subjects=3500, expr_ff_dim=1536,  # Added ff_dim
                  decoder_embed_dim=384, decoder_num_heads=4, decoder_num_layers=2, decoder_dropout=0.1,  # Changed from 8 to 4 heads
                  max_sequence_length=50):
         super().__init__()
@@ -57,7 +57,8 @@ class JointExpressionPredictionModel(nn.Module):
             num_heads=expr_num_heads, 
             num_layers=expr_num_layers, 
             dropout=expr_dropout,
-            max_subjects=expr_max_subjects  # Added max_subjects parameter
+            max_subjects=expr_max_subjects,  # Added max_subjects parameter
+            ff_dim=expr_ff_dim  # Added ff_dim parameter
         )
         
         # Component D: Transformer Decoder (trainable)
@@ -330,6 +331,7 @@ def train_expression_prediction(
     expr_num_layers=2,
     expr_dropout=0.1,
     expr_max_subjects=3500,  # Added max_subjects parameter
+    expr_ff_dim=1536,  # Feed-forward dimension for expression transformer
     decoder_embed_dim=384,
     decoder_num_heads=4,  # Changed from 8 to 4 to match your config
     decoder_num_layers=2,
@@ -514,6 +516,7 @@ def train_expression_prediction(
                 expr_num_layers=expr_num_layers,
                 expr_dropout=expr_dropout,
                 expr_max_subjects=expr_max_subjects,
+                expr_ff_dim=expr_ff_dim,
                 decoder_embed_dim=decoder_embed_dim,
                 decoder_num_heads=decoder_num_heads,
                 decoder_num_layers=decoder_num_layers,
@@ -541,6 +544,7 @@ def train_expression_prediction(
             expr_num_layers=expr_num_layers,
             expr_dropout=expr_dropout,
             expr_max_subjects=expr_max_subjects,  # Added max_subjects parameter
+            expr_ff_dim=expr_ff_dim,
             decoder_embed_dim=decoder_embed_dim,
             decoder_num_heads=decoder_num_heads,
             decoder_num_layers=decoder_num_layers,
@@ -877,6 +881,7 @@ def train_expression_prediction(
                                 expr_num_layers=expr_num_layers,
                                 expr_dropout=expr_dropout,
                                 expr_max_subjects=expr_max_subjects,
+                                expr_ff_dim=expr_ff_dim,  # Default ff_dim for expression transformer
                                 decoder_embed_dim=decoder_embed_dim,
                                 decoder_num_heads=decoder_num_heads,
                                 decoder_num_layers=decoder_num_layers,
