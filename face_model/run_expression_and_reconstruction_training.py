@@ -64,16 +64,16 @@ def main():
         },
         'expression_transformer': {
             'embed_dim': 384,
-            'num_heads': 8,  # Optimized architecture
+            'num_heads': 4,  # Optimized architecture
             'num_layers': 4,  # Optimized architecture
             'dropout': 0.1,
-            'max_subjects': 3011  # Added max_subjects parameter
+            'max_subjects': 501  # Added max_subjects parameter
         },
         'expression_reconstruction': {
             'embed_dim': 384,
             'num_cross_attention_layers': 2,
             'num_self_attention_layers': 2,
-            'num_heads': 8,
+            'num_heads': 4,
             'ff_dim': 1536,
             'dropout': 0.1
         }
