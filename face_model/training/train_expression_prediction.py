@@ -326,7 +326,8 @@ def train_expression_prediction(
     decoder_num_heads=4,  # Changed from 8 to 4 to match your config
     decoder_num_layers=2,
     decoder_dropout=0.1,
-    max_sequence_length=50
+    max_sequence_length=50,
+    log_dir=None
 ):
     """
     Train the joint expression prediction model using subject embeddings
@@ -742,10 +743,19 @@ def train_expression_prediction(
     logger.info(f"  Current training step: {current_training_step}")
     logger.info("Expression transformer and transformer decoder parameters will be trained")
     
-    # Initialize TensorBoard with unique job ID
+    # Initialize TensorBoard with log directory from config as base folder
     job_id = str(uuid.uuid4())[:8]  # Short unique ID
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_dir = f"./logs/exp_pred_training_{job_id}_{timestamp}"
+    
+    if log_dir is None:
+        # Fallback to default if no log_dir provided
+        log_dir = f"./logs/exp_pred_training_{job_id}_{timestamp}"
+    else:
+        # Use provided log_dir as base folder and create unique subfolder
+        log_dir = os.path.join(log_dir, f"exp_pred_training_{job_id}_{timestamp}")
+    
+    # Ensure the directory exists
+    os.makedirs(log_dir, exist_ok=True)
     writer = SummaryWriter(log_dir)
     
     logger.info(f"📊 TensorBoard logging to: {log_dir}")

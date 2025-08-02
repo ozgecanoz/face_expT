@@ -60,13 +60,13 @@ def main():
         },
         'scheduler': {
             # Loss weight scheduling parameters
-            'initial_lambda_prediction': 0.1,  # Start with low prediction weight
-            'initial_lambda_temporal': 0.5,    # Start with high temporal weight
+            'initial_lambda_prediction': 0.0,  # Start with low prediction weight
+            'initial_lambda_temporal': 0.1,    # Start with high temporal weight
             'initial_lambda_diversity': 0.5,   # Start with high diversity weight
-            'warmup_lambda_prediction': 0.3,   # Prediction weight at warmup
+            'warmup_lambda_prediction': 0.1,   # Prediction weight at warmup
             'warmup_lambda_temporal': 0.4,     # Temporal weight at warmup
-            'warmup_lambda_diversity': 0.4,    # Diversity weight at warmup
-            'final_lambda_prediction': 0.5,    # Final prediction weight (highest)
+            'warmup_lambda_diversity': 0.5,    # Diversity weight at warmup
+            'final_lambda_prediction': 0.3,    # Final prediction weight (highest)
             'final_lambda_temporal': 0.3,      # Final temporal weight
             'final_lambda_diversity': 0.3      # Final diversity weight
         },
@@ -194,11 +194,12 @@ def main():
         decoder_num_heads=config['transformer_decoder']['num_heads'],
         decoder_num_layers=config['transformer_decoder']['num_layers'],
         decoder_dropout=config['transformer_decoder']['dropout'],
-        max_sequence_length=config['transformer_decoder']['max_sequence_length']
+        max_sequence_length=config['transformer_decoder']['max_sequence_length'],
+        log_dir=config['training']['log_dir']
     )
     
     print("\n✅ Training completed!")
-    print(f"📊 TensorBoard logs will be saved with unique job ID (exp_pred_training_<id>)")
+    print(f"📊 TensorBoard logs saved to: {config['training']['log_dir']}/exp_pred_training_*")
     print(f"📊 Check TensorBoard logs at: {config['training']['log_dir']}/exp_pred_training_*")
 
 if __name__ == "__main__":
