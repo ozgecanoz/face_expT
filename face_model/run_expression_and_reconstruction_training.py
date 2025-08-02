@@ -63,7 +63,7 @@ def main():
             #'final_lambda_diversity': 0.2      # Final diversity weight
             'initial_lambda_reconstruction': 0.1,  # Start with low reconstruction weight
             'initial_lambda_temporal': 0.5,    # Start with high temporal weight # also changed  lambda_coherence = 0.7, lambda_contrast = 0.3
-            'initial_lambda_diversity': 0.3,   # Start with high diversity weight
+            'initial_lambda_diversity': 0.2,   # Start with high diversity weight
             'warmup_lambda_reconstruction': 0.2,   # Reconstruction weight at warmup
             'warmup_lambda_temporal': 0.3,     # Temporal weight at warmup
             'warmup_lambda_diversity': 0.2,    # Diversity weight at warmup
