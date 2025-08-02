@@ -34,10 +34,10 @@ def main():
             'max_train_samples': None,  # pass None to use all samples for full training
             'val_data_dir': "/mnt/dataset-storage/dbs/CCA_train_db4_no_padding/",
             'max_val_samples': 1000,   # Limit validation samples for testing
-            'checkpoint_dir': "/mnt/dataset-storage/face_model/checkpoints_with_keywords5",
+            'checkpoint_dir': "/mnt/dataset-storage/face_model/checkpoints_with_keywords6",
             'expression_transformer_checkpoint_path': None,  # Set to path if you want to load expression transformer
             'expression_reconstruction_checkpoint_path': None,  # Set to path if you want to load expression reconstruction
-            'joint_checkpoint_path': None,  # Set to path if you want to load joint checkpoint (preferred)
+            'joint_checkpoint_path': "/mnt/dataset-storage/face_model/checkpoints_with_keywords5/joint_expression_reconstruction_step_600.pt",  # Set to path if you want to load joint checkpoint (preferred)
             'log_dir': "/mnt/dataset-storage/face_model/logs_with_keywords5",
             'learning_rate': 5e-5,
             'warmup_steps': 3000,  # Learning rate warmup steps
@@ -52,12 +52,21 @@ def main():
         },
         'scheduler': {
             # Loss weight scheduling parameters
-            'initial_lambda_reconstruction': 0.01,  # Start with low reconstruction weight
-            'initial_lambda_temporal': 0.4,    # Start with high temporal weight
-            'initial_lambda_diversity': 0.5,   # Start with high diversity weight
+            #'initial_lambda_reconstruction': 0.01,  # Start with low reconstruction weight
+            #'initial_lambda_temporal': 0.4,    # Start with high temporal weight, lambda_coherence = 0.3, lambda_contrast = 0.7
+            #'initial_lambda_diversity': 0.5,   # Start with high diversity weight
+            #'warmup_lambda_reconstruction': 0.2,   # Reconstruction weight at warmup
+            #'warmup_lambda_temporal': 0.3,     # Temporal weight at warmup
+            #'warmup_lambda_diversity': 0.3,    # Diversity weight at warmup
+            #'final_lambda_reconstruction': 0.5,    # Final reconstruction weight (highest)
+            #'final_lambda_temporal': 0.2,      # Final temporal weight
+            #'final_lambda_diversity': 0.2      # Final diversity weight
+            'initial_lambda_reconstruction': 0.1,  # Start with low reconstruction weight
+            'initial_lambda_temporal': 0.5,    # Start with high temporal weight # also changed  lambda_coherence = 0.7, lambda_contrast = 0.3
+            'initial_lambda_diversity': 0.3,   # Start with high diversity weight
             'warmup_lambda_reconstruction': 0.2,   # Reconstruction weight at warmup
             'warmup_lambda_temporal': 0.3,     # Temporal weight at warmup
-            'warmup_lambda_diversity': 0.3,    # Diversity weight at warmup
+            'warmup_lambda_diversity': 0.2,    # Diversity weight at warmup
             'final_lambda_reconstruction': 0.5,    # Final reconstruction weight (highest)
             'final_lambda_temporal': 0.2,      # Final temporal weight
             'final_lambda_diversity': 0.2      # Final diversity weight

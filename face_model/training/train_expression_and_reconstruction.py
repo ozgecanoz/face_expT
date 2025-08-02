@@ -26,7 +26,7 @@ from models.expression_transformer import ExpressionTransformer
 from models.expression_reconstruction_model import ExpressionReconstructionModel
 from models.dinov2_tokenizer import DINOv2Tokenizer
 from utils.scheduler_utils import CombinedLRLossWeightScheduler
-from utils.checkpoint_utils import save_checkpoint, create_comprehensive_config
+from utils.checkpoint_utils import save_checkpoint, create_comprehensive_config, load_checkpoint_config, extract_model_config
 from utils.visualization_utils import compute_cosine_similarity_distribution, plot_cosine_similarity_distribution
 from utils.tensorboard_utils import log_model_parameters
 
@@ -213,8 +213,8 @@ class ExpressionReconstructionLoss(nn.Module):
 
             # ---- 2. Temporal Loss (dual objective: coherence + diversity) ----
             if clip_tokens.shape[0] > 1:
-                lambda_coherence = 0.3
-                lambda_contrast = 0.7
+                lambda_coherence = 0.7
+                lambda_contrast = 0.3
 
                 tokens = clip_tokens.squeeze(1)  # (T, D) - already normalized
 
@@ -400,21 +400,89 @@ def train_expression_and_reconstruction(
     # Initialize DINOv2 tokenizer
     dinov2_tokenizer = DINOv2Tokenizer(device=device)
     
-    # Initialize joint model
-    joint_model = JointExpressionReconstructionModel(
-        expr_embed_dim=expr_embed_dim,
-        expr_num_heads=expr_num_heads,
-        expr_num_layers=expr_num_layers,
-        expr_dropout=expr_dropout,
-        expr_max_subjects=expr_max_subjects,
-        expr_ff_dim=expr_ff_dim,
-        recon_embed_dim=recon_embed_dim,
-        recon_num_cross_layers=recon_num_cross_layers,
-        recon_num_self_layers=recon_num_self_layers,
-        recon_num_heads=recon_num_heads,
-        recon_ff_dim=recon_ff_dim,
-        recon_dropout=recon_dropout
-    ).to(device)
+    # Load from joint checkpoint if provided (preferred method)
+    if joint_checkpoint_path is not None:
+        logger.info(f"Loading joint model from checkpoint: {joint_checkpoint_path}")
+        try:
+            # Load checkpoint and extract configuration
+            joint_checkpoint, config = load_checkpoint_config(joint_checkpoint_path, device)
+            
+            # Extract model parameters from config
+            default_params = {
+                'expr_embed_dim': expr_embed_dim,
+                'expr_num_heads': expr_num_heads,
+                'expr_num_layers': expr_num_layers,
+                'expr_dropout': expr_dropout,
+                'expr_max_subjects': expr_max_subjects,
+                'expr_ff_dim': expr_ff_dim,
+                'recon_embed_dim': recon_embed_dim,
+                'recon_num_cross_layers': recon_num_cross_layers,
+                'recon_num_self_layers': recon_num_self_layers,
+                'recon_num_heads': recon_num_heads,
+                'recon_ff_dim': recon_ff_dim,
+                'recon_dropout': recon_dropout
+            }
+            
+            extracted_params = extract_model_config(config, default_params)
+            
+            # Update parameters
+            expr_embed_dim = extracted_params['expr_embed_dim']
+            expr_num_heads = extracted_params['expr_num_heads']
+            expr_num_layers = extracted_params['expr_num_layers']
+            expr_dropout = extracted_params['expr_dropout']
+            expr_max_subjects = extracted_params['expr_max_subjects']
+            expr_ff_dim = extracted_params['expr_ff_dim']
+            recon_embed_dim = extracted_params['recon_embed_dim']
+            recon_num_cross_layers = extracted_params['recon_num_cross_layers']
+            recon_num_self_layers = extracted_params['recon_num_self_layers']
+            recon_num_heads = extracted_params['recon_num_heads']
+            recon_ff_dim = extracted_params['recon_ff_dim']
+            recon_dropout = extracted_params['recon_dropout']
+            
+            # Initialize joint model with architecture from checkpoint
+            joint_model = JointExpressionReconstructionModel(
+                expr_embed_dim=expr_embed_dim,
+                expr_num_heads=expr_num_heads,
+                expr_num_layers=expr_num_layers,
+                expr_dropout=expr_dropout,
+                expr_max_subjects=expr_max_subjects,
+                expr_ff_dim=expr_ff_dim,
+                recon_embed_dim=recon_embed_dim,
+                recon_num_cross_layers=recon_num_cross_layers,
+                recon_num_self_layers=recon_num_self_layers,
+                recon_num_heads=recon_num_heads,
+                recon_ff_dim=recon_ff_dim,
+                recon_dropout=recon_dropout
+            ).to(device)
+            
+            # Load the entire joint model state dict
+            if 'joint_model_state_dict' in joint_checkpoint:
+                joint_model.load_state_dict(joint_checkpoint['joint_model_state_dict'])
+                logger.info(f"✅ Successfully loaded joint model from epoch {joint_checkpoint.get('epoch', 'unknown')}")
+            else:
+                # Try loading the entire checkpoint as state dict (for compatibility)
+                joint_model.load_state_dict(joint_checkpoint)
+                logger.info("✅ Successfully loaded joint model state dict directly")
+            
+        except Exception as e:
+            raise RuntimeError(f"Failed to load joint checkpoint: {str(e)}")
+    
+    # Initialize joint model with separate architectures for each component (fallback)
+    else:
+        joint_model = JointExpressionReconstructionModel(
+            expr_embed_dim=expr_embed_dim,
+            expr_num_heads=expr_num_heads,
+            expr_num_layers=expr_num_layers,
+            expr_dropout=expr_dropout,
+            expr_max_subjects=expr_max_subjects,
+            expr_ff_dim=expr_ff_dim,
+            recon_embed_dim=recon_embed_dim,
+            recon_num_cross_layers=recon_num_cross_layers,
+            recon_num_self_layers=recon_num_self_layers,
+            recon_num_heads=recon_num_heads,
+            recon_ff_dim=recon_ff_dim,
+            recon_dropout=recon_dropout
+        ).to(device)
     
     # Initialize optimizer
     optimizer = optim.AdamW(joint_model.parameters(), lr=learning_rate, weight_decay=0.01)
@@ -455,6 +523,21 @@ def train_expression_and_reconstruction(
         total_steps=total_training_steps,
         min_lr=min_lr
     )
+    
+    # Load optimizer and scheduler state from checkpoint if provided
+    if joint_checkpoint_path is not None and joint_checkpoint is not None:
+        try:
+            if 'optimizer_state_dict' in joint_checkpoint:
+                optimizer.load_state_dict(joint_checkpoint['optimizer_state_dict'])
+                logger.info("✅ Successfully loaded optimizer state from checkpoint")
+            
+            if 'scheduler_state_dict' in joint_checkpoint:
+                scheduler.load_state_dict(joint_checkpoint['scheduler_state_dict'])
+                logger.info("✅ Successfully loaded scheduler state from checkpoint")
+                logger.info("📊 Note: Your new weight scheduling parameters will override the checkpoint scheduler weights")
+            
+        except Exception as e:
+            logger.warning(f"Failed to load optimizer/scheduler state: {str(e)}")
     
     # Initialize TensorBoard
     job_id = str(uuid.uuid4())[:8]
@@ -613,7 +696,34 @@ def train_expression_and_reconstruction(
                     checkpoint_type="joint"
                 )
                 
-                logger.info(f"Saved step checkpoint: {joint_step_path}")
+                # Individual models
+                expr_step_path = os.path.join(checkpoint_dir, f"expression_transformer_step_{current_training_step}.pt")
+                save_checkpoint(
+                    model_state_dict=joint_model.expression_transformer.state_dict(),
+                    optimizer_state_dict=optimizer.state_dict(),
+                    scheduler_state_dict=scheduler.state_dict(),
+                    epoch=epoch + 1,
+                    avg_loss=loss.item(),
+                    total_steps=current_training_step,
+                    config=config,
+                    checkpoint_path=expr_step_path,
+                    checkpoint_type="expression_transformer"
+                )
+                
+                recon_step_path = os.path.join(checkpoint_dir, f"expression_reconstruction_step_{current_training_step}.pt")
+                save_checkpoint(
+                    model_state_dict=joint_model.expression_reconstruction.state_dict(),
+                    optimizer_state_dict=optimizer.state_dict(),
+                    scheduler_state_dict=scheduler.state_dict(),
+                    epoch=epoch + 1,
+                    avg_loss=loss.item(),
+                    total_steps=current_training_step,
+                    config=config,
+                    checkpoint_path=recon_step_path,
+                    checkpoint_type="expression_reconstruction"
+                )
+                
+                logger.info(f"Saved step checkpoints: {joint_step_path}, {expr_step_path}, {recon_step_path}")
             
             # Update progress bar
             progress_bar.set_postfix({
