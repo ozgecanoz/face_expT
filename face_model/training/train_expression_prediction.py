@@ -213,8 +213,15 @@ class ExpressionPredictionLoss_v2(nn.Module):
                 # ---- 3. Diversity Loss (within-clip token dissimilarity) ----
                 # clip_tokens are already normalized from ExpressionTransformer
                 tokens = clip_tokens.squeeze(1)  # (T, D) - already normalized
-                sim_matrix = tokens @ tokens.T  # (T, T)
-                diversity_loss = sim_matrix.mean()  # High if tokens are similar
+                #sim_matrix = tokens @ tokens.T  # (T, T)
+                # Subtract diagonal (self-similarities = 1.0) to get only cross-token similarities
+                #mask = torch.eye(sim_matrix.shape[0], device=sim_matrix.device, dtype=torch.bool)
+                #cross_similarities = sim_matrix[~mask]  # Exclude diagonal elements
+                #diversity_loss = cross_similarities.mean()  # High if tokens are similar
+
+                T = tokens.shape[0]
+                sim_matrix = tokens @ tokens.T
+                diversity_loss = (sim_matrix.sum() - T) / (T * (T - 1))
                 diversity_losses.append(diversity_loss)
 
         # Aggregate losses
