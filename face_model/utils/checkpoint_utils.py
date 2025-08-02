@@ -35,7 +35,7 @@ def save_checkpoint(
         total_steps: Total training steps completed
         config: Configuration dictionary containing model and training parameters
         checkpoint_path: Path where to save the checkpoint
-        checkpoint_type: Type of checkpoint ("joint", "expression_transformer", "transformer_decoder")
+        checkpoint_type: Type of checkpoint ("joint", "expression_transformer", "transformer_decoder", "expression_reconstruction")
     """
     # Ensure checkpoint directory exists
     os.makedirs(os.path.dirname(checkpoint_path), exist_ok=True)
@@ -57,6 +57,8 @@ def save_checkpoint(
         checkpoint_data['expression_transformer_state_dict'] = model_state_dict
     elif checkpoint_type == "transformer_decoder":
         checkpoint_data['transformer_decoder_state_dict'] = model_state_dict
+    elif checkpoint_type == "expression_reconstruction":
+        checkpoint_data['expression_reconstruction_state_dict'] = model_state_dict
     else:
         raise ValueError(f"Unknown checkpoint type: {checkpoint_type}")
     
@@ -128,6 +130,14 @@ def extract_model_config(
                 else:
                     extracted_params[f'decoder_{param_name}'] = decoder_config[param_name]
                 logger.info(f"Using transformer decoder {param_name}: {decoder_config[param_name]}")
+    
+    # Extract expression reconstruction parameters
+    if 'expression_reconstruction' in config:
+        recon_config = config['expression_reconstruction']
+        for param_name in ['embed_dim', 'num_cross_attention_layers', 'num_self_attention_layers', 'num_heads', 'ff_dim', 'dropout']:
+            if param_name in recon_config:
+                extracted_params[f'recon_{param_name}'] = recon_config[param_name]
+                logger.info(f"Using expression reconstruction {param_name}: {recon_config[param_name]}")
     
     # Extract loss function parameters
     if 'loss_function' in config:
@@ -383,6 +393,8 @@ def get_checkpoint_info(checkpoint_path: str, device: str = "cpu") -> Dict[str, 
             info['checkpoint_type'] = 'expression_transformer'
         elif 'transformer_decoder_state_dict' in checkpoint_data:
             info['checkpoint_type'] = 'transformer_decoder'
+        elif 'expression_reconstruction_state_dict' in checkpoint_data:
+            info['checkpoint_type'] = 'expression_reconstruction'
         else:
             info['checkpoint_type'] = 'unknown'
         
