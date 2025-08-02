@@ -45,7 +45,7 @@ def main():
             'joint_checkpoint_path': None,  # Set to path if you want to load joint checkpoint (preferred)
             'log_dir': "/mnt/dataset-storage/face_model/logs",
             'learning_rate': 5e-5,
-            'warmup_steps': 1000,  # Learning rate warmup steps
+            'warmup_steps': 750,  # Learning rate warmup steps
             'min_lr': 1e-6,  # Minimum learning rate after decay
             #'batch_size': 16,  # Optimized for 64GB RAM (cpu vm)
             'batch_size': 4,  # for L4 GPU train-gpu-co 
@@ -60,15 +60,15 @@ def main():
         },
         'scheduler': {
             # Loss weight scheduling parameters
-            'initial_lambda_prediction': 0.0,  # Start with low prediction weight
+            'initial_lambda_prediction': 0.01,  # Start with low prediction weight
             'initial_lambda_temporal': 0.1,    # Start with high temporal weight
             'initial_lambda_diversity': 0.5,   # Start with high diversity weight
-            'warmup_lambda_prediction': 0.1,   # Prediction weight at warmup
-            'warmup_lambda_temporal': 0.4,     # Temporal weight at warmup
-            'warmup_lambda_diversity': 0.5,    # Diversity weight at warmup
-            'final_lambda_prediction': 0.3,    # Final prediction weight (highest)
-            'final_lambda_temporal': 0.3,      # Final temporal weight
-            'final_lambda_diversity': 0.3      # Final diversity weight
+            'warmup_lambda_prediction': 0.15,   # Prediction weight at warmup
+            'warmup_lambda_temporal': 0.3,     # Temporal weight at warmup
+            'warmup_lambda_diversity': 0.4,    # Diversity weight at warmup
+            'final_lambda_prediction': 0.5,    # Final prediction weight (highest)
+            'final_lambda_temporal': 0.2,      # Final temporal weight
+            'final_lambda_diversity': 0.2      # Final diversity weight
         },
         'expression_transformer': {
             'embed_dim': 384,
