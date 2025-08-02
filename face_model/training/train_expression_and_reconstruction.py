@@ -211,30 +211,38 @@ class ExpressionReconstructionLoss(nn.Module):
             reconstruction_loss = F.mse_loss(recon_clip, orig_clip)
             reconstruction_losses.append(reconstruction_loss)
 
-            # ---- 2. Temporal Contrastive Loss (encourage change over time) ----
-            if clip_tokens.shape[0] > 5:
-                # Use every 5th frame for temporal comparison
-                t1 = clip_tokens[::5].squeeze(1)  # (T//5, D) - every 5th frame
-                t2 = clip_tokens[5::5].squeeze(1)  # (T//5, D) - every 5th frame starting from 5th
+            # ---- 2. Temporal Loss (dual objective: coherence + diversity) ----
+            if clip_tokens.shape[0] > 1:
+                lambda_coherence = 0.3
+                lambda_contrast = 0.7
+
+                tokens = clip_tokens.squeeze(1)  # (T, D) - already normalized
+
+                # Encourage similarity: cosine_similarity ~ 1 → loss ~ 0
+                adj_sim = F.cosine_similarity(tokens[:-1], tokens[1:], dim=-1)
+                coherence_loss = (1 - adj_sim).mean()  # Want sim ≈ 1 → loss ≈ 0
+
+                stride = 5
+                if tokens.shape[0] > stride:
+                    t1 = tokens[:-stride]
+                    t2 = tokens[stride:]
+                    contrast_sim = F.cosine_similarity(t1, t2, dim=-1)
+                    contrast_loss = (contrast_sim).mean()  # Want sim ≈ 0 → loss ≈ 0
+                else:
+                    contrast_loss = 0.0
                 
-                # Ensure we have matching pairs
-                min_len = min(t1.shape[0], t2.shape[0])
-                if min_len > 0:
-                    t1 = t1[:min_len]  # (min_len, D)
-                    t2 = t2[:min_len]  # (min_len, D)
-                    temporal_sim = F.cosine_similarity(t1, t2, dim=-1)  # (min_len,)
-                    temporal_loss = 1 - temporal_sim.mean()
-                    temporal_losses.append(temporal_loss)
+                temporal_loss = lambda_coherence * coherence_loss + lambda_contrast * contrast_loss
+                temporal_losses.append(temporal_loss)
 
                 # ---- 3. Diversity Loss (within-clip token dissimilarity) ----
-                # clip_tokens are already normalized from ExpressionTransformer
-                #tokens = clip_tokens.squeeze(1)  # (T, D) - already normalized
-                tokens = clip_tokens[::5].squeeze(1)  # (T//5, D)
-                sim_matrix = tokens @ tokens.T  # (T, T)
+                # Use every 5th frame for diversity computation (same as temporal contrast)
+                diversity_tokens = clip_tokens[::stride].squeeze(1)  # (T//5, D)
+                sim_matrix = diversity_tokens @ diversity_tokens.T  # (T//5, T//5)
                 # Subtract diagonal (self-similarities = 1.0) to get only cross-token similarities
-                T = tokens.shape[0]
-                diversity_loss = (sim_matrix.sum() - T) / (T * (T - 1))
-                diversity_losses.append(diversity_loss)
+                T = diversity_tokens.shape[0]
+                if T > 1:  # Need at least 2 tokens for diversity
+                    diversity_loss = (sim_matrix.sum() - T) / (T * (T - 1))
+                    diversity_losses.append(diversity_loss)
 
         # Aggregate losses
         total_reconstruction = torch.stack(reconstruction_losses).mean()
@@ -530,81 +538,82 @@ def train_expression_and_reconstruction(
             writer.add_scalar('Training/Loss_Components/Temporal', loss_components['temporal'].item(), current_training_step)
             writer.add_scalar('Training/Loss_Components/Diversity', loss_components['diversity'].item(), current_training_step)
             
-            # Compute and log cosine similarity distribution
-            if current_training_step % 100 == 0 and expression_tokens_by_clip:
+            # Save similarity plot and checkpoints every save_every_step steps (moved outside the clip count condition)
+            if current_training_step % save_every_step == 0 and expression_tokens_by_clip:
                 try:
-                    if len(expression_tokens_by_clip) >= 2:
+                    # Compute similarity for single clip (within-clip similarities)
+                    if len(expression_tokens_by_clip) >= 1:
+                        # Compute similarity data for plotting
                         similarity_data = compute_cosine_similarity_distribution(expression_tokens_by_clip)
-                        
-                        # Log similarity statistics to TensorBoard
+                                                # Log similarity statistics to TensorBoard
                         writer.add_scalar('Training/Similarity/Mean', similarity_data['mean_similarity'], current_training_step)
                         writer.add_scalar('Training/Similarity/Std', similarity_data['std_similarity'], current_training_step)
                         writer.add_scalar('Training/Similarity/Min', similarity_data['min_similarity'], current_training_step)
                         writer.add_scalar('Training/Similarity/Max', similarity_data['max_similarity'], current_training_step)
                         writer.add_scalar('Training/Similarity/Count', len(similarity_data['similarities']), current_training_step)
                         
-                        # Save similarity plot and checkpoints every save_every_step steps
-                        if current_training_step % save_every_step == 0:
-                            # Save similarity plot
-                            plot_path = os.path.join(log_dir, f'similarity_step_{current_training_step}.png')
-                            plot_cosine_similarity_distribution(
-                                similarity_data,
-                                save_path=plot_path,
-                                title=f"Cosine Similarity Distribution - Step {current_training_step}"
-                            )
-                            logger.info(f"Saved similarity plot to: {plot_path}")
-                            
-                            # Save checkpoints
-                            config = create_comprehensive_config(
-                                expr_embed_dim=expr_embed_dim,
-                                expr_num_heads=expr_num_heads,
-                                expr_num_layers=expr_num_layers,
-                                expr_dropout=expr_dropout,
-                                expr_max_subjects=expr_max_subjects,
-                                expr_ff_dim=expr_ff_dim,
-                                recon_embed_dim=recon_embed_dim,
-                                recon_num_cross_layers=recon_num_cross_layers,
-                                recon_num_self_layers=recon_num_self_layers,
-                                recon_num_heads=recon_num_heads,
-                                recon_ff_dim=recon_ff_dim,
-                                recon_dropout=recon_dropout,
-                                lambda_reconstruction=initial_lambda_reconstruction,
-                                lambda_temporal=initial_lambda_temporal,
-                                lambda_diversity=initial_lambda_diversity,
-                                learning_rate=learning_rate,
-                                batch_size=batch_size,
-                                num_epochs=num_epochs,
-                                warmup_steps=warmup_steps,
-                                min_lr=min_lr,
-                                initial_lambda_reconstruction=initial_lambda_reconstruction,
-                                initial_lambda_temporal=initial_lambda_temporal,
-                                initial_lambda_diversity=initial_lambda_diversity,
-                                warmup_lambda_reconstruction=warmup_lambda_reconstruction,
-                                warmup_lambda_temporal=warmup_lambda_temporal,
-                                warmup_lambda_diversity=warmup_lambda_diversity,
-                                final_lambda_reconstruction=final_lambda_reconstruction,
-                                final_lambda_temporal=final_lambda_temporal,
-                                final_lambda_diversity=final_lambda_diversity
-                            )
-                            
-                            # Joint model
-                            joint_step_path = os.path.join(checkpoint_dir, f"joint_expression_reconstruction_step_{current_training_step}.pt")
-                            save_checkpoint(
-                                model_state_dict=joint_model.state_dict(),
-                                optimizer_state_dict=optimizer.state_dict(),
-                                scheduler_state_dict=scheduler.state_dict(),
-                                epoch=epoch + 1,
-                                avg_loss=loss.item(),
-                                total_steps=current_training_step,
-                                config=config,
-                                checkpoint_path=joint_step_path,
-                                checkpoint_type="joint"
-                            )
-                            
-                            logger.info(f"Saved step checkpoint: {joint_step_path}")
-                            
+                        # Save similarity plot
+                        plot_path = os.path.join(log_dir, f'similarity_step_{current_training_step}.png')
+                        plot_cosine_similarity_distribution(
+                            similarity_data,
+                            save_path=plot_path,
+                            title=f"Cosine Similarity Distribution - Step {current_training_step} (Single Clip)"
+                        )
+                        logger.info(f"Saved similarity plot to: {plot_path}")
+                    else:
+                        logger.debug(f"Skipping similarity plot: no clips available")
+                        
                 except Exception as e:
-                    logger.warning(f"Failed to compute similarity distribution: {e}")
+                    logger.warning(f"Failed to save similarity plot: {e}")
+                
+                # Save checkpoints (always save, regardless of clip count)
+                config = create_comprehensive_config(
+                    expr_embed_dim=expr_embed_dim,
+                    expr_num_heads=expr_num_heads,
+                    expr_num_layers=expr_num_layers,
+                    expr_dropout=expr_dropout,
+                    expr_max_subjects=expr_max_subjects,
+                    expr_ff_dim=expr_ff_dim,
+                    recon_embed_dim=recon_embed_dim,
+                    recon_num_cross_layers=recon_num_cross_layers,
+                    recon_num_self_layers=recon_num_self_layers,
+                    recon_num_heads=recon_num_heads,
+                    recon_ff_dim=recon_ff_dim,
+                    recon_dropout=recon_dropout,
+                    lambda_reconstruction=initial_lambda_reconstruction,
+                    lambda_temporal=initial_lambda_temporal,
+                    lambda_diversity=initial_lambda_diversity,
+                    learning_rate=learning_rate,
+                    batch_size=batch_size,
+                    num_epochs=num_epochs,
+                    warmup_steps=warmup_steps,
+                    min_lr=min_lr,
+                    initial_lambda_reconstruction=initial_lambda_reconstruction,
+                    initial_lambda_temporal=initial_lambda_temporal,
+                    initial_lambda_diversity=initial_lambda_diversity,
+                    warmup_lambda_reconstruction=warmup_lambda_reconstruction,
+                    warmup_lambda_temporal=warmup_lambda_temporal,
+                    warmup_lambda_diversity=warmup_lambda_diversity,
+                    final_lambda_reconstruction=final_lambda_reconstruction,
+                    final_lambda_temporal=final_lambda_temporal,
+                    final_lambda_diversity=final_lambda_diversity
+                )
+                
+                # Joint model
+                joint_step_path = os.path.join(checkpoint_dir, f"joint_expression_reconstruction_step_{current_training_step}.pt")
+                save_checkpoint(
+                    model_state_dict=joint_model.state_dict(),
+                    optimizer_state_dict=optimizer.state_dict(),
+                    scheduler_state_dict=scheduler.state_dict(),
+                    epoch=epoch + 1,
+                    avg_loss=loss.item(),
+                    total_steps=current_training_step,
+                    config=config,
+                    checkpoint_path=joint_step_path,
+                    checkpoint_type="joint"
+                )
+                
+                logger.info(f"Saved step checkpoint: {joint_step_path}")
             
             # Update progress bar
             progress_bar.set_postfix({

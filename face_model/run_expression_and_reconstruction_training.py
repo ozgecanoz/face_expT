@@ -34,17 +34,17 @@ def main():
             'max_train_samples': None,  # pass None to use all samples for full training
             'val_data_dir': "/mnt/dataset-storage/dbs/CCA_train_db4_no_padding/",
             'max_val_samples': 1000,   # Limit validation samples for testing
-            'checkpoint_dir': "/mnt/dataset-storage/face_model/checkpoints_with_keywords4",
+            'checkpoint_dir': "/mnt/dataset-storage/face_model/checkpoints_with_keywords5",
             'expression_transformer_checkpoint_path': None,  # Set to path if you want to load expression transformer
             'expression_reconstruction_checkpoint_path': None,  # Set to path if you want to load expression reconstruction
             'joint_checkpoint_path': None,  # Set to path if you want to load joint checkpoint (preferred)
-            'log_dir': "/mnt/dataset-storage/face_model/logs_with_keywords4",
+            'log_dir': "/mnt/dataset-storage/face_model/logs_with_keywords5",
             'learning_rate': 5e-5,
-            'warmup_steps': 6000,  # Learning rate warmup steps
+            'warmup_steps': 3000,  # Learning rate warmup steps
             'min_lr': 1e-6,  # Minimum learning rate after decay
             'batch_size': 1,  # for L4 GPU train-gpu-co 
             'num_epochs': 3,
-            'save_every_step': 1200,   # Save similarity plots and checkpoints every 300 steps
+            'save_every_step': 600,   # Save similarity plots and checkpoints every 300 steps
             'num_workers': 8,  # for L4 GPU (24 GB VRAM) train-gpu-co (it has 16 vCPUs), memory 64GB, 
             'pin_memory': True,  # for L4 GPU train-gpu-co 
             'persistent_workers': True,  # Keep workers alive for efficiency
@@ -52,12 +52,12 @@ def main():
         },
         'scheduler': {
             # Loss weight scheduling parameters
-            'initial_lambda_reconstruction': 0.1,  # Start with low reconstruction weight
-            'initial_lambda_temporal': 0.1,    # Start with high temporal weight
+            'initial_lambda_reconstruction': 0.01,  # Start with low reconstruction weight
+            'initial_lambda_temporal': 0.4,    # Start with high temporal weight
             'initial_lambda_diversity': 0.5,   # Start with high diversity weight
             'warmup_lambda_reconstruction': 0.2,   # Reconstruction weight at warmup
             'warmup_lambda_temporal': 0.3,     # Temporal weight at warmup
-            'warmup_lambda_diversity': 0.4,    # Diversity weight at warmup
+            'warmup_lambda_diversity': 0.3,    # Diversity weight at warmup
             'final_lambda_reconstruction': 0.5,    # Final reconstruction weight (highest)
             'final_lambda_temporal': 0.2,      # Final temporal weight
             'final_lambda_diversity': 0.2      # Final diversity weight
