@@ -34,11 +34,11 @@ def main():
             'max_train_samples': None,  # pass None to use all samples for full training
             'val_data_dir': "/mnt/dataset-storage/dbs/CCA_train_db4_no_padding/",
             'max_val_samples': 1000,   # Limit validation samples for testing
-            'checkpoint_dir': "/mnt/dataset-storage/face_model/checkpoints_with_keywords6",
+            'checkpoint_dir': "/mnt/dataset-storage/face_model/checkpoints_with_keywords7",
             'expression_transformer_checkpoint_path': None,  # Set to path if you want to load expression transformer
             'expression_reconstruction_checkpoint_path': None,  # Set to path if you want to load expression reconstruction
-            'joint_checkpoint_path': "/mnt/dataset-storage/face_model/checkpoints_with_keywords5/joint_expression_reconstruction_step_600.pt",  # Set to path if you want to load joint checkpoint (preferred)
-            'log_dir': "/mnt/dataset-storage/face_model/logs_with_keywords5",
+            'joint_checkpoint_path': "/mnt/dataset-storage/face_model/checkpoints_with_keywords6/joint_expression_reconstruction_step_600.pt",  # Set to path if you want to load joint checkpoint (preferred)
+            'log_dir': "/mnt/dataset-storage/face_model/logs_with_keywords7",
             'learning_rate': 5e-5,
             'warmup_steps': 3000,  # Learning rate warmup steps
             'min_lr': 1e-6,  # Minimum learning rate after decay
