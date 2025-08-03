@@ -2,7 +2,7 @@
 """
 Generate Identity Swap Video
 Creates a video where expressions from input video are mapped to a different subject's identity
-Uses pre-prepared identity features from JSON file
+Uses Expression Transformer and Expression Reconstruction models
 """
 
 import cv2
@@ -12,7 +12,6 @@ import logging
 import argparse
 import os
 import sys
-import json
 from typing import Optional, Dict, Any
 from tqdm import tqdm
 
@@ -20,7 +19,6 @@ from tqdm import tqdm
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from model_loader import ModelLoader
-from token_extractor import TokenExtractor
 
 # Setup logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -28,18 +26,18 @@ logger = logging.getLogger(__name__)
 
 
 class IdentitySwapVideoGenerator:
-    """Generate identity swap videos using pre-prepared identity features"""
+    """Generate identity swap videos using Expression Transformer and Expression Reconstruction models"""
     
     def __init__(self, 
                  expression_transformer_checkpoint_path: str,
-                 face_reconstruction_checkpoint_path: str,
+                 expression_reconstruction_checkpoint_path: str,
                  device: str = "cpu"):
         """
         Initialize identity swap video generator
         
         Args:
             expression_transformer_checkpoint_path: Path to Expression Transformer checkpoint
-            face_reconstruction_checkpoint_path: Path to Face Reconstruction model checkpoint
+            expression_reconstruction_checkpoint_path: Path to Expression Reconstruction model checkpoint
             device: Device to run models on
         """
         self.device = device
@@ -50,19 +48,13 @@ class IdentitySwapVideoGenerator:
         self.models = model_loader.load_all_models(
             expression_transformer_checkpoint_path=expression_transformer_checkpoint_path,
             expression_predictor_checkpoint_path="dummy",  # Not needed for reconstruction
-            face_reconstruction_checkpoint_path=face_reconstruction_checkpoint_path
+            face_reconstruction_checkpoint_path=expression_reconstruction_checkpoint_path
         )
         
         # Initialize components
         self.tokenizer = self.models['tokenizer']
-        self.token_extractor = TokenExtractor(
-            expression_transformer=self.models['expression_transformer'],
-            expression_predictor=self.models.get('expression_predictor'),  # May be None
-            face_reconstruction_model=self.models.get('face_reconstruction_model'),  # May be None
-            tokenizer=self.models['tokenizer'],
-            device=self.device,
-            subject_id=0  # Will be set per frame
-        )
+        self.expression_transformer = self.models['expression_transformer']
+        self.expression_reconstruction_model = self.models.get('expression_reconstruction_model')
         
         # Store first frame expression token for cosine similarity calculation
         self.first_frame_expression_token = None
@@ -89,38 +81,28 @@ class IdentitySwapVideoGenerator:
         
         return cos_sim.item()
     
-    def load_identity_features(self, identity_json_path: str) -> Dict[str, Any]:
+    def get_target_subject_embedding(self, target_subject_id: int) -> torch.Tensor:
         """
-        Load identity features from JSON file
+        Get the learned subject embedding for target subject ID
         
         Args:
-            identity_json_path: Path to JSON file with identity features
+            target_subject_id: Target subject ID
             
         Returns:
-            Dictionary containing identity features
+            Subject embedding tensor (1, 1, 384)
         """
-        if not os.path.exists(identity_json_path):
-            raise FileNotFoundError(f"Identity features file not found: {identity_json_path}")
+        # Get subject embedding from Expression Transformer
+        subject_embedding = self.expression_transformer.subject_embeddings(torch.tensor([target_subject_id], device=self.device))
+        subject_embedding = subject_embedding.unsqueeze(1)  # (1, 1, 384)
         
-        with open(identity_json_path, 'r') as f:
-            identity_features = json.load(f)
-        
-        # Convert numpy arrays back to tensors
-        for key in ['patch_tokens', 'pos_embeddings', 'subject_embeddings']:
-            if key in identity_features:
-                identity_features[key] = torch.tensor(identity_features[key], dtype=torch.float32)
-        
-        logger.info(f"✅ Loaded identity features from: {identity_json_path}")
-        logger.info(f"   Subject ID: {identity_features.get('subject_id', 'unknown')}")
-        logger.info(f"   Available features: {list(identity_features.keys())}")
-        
-        return identity_features
+        logger.info(f"✅ Retrieved subject embedding for target subject ID: {target_subject_id}")
+        return subject_embedding
     
     def process_video(self, 
                      input_video_path: str, 
                      output_video_path: str, 
-                     identity_json_path: str,
                      input_subject_id: int = 0,
+                     target_subject_id: int = 0,
                      max_frames: Optional[int] = None) -> bool:
         """
         Process video and generate identity swap video
@@ -128,16 +110,16 @@ class IdentitySwapVideoGenerator:
         Args:
             input_video_path: Path to input video with face frames
             output_video_path: Path to save output video
-            identity_json_path: Path to JSON file with target identity features
             input_subject_id: Subject ID for the input video (for expression extraction)
+            target_subject_id: Target subject ID for identity swap
             max_frames: Maximum number of frames to process (for testing)
             
         Returns:
             True if successful, False otherwise
         """
         try:
-            # Load identity features
-            identity_features = self.load_identity_features(identity_json_path)
+            # Get target subject embedding
+            target_subject_embedding = self.get_target_subject_embedding(target_subject_id)
             
             # Open input video
             cap = cv2.VideoCapture(input_video_path)
@@ -156,7 +138,7 @@ class IdentitySwapVideoGenerator:
             logger.info(f"   Total frames: {total_frames}")
             logger.info(f"   Resolution: {width}x{height}")
             logger.info(f"   Input Subject ID: {input_subject_id}")
-            logger.info(f"   Target Subject ID: {identity_features.get('subject_id', 'unknown')}")
+            logger.info(f"   Target Subject ID: {target_subject_id}")
             
             # Verify frame size is 518x518
             if width != 518 or height != 518:
@@ -194,7 +176,7 @@ class IdentitySwapVideoGenerator:
                     break
                 
                 # Process frame (frame is already 518x518 face crop)
-                result = self._process_identity_swap_frame(frame, input_subject_id, identity_features, frame_idx)
+                result = self._process_identity_swap_frame(frame, input_subject_id, target_subject_embedding, frame_idx)
                 
                 if result is not None:
                     # Create side-by-side comparison
@@ -230,14 +212,14 @@ class IdentitySwapVideoGenerator:
             logger.error(f"❌ Error processing video: {e}")
             return False
     
-    def _process_identity_swap_frame(self, face_frame: np.ndarray, input_subject_id: int, identity_features: Dict[str, Any], frame_idx: int = 0) -> Optional[Dict[str, Any]]:
+    def _process_identity_swap_frame(self, face_frame: np.ndarray, input_subject_id: int, target_subject_embedding: torch.Tensor, frame_idx: int = 0) -> Optional[Dict[str, Any]]:
         """
         Process a single frame for identity swapping
         
         Args:
             face_frame: Input face frame (518x518x3)
             input_subject_id: Subject ID for expression extraction
-            identity_features: Dictionary with target identity features
+            target_subject_embedding: Target subject embedding tensor (1, 1, 384)
             frame_idx: Frame index for tracking first frame
             
         Returns:
@@ -249,84 +231,69 @@ class IdentitySwapVideoGenerator:
                 logger.warning(f"⚠️ Expected 518x518x3 frame, got {face_frame.shape}")
                 return None
             
-            # Update token extractor with input subject ID for expression extraction
-            self.token_extractor.subject_id = input_subject_id
+            # Convert numpy array to torch tensor
+            face_tensor = torch.from_numpy(face_frame).float().to(self.device)
             
-            # Extract expression tokens from input frame
-            logger.debug("Extracting tokens from input frame...")
-            tokens = self.token_extractor.process_frame_tokens(face_frame)
+            # Normalize to [0, 1] if needed
+            if face_tensor.max() > 1.0:
+                face_tensor = face_tensor / 255.0
             
-            if tokens is None or tokens.get('expression_token') is None:
-                logger.warning("Failed to extract tokens from input frame")
-                return None
+            # Ensure correct shape: (H, W, C) -> (C, H, W)
+            if face_tensor.dim() == 3:
+                if face_tensor.shape[0] == 3:  # (C, H, W) format
+                    face_tensor = face_tensor.permute(1, 2, 0)  # (H, W, C)
+                face_tensor = face_tensor.permute(2, 0, 1)  # (C, H, W)
             
-            logger.debug("Successfully extracted tokens from input frame")
+            # Add batch dimension
+            face_tensor = face_tensor.unsqueeze(0)  # (1, 3, 518, 518)
+            
+            # Extract DINOv2 tokens
+            with torch.no_grad():
+                patch_tokens, pos_embeddings = self.tokenizer(face_tensor)
+            
+            # Create subject ID tensor for input subject
+            subject_ids = torch.tensor([input_subject_id], dtype=torch.long, device=self.device)
+            
+            # Extract expression token using Expression Transformer
+            with torch.no_grad():
+                expression_token, _ = self.expression_transformer.inference(patch_tokens, pos_embeddings, subject_ids)
+            
+            logger.debug("Successfully extracted expression token from input frame")
             
             # Store first frame expression token for cosine similarity calculation
             if frame_idx == 0:
-                self.first_frame_expression_token = tokens['expression_token'].clone()
+                self.first_frame_expression_token = expression_token.clone()
                 cosine_similarity = 1.0  # First frame has perfect similarity with itself
             else:
                 # Calculate cosine similarity with first frame
                 cosine_similarity = self._calculate_cosine_similarity(
                     self.first_frame_expression_token, 
-                    tokens['expression_token']
+                    expression_token
                 )
             
             # Get first three values of expression token for display
-            expression_values = tokens['expression_token'].flatten()[:3].cpu().numpy()
+            expression_values = expression_token.flatten()[:3].cpu().numpy()
             
-            # Get target identity features
-            target_patch_tokens = identity_features['patch_tokens'].to(self.device)
-            target_pos_embeddings = identity_features['pos_embeddings'].to(self.device)
-            target_subject_embeddings = identity_features['subject_embeddings'].to(self.device)
-            
-            # Ensure correct shapes - add batch dimensions if missing
-            if len(target_patch_tokens.shape) == 2:
-                target_patch_tokens = target_patch_tokens.unsqueeze(0)  # (1369, 384) -> (1, 1369, 384)
-            
-            if len(target_pos_embeddings.shape) == 2:
-                target_pos_embeddings = target_pos_embeddings.unsqueeze(0)  # (1369, 384) -> (1, 1369, 384)
-            
-            # Fix subject_embeddings shape to be (1, 1, 384)
-            logger.debug(f"Original target_subject_embeddings shape: {target_subject_embeddings.shape}")
-            
-            if len(target_subject_embeddings.shape) == 2:
-                target_subject_embeddings = target_subject_embeddings.unsqueeze(0)  # (384,) -> (1, 384)
-                target_subject_embeddings = target_subject_embeddings.unsqueeze(1)  # (1, 384) -> (1, 1, 384)
-            elif len(target_subject_embeddings.shape) == 3 and target_subject_embeddings.shape[1] != 1:
-                # If it's (1, 384, 384) or similar, squeeze to (1, 1, 384)
-                target_subject_embeddings = target_subject_embeddings.squeeze(1)  # Remove extra dimension
-                target_subject_embeddings = target_subject_embeddings.unsqueeze(1)  # Add back to (1, 1, 384)
-            elif len(target_subject_embeddings.shape) == 4:
-                # If it's (1, 1, 1, 384), squeeze to (1, 1, 384)
-                target_subject_embeddings = target_subject_embeddings.squeeze(1)  # Remove extra dimension
-            
-            logger.debug(f"After shape fixing, target_subject_embeddings shape: {target_subject_embeddings.shape}")
-            
-            # Ensure it's exactly (1, 1, 384)
-            if target_subject_embeddings.shape != (1, 1, 384):
-                logger.warning(f"target_subject_embeddings shape is {target_subject_embeddings.shape}, forcing to (1, 1, 384)")
-                # Force the shape by flattening and reshaping
-                target_subject_embeddings = target_subject_embeddings.flatten()[:384].view(1, 1, 384)
+            # Add delta positional embeddings from Expression Transformer
+            adjusted_pos_embeddings = pos_embeddings + self.expression_transformer.delta_pos_embed
             
             logger.debug("Starting face reconstruction...")
-            # Reconstruct face using target identity but input expression
-            swapped_face = self.token_extractor.reconstruct_face(
-                target_subject_embeddings,
-                tokens['expression_token'],
-                target_patch_tokens,
-                target_pos_embeddings
-            )
+            # Reconstruct face using target subject embedding and input expression token
+            with torch.no_grad():
+                reconstructed_face = self.expression_reconstruction_model(
+                    target_subject_embedding,
+                    expression_token,
+                    adjusted_pos_embeddings
+                )
             
-            if swapped_face is None:
+            if reconstructed_face is None:
                 logger.warning("Face reconstruction failed")
                 return None
             
             logger.debug("Face reconstruction completed successfully")
             
             # Convert reconstructed face to numpy for display
-            swapped_face = swapped_face.squeeze(0).cpu().numpy()  # (3, 518, 518)
+            swapped_face = reconstructed_face.squeeze(0).cpu().numpy()  # (3, 518, 518)
             swapped_face = np.transpose(swapped_face, (1, 2, 0))  # (518, 518, 3)
             
             # Ensure both images are in the same format
@@ -388,23 +355,28 @@ class IdentitySwapVideoGenerator:
 
 def main():
     """Main function"""
-    parser = argparse.ArgumentParser(description="Generate identity swap video using pre-prepared identity features")
+    parser = argparse.ArgumentParser(description="Generate identity swap video using pre-prepared identity features and Expression Reconstruction model")
     parser.add_argument("--input_video", type=str, 
-    default="/Users/ozgewhiting/Documents/EQLabs/datasets_serial/CCA_small/1220_08_faces_53_07.mp4", help="Path to input video with 518x518 face frames")
-    parser.add_argument("--input_subject_id", type=int, default=81, help="Subject ID for the input video")
+    #default="/Users/ozgewhiting/Documents/EQLabs/datasets_serial/CCA_small/1220_08_faces_53_07.mp4", help="Path to input video with 518x518 face frames")
+    #default="/Users/ozgewhiting/Documents/EQLabs/datasets_serial/CCA_train_db4_no_padding/CCA_train_db4_no_padding/subject_369_1508_09_faces_20_82.mp4",
+    default="/Users/ozgewhiting/Documents/EQLabs/datasets_serial/CCA_train_db4_no_padding/CCA_train_db4_no_padding/subject_100_1239_10_faces_21_09.mp4",
+    help="Path to input video with 518x518 face frames") 
+    parser.add_argument("--input_subject_id", type=int, default=100, help="Subject ID for the input video")
+    
+    parser.add_argument("--target_subject_id", type=int, default=37, help="Target subject ID for identity swap")
     
     parser.add_argument("--output_video", type=str, 
-    default="/Users/ozgewhiting/Documents/projects/cloud_checkpoints_with_keywords/1220_08_faces_53_07_reconstructed_w_subj_id_37_w_epoch_3.mp4", 
+    #default="/Users/ozgewhiting/Documents/projects/cloud_checkpoints_with_keywords/1220_08_faces_53_07_expression_identity_swapped.mp4", 
+    #default="/Users/ozgewhiting/Documents/projects/cloud_checkpoints_with_keywords7/subject_369_1508_09_faces_20_82_expression_identity_swapped_w_subj_id_37.mp4", 
+    default="/Users/ozgewhiting/Documents/projects/cloud_checkpoints_with_keywords7/subject_100_1239_10_faces_21_09_expression_identity_swapped_w_subj_id_37_w_step_5400.mp4", 
     help="Path to save output video")
-    parser.add_argument("--identity_json", type=str, 
-    default="/Users/ozgewhiting/Documents/projects/dataset_utils/app_demo/CCA_small_1176_14_faces_1_70_w_subj_id_37_w_embeddings.json",
-    help="Path to JSON file with target identity features")
+
     parser.add_argument("--expression_transformer_checkpoint", type=str, 
-                       default="/Users/ozgewhiting/Documents/projects/cloud_checkpoints_with_keywords/expression_transformer_epoch_2.pt",
+                       default="/Users/ozgewhiting/Documents/projects/cloud_checkpoints_with_keywords7/expression_transformer_step_5400.pt",
                        help="Path to Expression Transformer checkpoint")
-    parser.add_argument("--face_reconstruction_checkpoint", type=str, 
-                       default="/Users/ozgewhiting/Documents/projects/cloud_checkpoints_with_subject_ids/reconstruction_model_epoch_3.pt",
-                       help="Path to Face Reconstruction model checkpoint")
+    parser.add_argument("--expression_reconstruction_checkpoint", type=str, 
+                       default="/Users/ozgewhiting/Documents/projects/cloud_checkpoints_with_keywords7/expression_reconstruction_step_5400.pt",
+                       help="Path to Expression Reconstruction model checkpoint")
     parser.add_argument("--device", type=str, default="cpu", help="Device to run models on")
     parser.add_argument("--max_frames", type=int, default=None, help="Maximum frames to process (for testing)")
     
@@ -413,7 +385,7 @@ def main():
     # Create identity swap generator
     generator = IdentitySwapVideoGenerator(
         expression_transformer_checkpoint_path=args.expression_transformer_checkpoint,
-        face_reconstruction_checkpoint_path=args.face_reconstruction_checkpoint,
+        expression_reconstruction_checkpoint_path=args.expression_reconstruction_checkpoint,
         device=args.device
     )
     
@@ -421,8 +393,8 @@ def main():
     success = generator.process_video(
         input_video_path=args.input_video,
         output_video_path=args.output_video,
-        identity_json_path=args.identity_json,
         input_subject_id=args.input_subject_id,
+        target_subject_id=args.target_subject_id,
         max_frames=args.max_frames
     )
     

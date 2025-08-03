@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from face_model.models.dinov2_tokenizer import DINOv2Tokenizer
 from face_model.models.expression_transformer import ExpressionTransformer
 from face_model.models.expression_transformer_decoder import ExpressionTransformerDecoder
-from face_model.models.face_reconstruction_model import FaceReconstructionModel
+from face_model.models.expression_reconstruction_model import ExpressionReconstructionModel
 
 logger = logging.getLogger(__name__)
 
@@ -68,15 +68,15 @@ class ModelLoader:
         else:
             logger.info("⏭️ Skipping Expression Predictor (not needed for reconstruction)")
         
-        # Load Face Reconstruction model
+        # Load Expression Reconstruction model
         if face_reconstruction_checkpoint_path:
-            logger.info("🎨 Loading Face Reconstruction model...")
-            face_reconstruction_model = self._load_face_reconstruction_model(face_reconstruction_checkpoint_path)
-            self.models['face_reconstruction'] = face_reconstruction_model
-            logger.info("✅ Face Reconstruction model loaded")
+            logger.info("🎨 Loading Expression Reconstruction model...")
+            expression_reconstruction_model = self._load_expression_reconstruction_model(face_reconstruction_checkpoint_path)
+            self.models['expression_reconstruction'] = expression_reconstruction_model
+            logger.info("✅ Expression Reconstruction model loaded")
         else:
-            logger.warning("⚠️ No Face Reconstruction checkpoint provided")
-            face_reconstruction_model = None
+            logger.warning("⚠️ No Expression Reconstruction checkpoint provided")
+            expression_reconstruction_model = None
         
         logger.info("🎉 All models loaded successfully!")
         
@@ -84,7 +84,7 @@ class ModelLoader:
             'tokenizer': self.tokenizer,
             'expression_transformer': expression_transformer,
             'expression_predictor': expression_predictor,
-            'face_reconstruction_model': face_reconstruction_model
+            'expression_reconstruction_model': expression_reconstruction_model
         }
     
     def _load_expression_transformer(self, checkpoint_path: str) -> ExpressionTransformer:
@@ -103,10 +103,14 @@ class ModelLoader:
             num_layers = expr_config.get('num_layers', 2)
             dropout = expr_config.get('dropout', 0.1)
             max_subjects = expr_config.get('max_subjects', 3500)  # Load from checkpoint
+            ff_dim = expr_config.get('ff_dim', 1536)  # Load ff_dim from checkpoint
             logger.info(f"📐 Expression Transformer architecture: {num_layers} layers, {num_heads} heads, {max_subjects} subjects")
+            logger.info(f"Expression Transformer initialized with {num_layers} layers, {num_heads} heads")
+            logger.info(f"Feed-forward dimension: {ff_dim}")
+            logger.info(f"Subject embeddings: {max_subjects} subjects, {embed_dim} dimensions")
         else:
             # Fallback to default architecture
-            embed_dim, num_heads, num_layers, dropout, max_subjects = 384, 4, 2, 0.1, 3500
+            embed_dim, num_heads, num_layers, dropout, max_subjects, ff_dim = 384, 4, 2, 0.1, 3500, 1536
             logger.warning("No architecture config found in Expression Transformer checkpoint, using defaults")
         
         # Initialize model with correct architecture
@@ -115,7 +119,8 @@ class ModelLoader:
             num_heads=num_heads,
             num_layers=num_layers,
             dropout=dropout,
-            max_subjects=max_subjects  # Use max_subjects from checkpoint
+            max_subjects=max_subjects,  # Use max_subjects from checkpoint
+            ff_dim=ff_dim  # Use ff_dim from checkpoint
         ).to(self.device)
         
         # Load state dict
@@ -197,48 +202,52 @@ class ModelLoader:
         
         return expression_predictor
     
-    def _load_face_reconstruction_model(self, checkpoint_path: str) -> FaceReconstructionModel:
-        """Load Face Reconstruction model with architecture from checkpoint"""
+    def _load_expression_reconstruction_model(self, checkpoint_path: str) -> ExpressionReconstructionModel:
+        """Load Expression Reconstruction model with architecture from checkpoint"""
         if not os.path.exists(checkpoint_path):
-            raise FileNotFoundError(f"Face Reconstruction checkpoint not found: {checkpoint_path}")
+            raise FileNotFoundError(f"Expression Reconstruction checkpoint not found: {checkpoint_path}")
         
         # Load checkpoint to get architecture
         checkpoint = torch.load(checkpoint_path, map_location=self.device)
         
         # Get architecture from checkpoint config
-        if 'config' in checkpoint and 'reconstruction_model' in checkpoint['config']:
-            recon_config = checkpoint['config']['reconstruction_model']
+        if 'config' in checkpoint and 'expression_reconstruction' in checkpoint['config']:
+            recon_config = checkpoint['config']['expression_reconstruction']
             embed_dim = recon_config.get('embed_dim', 384)
-            num_heads = recon_config.get('num_heads', 4)
-            num_layers = recon_config.get('num_layers', 2)
+            num_cross_attention_layers = recon_config.get('num_cross_attention_layers', 2)
+            num_self_attention_layers = recon_config.get('num_self_attention_layers', 2)
+            num_heads = recon_config.get('num_heads', 8)
+            ff_dim = recon_config.get('ff_dim', 1536)
             dropout = recon_config.get('dropout', 0.1)
-            logger.info(f"📐 Face Reconstruction architecture: {num_layers} layers, {num_heads} heads")
+            logger.info(f"📐 Expression Reconstruction architecture: {num_cross_attention_layers} cross layers, {num_self_attention_layers} self layers, {num_heads} heads")
         else:
             # Fallback to default architecture
-            embed_dim, num_heads, num_layers, dropout = 384, 4, 2, 0.1
-            logger.warning("No architecture config found in Face Reconstruction checkpoint, using defaults")
+            embed_dim, num_cross_attention_layers, num_self_attention_layers, num_heads, ff_dim, dropout = 384, 2, 2, 8, 1536, 0.1
+            logger.warning("No architecture config found in Expression Reconstruction checkpoint, using defaults")
         
         # Initialize model with correct architecture
-        face_reconstruction_model = FaceReconstructionModel(
+        expression_reconstruction_model = ExpressionReconstructionModel(
             embed_dim=embed_dim,
+            num_cross_attention_layers=num_cross_attention_layers,
+            num_self_attention_layers=num_self_attention_layers,
             num_heads=num_heads,
-            num_layers=num_layers,
+            ff_dim=ff_dim,
             dropout=dropout
         ).to(self.device)
         
         # Load state dict
-        if 'reconstruction_model_state_dict' in checkpoint:
-            face_reconstruction_model.load_state_dict(checkpoint['reconstruction_model_state_dict'])
-            logger.info(f"Loaded Face Reconstruction model from epoch {checkpoint.get('epoch', 'unknown')}")
+        if 'expression_reconstruction_state_dict' in checkpoint:
+            expression_reconstruction_model.load_state_dict(checkpoint['expression_reconstruction_state_dict'])
+            logger.info(f"Loaded Expression Reconstruction model from epoch {checkpoint.get('epoch', 'unknown')}")
         else:
             # Try loading the entire checkpoint as state dict
-            face_reconstruction_model.load_state_dict(checkpoint)
-            logger.info("Loaded Face Reconstruction model state dict directly")
+            expression_reconstruction_model.load_state_dict(checkpoint)
+            logger.info("Loaded Expression Reconstruction model state dict directly")
         
         # Set to evaluation mode
-        face_reconstruction_model.eval()
+        expression_reconstruction_model.eval()
         
-        return face_reconstruction_model
+        return expression_reconstruction_model
     
     def get_models(self) -> Dict[str, Any]:
         """Get all loaded models"""

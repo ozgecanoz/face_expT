@@ -22,7 +22,7 @@ class TokenExtractor:
     def __init__(self, 
                  expression_transformer,
                  expression_predictor=None,  # Make optional
-                 face_reconstruction_model=None,
+                 expression_reconstruction_model=None,
                  tokenizer=None,
                  device="cpu",
                  subject_id=0):
@@ -32,14 +32,14 @@ class TokenExtractor:
         Args:
             expression_transformer: Expression Transformer model
             expression_predictor: Expression Predictor model (optional)
-            face_reconstruction_model: Face Reconstruction model (optional)
+            expression_reconstruction_model: Expression Reconstruction model (optional)
             tokenizer: DINOv2 tokenizer
             device: Device to run models on
             subject_id: Subject ID for current session
         """
         self.expression_transformer = expression_transformer
         self.expression_predictor = expression_predictor
-        self.face_reconstruction_model = face_reconstruction_model
+        self.expression_reconstruction_model = expression_reconstruction_model
         self.tokenizer = tokenizer
         self.device = device
         self.subject_id = subject_id
@@ -50,8 +50,8 @@ class TokenExtractor:
         logger.info(f"TokenExtractor initialized with subject_id: {subject_id}")
         if expression_predictor is None:
             logger.info("Expression Predictor not provided - prediction disabled")
-        if face_reconstruction_model is None:
-            logger.info("Face Reconstruction model not provided - reconstruction disabled")
+        if expression_reconstruction_model is None:
+            logger.info("Expression Reconstruction model not provided - reconstruction disabled")
     
     def extract_tokens_from_face(self, face_image: np.ndarray) -> Dict[str, torch.Tensor]:
         """
@@ -147,7 +147,7 @@ class TokenExtractor:
     def reconstruct_face(self, subject_embeddings: torch.Tensor, expression_token: torch.Tensor, 
                         patch_tokens: torch.Tensor, pos_embeddings: torch.Tensor) -> torch.Tensor:
         """
-        Reconstruct face image from subject embeddings and expression tokens using actual DINOv2 tokens
+        Reconstruct face image from subject embeddings and expression tokens using Expression Reconstruction model
         
         Args:
             subject_embeddings: (1, 1, 384) - Subject embeddings from Expression Transformer
@@ -158,8 +158,8 @@ class TokenExtractor:
         Returns:
             reconstructed_face: (1, 3, 518, 518) - Reconstructed face image
         """
-        if self.face_reconstruction_model is None:
-            logger.warning("Face Reconstruction model is not initialized. Cannot reconstruct face.")
+        if self.expression_reconstruction_model is None:
+            logger.warning("Expression Reconstruction model is not initialized. Cannot reconstruct face.")
             return torch.zeros(1, 3, 518, 518, device=self.device) # Return a dummy tensor
 
         # Debug: Check tensor shapes
@@ -170,9 +170,12 @@ class TokenExtractor:
         logger.debug(f"  pos_embeddings: {pos_embeddings.shape}")
 
         with torch.no_grad():
-            # Use actual DINOv2 tokens from the input frame and subject embeddings from Expression Transformer
-            reconstructed_face = self.face_reconstruction_model(
-                patch_tokens, pos_embeddings, subject_embeddings, expression_token
+            # Add delta positional embeddings from Expression Transformer to match training
+            adjusted_pos_embeddings = pos_embeddings + self.expression_transformer.delta_pos_embed
+            
+            # Use Expression Reconstruction model with subject embeddings and expression token
+            reconstructed_face = self.expression_reconstruction_model(
+                subject_embeddings, expression_token, adjusted_pos_embeddings
             )
         
         return reconstructed_face

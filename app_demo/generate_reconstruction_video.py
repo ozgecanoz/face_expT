@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Generate Reconstruction Comparison Video
-Creates a side-by-side video showing original frames vs reconstructed frames
+Creates a side-by-side video showing original frames vs reconstructed frames using Expression Reconstruction model
 Works with pre-cropped 518x518 face frames
 """
 
@@ -27,18 +27,18 @@ logger = logging.getLogger(__name__)
 
 
 class ReconstructionVideoGenerator:
-    """Generate side-by-side reconstruction comparison videos from pre-cropped face frames"""
+    """Generate side-by-side reconstruction comparison videos from pre-cropped face frames using Expression Reconstruction model"""
     
     def __init__(self, 
                  expression_transformer_checkpoint_path: str,
-                 face_reconstruction_checkpoint_path: str,
+                 expression_reconstruction_checkpoint_path: str,
                  device: str = "cpu"):
         """
         Initialize video generator
         
         Args:
             expression_transformer_checkpoint_path: Path to Expression Transformer checkpoint
-            face_reconstruction_checkpoint_path: Path to Face Reconstruction model checkpoint
+            expression_reconstruction_checkpoint_path: Path to Expression Reconstruction model checkpoint
             device: Device to run models on
         """
         self.device = device
@@ -49,7 +49,7 @@ class ReconstructionVideoGenerator:
         self.models = model_loader.load_all_models(
             expression_transformer_checkpoint_path=expression_transformer_checkpoint_path,
             expression_predictor_checkpoint_path="dummy",  # Not needed for reconstruction
-            face_reconstruction_checkpoint_path=face_reconstruction_checkpoint_path
+            face_reconstruction_checkpoint_path=expression_reconstruction_checkpoint_path
         )
         
         # Initialize components
@@ -57,7 +57,7 @@ class ReconstructionVideoGenerator:
         self.token_extractor = TokenExtractor(
             expression_transformer=self.models['expression_transformer'],
             expression_predictor=self.models.get('expression_predictor'),  # May be None
-            face_reconstruction_model=self.models.get('face_reconstruction_model'),  # May be None
+            expression_reconstruction_model=self.models.get('expression_reconstruction_model'),  # May be None
             tokenizer=self.models['tokenizer'],
             device=self.device,
             subject_id=0  # Will be set per frame
@@ -253,22 +253,26 @@ class ReconstructionVideoGenerator:
 
 def main():
     """Main function"""
-    parser = argparse.ArgumentParser(description="Generate reconstruction comparison video from pre-cropped face frames")
+    parser = argparse.ArgumentParser(description="Generate reconstruction comparison video from pre-cropped face frames using Expression Reconstruction model")
     parser.add_argument("--input_video", type=str, 
-    default="/Users/ozgewhiting/Documents/EQLabs/datasets_serial/CCA_small/1176_14_faces_1_70.mp4", 
+    #default="/Users/ozgewhiting/Documents/EQLabs/datasets_serial/CCA_small/1176_14_faces_1_70.mp4", # subject_37
+    #default="/Users/ozgewhiting/Documents/EQLabs/datasets_serial/CCA_train_db4_no_padding/CCA_train_db4_no_padding/subject_369_1508_09_faces_20_82.mp4", 
+    default="/Users/ozgewhiting/Documents/EQLabs/datasets_serial/CCA_train_db4_no_padding/CCA_train_db4_no_padding/subject_100_1239_10_faces_21_09.mp4",
     help="Path to input video with 518x518 face frames")
-    parser.add_argument("--subject_id", type=int, default=37, help="Subject ID for the input video")
+    parser.add_argument("--subject_id", type=int, default=100, help="Subject ID for the input video")
     parser.add_argument("--output_video", type=str, 
-    default="/Users/ozgewhiting/Documents/projects/cloud_checkpoints_with_keywords/1176_14_faces_1_70_reconstructed2_w_subj_id_37_w_keyword_epoch_2.mp4", 
+    #default="/Users/ozgewhiting/Documents/projects/cloud_checkpoints_with_keywords7/1176_14_faces_1_70_reconstructed2_w_subj_id_37_w_keyword_epoch_2.mp4", 
+    #default="/Users/ozgewhiting/Documents/projects/cloud_checkpoints_with_keywords7/subject_369_1508_09_faces_20_82_reconstructed.mp4", 
+    default="/Users/ozgewhiting/Documents/projects/cloud_checkpoints_with_keywords7/subject_100_1239_10_faces_21_09_reconstructed_w_step_5400.mp4", 
     help="Path to save output video")
     parser.add_argument("--target_subject_id", type=int, default=None,
                        help="Target subject ID for reconstruction (if different from input)")
     parser.add_argument("--expression_transformer_checkpoint", type=str, 
-                       default="/Users/ozgewhiting/Documents/projects/cloud_checkpoints_with_keywords/expression_transformer_epoch_2.pt",
+                       default="/Users/ozgewhiting/Documents/projects/cloud_checkpoints_with_keywords7/expression_transformer_step_5400.pt",
                        help="Path to Expression Transformer checkpoint")
-    parser.add_argument("--face_reconstruction_checkpoint", type=str, 
-                       default="/Users/ozgewhiting/Documents/projects/cloud_checkpoints_with_subject_ids/reconstruction_model_epoch_3.pt",
-                       help="Path to Face Reconstruction model checkpoint")
+    parser.add_argument("--expression_reconstruction_checkpoint", type=str, 
+                       default="/Users/ozgewhiting/Documents/projects/cloud_checkpoints_with_keywords7/expression_reconstruction_step_5400.pt",
+                       help="Path to Expression Reconstruction model checkpoint")
     parser.add_argument("--device", type=str, default="cpu", help="Device to run models on")
     parser.add_argument("--max_frames", type=int, default=None, help="Maximum frames to process (for testing)")
     
@@ -277,7 +281,7 @@ def main():
     # Create video generator
     generator = ReconstructionVideoGenerator(
         expression_transformer_checkpoint_path=args.expression_transformer_checkpoint,
-        face_reconstruction_checkpoint_path=args.face_reconstruction_checkpoint,
+        expression_reconstruction_checkpoint_path=args.expression_reconstruction_checkpoint,
         device=args.device
     )
     

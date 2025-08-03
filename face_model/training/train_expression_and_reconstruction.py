@@ -227,7 +227,7 @@ class ExpressionReconstructionLoss(nn.Module):
                     t1 = tokens[:-stride]
                     t2 = tokens[stride:]
                     contrast_sim = F.cosine_similarity(t1, t2, dim=-1)
-                    contrast_loss = (contrast_sim).mean()  # Want sim ≈ 0 → loss ≈ 0
+                    contrast_loss = (contrast_sim.abs()).mean()  # Want sim ≈ 0 → loss ≈ 0
                 else:
                     contrast_loss = 0.0
                 
@@ -241,7 +241,8 @@ class ExpressionReconstructionLoss(nn.Module):
                 # Subtract diagonal (self-similarities = 1.0) to get only cross-token similarities
                 T = diversity_tokens.shape[0]
                 if T > 1:  # Need at least 2 tokens for diversity
-                    diversity_loss = (sim_matrix.sum() - T) / (T * (T - 1))
+                    #diversity_loss = (sim_matrix.sum() - T) / (T * (T - 1))
+                    diversity_loss = torch.clamp((sim_matrix.sum() - T) / (T * (T - 1)), min=0.0)
                     diversity_losses.append(diversity_loss)
 
         # Aggregate losses
