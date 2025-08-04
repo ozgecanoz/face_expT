@@ -34,22 +34,23 @@ def main():
             'max_train_samples': None,  # pass None to use all samples for full training
             'val_data_dir': "/mnt/dataset-storage/dbs/CCA_train_db4_no_padding/",
             'max_val_samples': 1000,   # Limit validation samples for testing
-            'checkpoint_dir': "/mnt/dataset-storage/face_model/checkpoints_with_keywords8",
+            'checkpoint_dir': "/mnt/dataset-storage/face_model/checkpoints_with_keywords9",
             'expression_transformer_checkpoint_path': None,  # Set to path if you want to load expression transformer
             'expression_reconstruction_checkpoint_path': None,  # Set to path if you want to load expression reconstruction
             #'joint_checkpoint_path': "/mnt/dataset-storage/face_model/checkpoints_with_keywords6/joint_expression_reconstruction_step_600.pt",  # Set to path if you want to load joint checkpoint (preferred)
-            'joint_checkpoint_path': None,
-            'log_dir': "/mnt/dataset-storage/face_model/logs_with_keywords8",
+            'joint_checkpoint_path': '/mnt/dataset-storage/face_model/checkpoints_with_keywords8/joint_expression_reconstruction_step_5400.pt',
+            'log_dir': "/mnt/dataset-storage/face_model/logs_with_keywords9",
             'learning_rate': 5e-5,
             'warmup_steps': 3000,  # Learning rate warmup steps
             'min_lr': 1e-6,  # Minimum learning rate after decay
-            'batch_size': 1,  # for L4 GPU train-gpu-co 
+            'batch_size': 2,  # for L4 GPU train-gpu-co 
             'num_epochs': 3,
             'save_every_step': 600,   # Save similarity plots and checkpoints every 300 steps
             'num_workers': 8,  # for L4 GPU (24 GB VRAM) train-gpu-co (it has 16 vCPUs), memory 64GB, 
             'pin_memory': True,  # for L4 GPU train-gpu-co 
             'persistent_workers': True,  # Keep workers alive for efficiency
-            'drop_last': True  # Consistent batch sizes
+            'drop_last': True,  # Consistent batch sizes
+            'freeze_expression_transformer': True  # Set to True to freeze expression transformer and only train reconstruction model
         },
         'scheduler': {
             # Loss weight scheduling parameters
@@ -62,15 +63,28 @@ def main():
             #'final_lambda_reconstruction': 0.5,    # Final reconstruction weight (highest)
             #'final_lambda_temporal': 0.2,      # Final temporal weight
             #'final_lambda_diversity': 0.2      # Final diversity weight
-            'initial_lambda_reconstruction': 0.01,  # Start with low reconstruction weight
-            'initial_lambda_temporal': 0.4,    # Start with high temporal weight # also changed  lambda_coherence = 0.7, lambda_contrast = 0.3
-            'initial_lambda_diversity': 0.3,   # Start with high diversity weight
-            'warmup_lambda_reconstruction': 0.2,   # Reconstruction weight at warmup
-            'warmup_lambda_temporal': 0.3,     # Temporal weight at warmup
-            'warmup_lambda_diversity': 0.2,    # Diversity weight at warmup
-            'final_lambda_reconstruction': 0.5,    # Final reconstruction weight (highest)
-            'final_lambda_temporal': 0.2,      # Final temporal weight
-            'final_lambda_diversity': 0.2      # Final diversity weight
+            
+            # weights for from scratch training in /checkpoints_with_keywords8/joint_expression_reconstruction_step_5400.pt
+            #'initial_lambda_reconstruction': 0.01,  # Start with low reconstruction weight
+            #'initial_lambda_temporal': 0.4,    # Start with high temporal weight # also changed  lambda_coherence = 0.7, lambda_contrast = 0.3
+            #'initial_lambda_diversity': 0.3,   # Start with high diversity weight
+            #'warmup_lambda_reconstruction': 0.2,   # Reconstruction weight at warmup
+            #'warmup_lambda_temporal': 0.3,     # Temporal weight at warmup
+            #'warmup_lambda_diversity': 0.2,    # Diversity weight at warmup
+            #'final_lambda_reconstruction': 0.5,    # Final reconstruction weight (highest)
+            #'final_lambda_temporal': 0.2,      # Final temporal weight
+            #'final_lambda_diversity': 0.2      # Final diversity weight
+            
+            # weights for from frozen expression but reconstruction training from joint_expression_reconstruction_step_5400.pt above and save to /checkpoints_with_keywords9/
+            'initial_lambda_reconstruction': 1.0,  # Start with low reconstruction weight
+            'initial_lambda_temporal': 0.0,    # Start with high temporal weight # also changed  lambda_coherence = 0.7, lambda_contrast = 0.3
+            'initial_lambda_diversity': 0.0,   # Start with high diversity weight
+            'warmup_lambda_reconstruction': 1.0,   # Reconstruction weight at warmup
+            'warmup_lambda_temporal': 0.0,     # Temporal weight at warmup
+            'warmup_lambda_diversity': 0.0,    # Diversity weight at warmup
+            'final_lambda_reconstruction': 1.0,    # Final reconstruction weight (highest)
+            'final_lambda_temporal': 0.0,      # Final temporal weight
+            'final_lambda_diversity': 0.0      # Final diversity weight
         },
         'expression_transformer': {
             'embed_dim': 384,
@@ -152,7 +166,11 @@ def main():
     else:
         print(f"🎓 Expression Reconstruction: Will train from scratch")
     
-    print(f"\n🔗 Joint Training: Both Expression Transformer and Expression Reconstruction will be trained together")
+    # Log freeze status
+    if config['training']['freeze_expression_transformer']:
+        print(f"\n🔒 Frozen Training: Expression Transformer will be frozen, only Expression Reconstruction will be trained")
+    else:
+        print(f"\n🔗 Joint Training: Both Expression Transformer and Expression Reconstruction will be trained together")
     
     # Start training
     print("\n🎯 Starting training...")
@@ -199,7 +217,8 @@ def main():
         recon_num_heads=config['expression_reconstruction']['num_heads'],
         recon_ff_dim=config['expression_reconstruction']['ff_dim'],
         recon_dropout=config['expression_reconstruction']['dropout'],
-        log_dir=config['training']['log_dir']
+        log_dir=config['training']['log_dir'],
+        freeze_expression_transformer=config['training']['freeze_expression_transformer']
     )
     
     print("\n✅ Training completed!")

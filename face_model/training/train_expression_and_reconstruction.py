@@ -28,7 +28,7 @@ from models.dinov2_tokenizer import DINOv2Tokenizer
 from utils.scheduler_utils import CombinedLRLossWeightScheduler
 from utils.checkpoint_utils import save_checkpoint, create_comprehensive_config, load_checkpoint_config, extract_model_config
 from utils.visualization_utils import compute_cosine_similarity_distribution, plot_cosine_similarity_distribution
-from utils.tensorboard_utils import log_model_parameters
+# Removed tensorboard histogram logging to avoid compatibility issues
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -358,10 +358,55 @@ def train_expression_and_reconstruction(
     recon_num_heads=8,
     recon_ff_dim=1536,
     recon_dropout=0.1,
-    log_dir=None
+    log_dir=None,
+    freeze_expression_transformer=False
 ):
     """
     Train the joint expression and reconstruction model
+    
+    Args:
+        dataset_path: Path to the dataset
+        expression_transformer_checkpoint_path: Path to expression transformer checkpoint
+        expression_reconstruction_checkpoint_path: Path to expression reconstruction checkpoint
+        joint_checkpoint_path: Path to joint model checkpoint (preferred)
+        checkpoint_dir: Directory to save checkpoints
+        save_every_step: Save checkpoints and plots every N steps
+        batch_size: Training batch size
+        num_epochs: Number of training epochs
+        learning_rate: Learning rate
+        max_samples: Maximum number of samples to use
+        val_dataset_path: Path to validation dataset
+        max_val_samples: Maximum number of validation samples
+        device: Device to use for training
+        num_workers: Number of data loader workers
+        pin_memory: Whether to pin memory
+        persistent_workers: Whether to use persistent workers
+        drop_last: Whether to drop last incomplete batch
+        warmup_steps: Number of warmup steps for scheduler
+        min_lr: Minimum learning rate
+        initial_lambda_reconstruction: Initial reconstruction loss weight
+        initial_lambda_temporal: Initial temporal loss weight
+        initial_lambda_diversity: Initial diversity loss weight
+        warmup_lambda_reconstruction: Warmup reconstruction loss weight
+        warmup_lambda_temporal: Warmup temporal loss weight
+        warmup_lambda_diversity: Warmup diversity loss weight
+        final_lambda_reconstruction: Final reconstruction loss weight
+        final_lambda_temporal: Final temporal loss weight
+        final_lambda_diversity: Final diversity loss weight
+        expr_embed_dim: Expression transformer embedding dimension
+        expr_num_heads: Expression transformer number of heads
+        expr_num_layers: Expression transformer number of layers
+        expr_dropout: Expression transformer dropout
+        expr_max_subjects: Expression transformer max subjects
+        expr_ff_dim: Expression transformer feed-forward dimension
+        recon_embed_dim: Reconstruction model embedding dimension
+        recon_num_cross_layers: Reconstruction model cross-attention layers
+        recon_num_self_layers: Reconstruction model self-attention layers
+        recon_num_heads: Reconstruction model number of heads
+        recon_ff_dim: Reconstruction model feed-forward dimension
+        recon_dropout: Reconstruction model dropout
+        log_dir: Directory for TensorBoard logs
+        freeze_expression_transformer: If True, freeze expression transformer and only train reconstruction model
     """
     logger.info(f"Starting joint expression and reconstruction training on device: {device}")
     
@@ -485,8 +530,19 @@ def train_expression_and_reconstruction(
             recon_dropout=recon_dropout
         ).to(device)
     
-    # Initialize optimizer
-    optimizer = optim.AdamW(joint_model.parameters(), lr=learning_rate, weight_decay=0.01)
+    # Handle freezing of expression transformer if requested
+    if freeze_expression_transformer:
+        logger.info("🔒 Freezing expression transformer parameters")
+        for param in joint_model.expression_transformer.parameters():
+            param.requires_grad = False
+        
+        # Only optimize reconstruction model parameters
+        trainable_params = list(joint_model.expression_reconstruction.parameters())
+        optimizer = optim.AdamW(trainable_params, lr=learning_rate, weight_decay=0.01)
+        logger.info(f"📊 Training only expression reconstruction model ({len(trainable_params)} parameter groups)")
+    else:
+        logger.info("🔄 Training both expression transformer and reconstruction model")
+        optimizer = optim.AdamW(joint_model.parameters(), lr=learning_rate, weight_decay=0.01)
     
     # Initialize loss function
     criterion = ExpressionReconstructionLoss(
@@ -760,12 +816,7 @@ def train_expression_and_reconstruction(
             # Log validation metrics to TensorBoard
             writer.add_scalar('Validation/Epoch_Loss', val_loss, epoch + 1)
     
-    # Log model parameters to TensorBoard
-    try:
-        logging_results = log_model_parameters(writer, joint_model, global_step=0)
-        logger.info(f"Parameter logging completed: {logging_results['histograms_successful']} histograms, {logging_results['statistics_successful']} statistics")
-    except Exception as e:
-        logger.warning(f"Could not log model parameters: {e}")
+    # Removed tensorboard histogram logging to avoid compatibility issues
     
     # Close TensorBoard writer
     writer.close()

@@ -359,23 +359,30 @@ def main():
     parser.add_argument("--input_video", type=str, 
     #default="/Users/ozgewhiting/Documents/EQLabs/datasets_serial/CCA_small/1220_08_faces_53_07.mp4", help="Path to input video with 518x518 face frames")
     #default="/Users/ozgewhiting/Documents/EQLabs/datasets_serial/CCA_train_db4_no_padding/CCA_train_db4_no_padding/subject_369_1508_09_faces_20_82.mp4",
-    default="/Users/ozgewhiting/Documents/EQLabs/datasets_serial/CCA_train_db4_no_padding/CCA_train_db4_no_padding/subject_100_1239_10_faces_21_09.mp4",
+   
+    #default="/Users/ozgewhiting/Documents/EQLabs/datasets_serial/CCA_train_db4_no_padding/CCA_train_db4_no_padding/subject_100_1239_10_faces_21_09.mp4",
+    #default="/Users/ozgewhiting/Documents/EQLabs/datasets_serial/CCA_train_db4_no_padding/CCA_train_db4_no_padding/subject_92_1231_00_faces_38_23.mp4",
+    default="/Users/ozgewhiting/Documents/EQLabs/datasets_serial/CCA_train_db4_no_padding/CCA_train_db4_no_padding/subject_116_1255_00_faces_9_18.mp4",
     help="Path to input video with 518x518 face frames") 
-    parser.add_argument("--input_subject_id", type=int, default=100, help="Subject ID for the input video")
-    
+    #parser.add_argument("--input_subject_id", type=int, default=100, help="Subject ID for the input video")
+    #parser.add_argument("--input_subject_id", type=int, default=92, help="Subject ID for the input video")
+    parser.add_argument("--input_subject_id", type=int, default=116, help="Subject ID for the input video")
+
     parser.add_argument("--target_subject_id", type=int, default=37, help="Target subject ID for identity swap")
     
     parser.add_argument("--output_video", type=str, 
     #default="/Users/ozgewhiting/Documents/projects/cloud_checkpoints_with_keywords/1220_08_faces_53_07_expression_identity_swapped.mp4", 
     #default="/Users/ozgewhiting/Documents/projects/cloud_checkpoints_with_keywords7/subject_369_1508_09_faces_20_82_expression_identity_swapped_w_subj_id_37.mp4", 
-    default="/Users/ozgewhiting/Documents/projects/cloud_checkpoints_with_keywords7/subject_100_1239_10_faces_21_09_expression_identity_swapped_w_subj_id_37_w_step_5400.mp4", 
+    #default="/Users/ozgewhiting/Documents/projects/checkpoints_with_keywords8/subject_100_1239_10_faces_21_09_expression_identity_swapped_w_subj_id_37_w_step_19800.mp4", 
+    #default="/Users/ozgewhiting/Documents/projects/checkpoints_with_keywords8/subject_92_1231_00_faces_38_23_expression_identity_swapped_w_subj_id_37_w_step_5400_frozen_expr_trans.mp4", 
+    default="/Users/ozgewhiting/Documents/projects/checkpoints_with_keywords8/subject_116_1255_00_faces_9_18_expression_identity_swapped_w_subj_id_37_w_step_5400_frozen_expr_trans.mp4", 
     help="Path to save output video")
 
     parser.add_argument("--expression_transformer_checkpoint", type=str, 
-                       default="/Users/ozgewhiting/Documents/projects/cloud_checkpoints_with_keywords7/expression_transformer_step_5400.pt",
+                       default="/Users/ozgewhiting/Documents/projects/checkpoints_with_keywords8/expression_transformer_step_5400.pt",
                        help="Path to Expression Transformer checkpoint")
     parser.add_argument("--expression_reconstruction_checkpoint", type=str, 
-                       default="/Users/ozgewhiting/Documents/projects/cloud_checkpoints_with_keywords7/expression_reconstruction_step_5400.pt",
+                       default="/Users/ozgewhiting/Documents/projects/checkpoints_with_keywords8/expression_reconstruction_step_5400.pt",
                        help="Path to Expression Reconstruction model checkpoint")
     parser.add_argument("--device", type=str, default="cpu", help="Device to run models on")
     parser.add_argument("--max_frames", type=int, default=None, help="Maximum frames to process (for testing)")
