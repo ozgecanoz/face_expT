@@ -38,7 +38,7 @@ def main():
             'expression_transformer_checkpoint_path': None,  # Set to path if you want to load expression transformer
             'expression_reconstruction_checkpoint_path': None,  # Set to path if you want to load expression reconstruction
             #'joint_checkpoint_path': "/mnt/dataset-storage/face_model/checkpoints_with_keywords6/joint_expression_reconstruction_step_600.pt",  # Set to path if you want to load joint checkpoint (preferred)
-            'joint_checkpoint_path': '/mnt/dataset-storage/face_model/checkpoints_with_keywords8/joint_expression_reconstruction_step_12000.pt',
+            'joint_checkpoint_path': '/mnt/dataset-storage/face_model/checkpoints_with_keywords8/joint_expression_reconstruction_step_19800.pt',
             'log_dir': "/mnt/dataset-storage/face_model/logs_with_keywords9",
             'learning_rate': 5e-5,
             'warmup_steps': 3000,  # Learning rate warmup steps
