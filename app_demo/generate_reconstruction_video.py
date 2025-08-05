@@ -263,15 +263,15 @@ def main():
     parser.add_argument("--output_video", type=str, 
     #default="/Users/ozgewhiting/Documents/projects/cloud_checkpoints_with_keywords7/1176_14_faces_1_70_reconstructed2_w_subj_id_37_w_keyword_epoch_2.mp4", 
     #default="/Users/ozgewhiting/Documents/projects/cloud_checkpoints_with_keywords7/subject_369_1508_09_faces_20_82_reconstructed.mp4", 
-    default="/Users/ozgewhiting/Documents/projects/checkpoints_with_keywords8/subject_100_1239_10_faces_21_09_reconstructed_w_step_19800.mp4", 
+    default="/Users/ozgewhiting/Documents/projects/checkpoints_with_keywords9/subject_100_1239_10_faces_21_09_reconstructed_w_step_15000.mp4", 
     help="Path to save output video")
     parser.add_argument("--target_subject_id", type=int, default=None,
                        help="Target subject ID for reconstruction (if different from input)")
     parser.add_argument("--expression_transformer_checkpoint", type=str, 
-                       default="/Users/ozgewhiting/Documents/projects/checkpoints_with_keywords8/expression_transformer_step_19800.pt",
+                       default="/Users/ozgewhiting/Documents/projects/checkpoints_with_keywords9/expression_transformer_step_15000.pt",
                        help="Path to Expression Transformer checkpoint")
     parser.add_argument("--expression_reconstruction_checkpoint", type=str, 
-                       default="/Users/ozgewhiting/Documents/projects/checkpoints_with_keywords8/expression_reconstruction_step_19800.pt",
+                       default="/Users/ozgewhiting/Documents/projects/checkpoints_with_keywords9/expression_reconstruction_step_15000.pt",
                        help="Path to Expression Reconstruction model checkpoint")
     parser.add_argument("--device", type=str, default="cpu", help="Device to run models on")
     parser.add_argument("--max_frames", type=int, default=None, help="Maximum frames to process (for testing)")
