@@ -664,6 +664,12 @@ def train_expression_and_reconstruction(
             num_batches += 1
             current_training_step += 1
             
+            # Periodic memory cleanup (every 50 steps)
+            if current_training_step % 50 == 0 and device.type == "cuda":
+                torch.cuda.empty_cache()
+                import gc
+                gc.collect()
+            
             # Log to TensorBoard
             writer.add_scalar('Training/Total_Loss', loss.item(), current_training_step)
             writer.add_scalar('Training/Learning_Rate', current_lr, current_training_step)
@@ -801,6 +807,9 @@ def train_expression_and_reconstruction(
         # CUDA memory cleanup after each epoch
         if device.type == "cuda":
             torch.cuda.empty_cache()
+            import gc
+            gc.collect()
+            logger.info(f"🧹 Memory cleanup after epoch {epoch+1}")
         
         # Log epoch metrics to TensorBoard
         writer.add_scalar('Training/Epoch_Loss', avg_loss, epoch + 1)
@@ -815,6 +824,12 @@ def train_expression_and_reconstruction(
             
             # Log validation metrics to TensorBoard
             writer.add_scalar('Validation/Epoch_Loss', val_loss, epoch + 1)
+            
+            # Memory cleanup after validation
+            if device.type == "cuda":
+                torch.cuda.empty_cache()
+                import gc
+                gc.collect()
     
     # Removed tensorboard histogram logging to avoid compatibility issues
     
