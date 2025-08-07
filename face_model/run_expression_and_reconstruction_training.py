@@ -10,7 +10,7 @@ import sys
 sys.path.append('.')
 
 # Set CUDA memory allocation configuration to prevent fragmentation
-os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'max_split_size_mb:64,expandable_segments:False'
+os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'max_split_size_mb:64'
 
 from training.train_expression_and_reconstruction import train_expression_and_reconstruction
 
