@@ -10,9 +10,17 @@ import sys
 sys.path.append('.')
 
 # Set CUDA memory allocation configuration to prevent fragmentation
-os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'max_split_size_mb:128'
+os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'max_split_size_mb:64,expandable_segments:False'
 
 from training.train_expression_and_reconstruction import train_expression_and_reconstruction
+
+def cleanup_gpu_memory():
+    """Clean up GPU memory"""
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
+        import gc
+        gc.collect()
 
 def main():
     """Run Joint Expression and Reconstruction Training"""
@@ -29,11 +37,13 @@ def main():
         torch.backends.cudnn.benchmark = True  # Enable for GPU
         if torch.cuda.is_available():
             torch.cuda.empty_cache()  # Clear GPU cache
-            # Limit memory usage to 80% of GPU memory
-            torch.cuda.set_per_process_memory_fraction(0.8)
+            # Limit memory usage to 70% of GPU memory (more conservative)
+            torch.cuda.set_per_process_memory_fraction(0.7)
             # Force garbage collection
             import gc
             gc.collect()
+            # Reset peak memory stats
+            torch.cuda.reset_peak_memory_stats()
     
     # Configuration - Optimized for CPU training
     config = {
@@ -134,6 +144,12 @@ def main():
     print(f"📦 Batch size: {config['training']['batch_size']}")
     print(f"🔄 Epochs: {config['training']['num_epochs']}")
     print(f"💾 Save every: {config['training']['save_every_step']} steps")
+    
+    # Final memory cleanup before training
+    if device.type == "cuda":
+        cleanup_gpu_memory()
+        print(f"🧹 Memory cleanup completed")
+        print(f"💾 Available after cleanup: {(torch.cuda.get_device_properties(0).total_memory - torch.cuda.memory_reserved()) / 1024**3:.1f} GB")
     print(f"🧠 Expression Transformer: {config['expression_transformer']['num_layers']} layers, {config['expression_transformer']['num_heads']} heads")
     print(f"🧠 Expression Reconstruction: {config['expression_reconstruction']['num_cross_attention_layers']} cross layers, {config['expression_reconstruction']['num_self_attention_layers']} self layers, {config['expression_reconstruction']['num_heads']} heads")
     print(f"🧵 Num workers: {config['training']['num_workers']}")
