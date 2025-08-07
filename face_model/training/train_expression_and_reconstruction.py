@@ -631,18 +631,18 @@ def train_expression_and_reconstruction(
                 batch, dinov2_tokenizer, device
             )
 
-            print(f"💾 GPU Memory: {torch.cuda.get_device_name()}")
-            print(f"💾 Total Memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB")
-            print(f"💾 Allocated Memory: {torch.cuda.memory_allocated() / 1024**3:.1f} GB")
-            print(f"💾 Reserved Memory: {torch.cuda.memory_reserved() / 1024**3:.1f} GB")
-            print(f"💾 Free Memory: {(torch.cuda.get_device_properties(0).total_memory - torch.cuda.memory_reserved()) / 1024**3:.1f} GB")
+            #print(f"💾 GPU Memory: {torch.cuda.get_device_name()}")
+            #print(f"💾 Total Memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB")
+            #print(f"💾 Allocated Memory: {torch.cuda.memory_allocated() / 1024**3:.1f} GB")
+            #print(f"💾 Reserved Memory: {torch.cuda.memory_reserved() / 1024**3:.1f} GB")
+            #print(f"💾 Free Memory: {(torch.cuda.get_device_properties(0).total_memory - torch.cuda.memory_reserved()) / 1024**3:.1f} GB")
         
             # Forward pass through joint model
             all_expression_tokens, all_reconstructed_images = joint_model(face_images, subject_ids, dinov2_tokenizer, clip_lengths)
             
-            print(f"💾 After forward pass Allocated Memory: {torch.cuda.memory_allocated() / 1024**3:.1f} GB")
-            print(f"💾 Reserved Memory: {torch.cuda.memory_reserved() / 1024**3:.1f} GB")
-            print(f"💾 Free Memory: {(torch.cuda.get_device_properties(0).total_memory - torch.cuda.memory_reserved()) / 1024**3:.1f} GB")
+            #print(f"💾 After forward pass Allocated Memory: {torch.cuda.memory_allocated() / 1024**3:.1f} GB")
+            #print(f"💾 Reserved Memory: {torch.cuda.memory_reserved() / 1024**3:.1f} GB")
+            #print(f"💾 Free Memory: {(torch.cuda.get_device_properties(0).total_memory - torch.cuda.memory_reserved()) / 1024**3:.1f} GB")
         
             # Prepare data for loss computation
             original_images = []
@@ -666,22 +666,22 @@ def train_expression_and_reconstruction(
             # Compute loss
             loss, loss_components = criterion(original_images, reconstructed_images, expression_tokens_by_clip)
             
-            print(f"💾 After lossAllocated Memory: {torch.cuda.memory_allocated() / 1024**3:.1f} GB")
-            print(f"💾 Reserved Memory: {torch.cuda.memory_reserved() / 1024**3:.1f} GB")
-            print(f"💾 Free Memory: {(torch.cuda.get_device_properties(0).total_memory - torch.cuda.memory_reserved()) / 1024**3:.1f} GB")
+            #print(f"💾 After lossAllocated Memory: {torch.cuda.memory_allocated() / 1024**3:.1f} GB")
+            #print(f"💾 Reserved Memory: {torch.cuda.memory_reserved() / 1024**3:.1f} GB")
+            #print(f"💾 Free Memory: {(torch.cuda.get_device_properties(0).total_memory - torch.cuda.memory_reserved()) / 1024**3:.1f} GB")
         
             # Backward pass
             optimizer.zero_grad()
             
-            print(f"💾 After optimizer Allocated Memory: {torch.cuda.memory_allocated() / 1024**3:.1f} GB")
-            print(f"💾 Reserved Memory: {torch.cuda.memory_reserved() / 1024**3:.1f} GB")
-            print(f"💾 Free Memory: {(torch.cuda.get_device_properties(0).total_memory - torch.cuda.memory_reserved()) / 1024**3:.1f} GB")
+            #print(f"💾 After optimizer Allocated Memory: {torch.cuda.memory_allocated() / 1024**3:.1f} GB")
+            #print(f"💾 Reserved Memory: {torch.cuda.memory_reserved() / 1024**3:.1f} GB")
+            #print(f"💾 Free Memory: {(torch.cuda.get_device_properties(0).total_memory - torch.cuda.memory_reserved()) / 1024**3:.1f} GB")
         
             loss.backward()
 
-            print(f"💾 After loss.backward() Allocated Memory: {torch.cuda.memory_allocated() / 1024**3:.1f} GB")
-            print(f"💾 Reserved Memory: {torch.cuda.memory_reserved() / 1024**3:.1f} GB")
-            print(f"💾 Free Memory: {(torch.cuda.get_device_properties(0).total_memory - torch.cuda.memory_reserved()) / 1024**3:.1f} GB")
+            #print(f"💾 After loss.backward() Allocated Memory: {torch.cuda.memory_allocated() / 1024**3:.1f} GB")
+            #print(f"💾 Reserved Memory: {torch.cuda.memory_reserved() / 1024**3:.1f} GB")
+            #print(f"💾 Free Memory: {(torch.cuda.get_device_properties(0).total_memory - torch.cuda.memory_reserved()) / 1024**3:.1f} GB")
         
             optimizer.step()
             
@@ -689,11 +689,11 @@ def train_expression_and_reconstruction(
             current_lr, current_weights = scheduler.step()
             criterion.update_weights(current_weights)
 
-            print(f"💾 GPU Memory: {torch.cuda.get_device_name()}")
-            print(f"💾 Total Memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB")
-            print(f"💾 Allocated Memory: {torch.cuda.memory_allocated() / 1024**3:.1f} GB")
-            print(f"💾 Reserved Memory: {torch.cuda.memory_reserved() / 1024**3:.1f} GB")
-            print(f"💾 Free Memory: {(torch.cuda.get_device_properties(0).total_memory - torch.cuda.memory_reserved()) / 1024**3:.1f} GB")
+            #print(f"💾 GPU Memory: {torch.cuda.get_device_name()}")
+            #print(f"💾 Total Memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB")
+            #print(f"💾 Allocated Memory: {torch.cuda.memory_allocated() / 1024**3:.1f} GB")
+            #print(f"💾 Reserved Memory: {torch.cuda.memory_reserved() / 1024**3:.1f} GB")
+            #print(f"💾 Free Memory: {(torch.cuda.get_device_properties(0).total_memory - torch.cuda.memory_reserved()) / 1024**3:.1f} GB")
         
             
             # Update metrics
