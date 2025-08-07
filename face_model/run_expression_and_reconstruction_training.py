@@ -64,7 +64,7 @@ def main():
             'warmup_steps': 3000,  # Learning rate warmup steps
             'min_lr': 1e-6,  # Minimum learning rate after decay
             #'batch_size': 1,  # for L4 GPU train-gpu-co 
-            'batch_size': 4,  # for A100 GPU trainer-a100-co 
+            'batch_size': 2,  # for A100 GPU trainer-a100-co 
             'num_epochs': 3,
             'save_every_step': 600,   # Save similarity plots and checkpoints every 300 steps
             'num_workers': 8,  # for L4 GPU (24 GB VRAM) train-gpu-co (it has 16 vCPUs), memory 64GB, 
