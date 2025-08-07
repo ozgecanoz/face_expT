@@ -130,8 +130,8 @@ sudo apt-get install -y htop tmux
 ### **4. Setup Python Environment:**
 ```bash
 # Create virtual environment
-python3 -m venv face_training_env
-source face_training_env/bin/activate
+python3 -m venv myenv
+source myenv/bin/activate
 
 # Install PyTorch (CPU version for CPU VMs, GPU version for GPU VMs)
 pip install torch torchvision torchaudio
