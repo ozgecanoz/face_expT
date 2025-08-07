@@ -29,6 +29,11 @@ def main():
         torch.backends.cudnn.benchmark = True  # Enable for GPU
         if torch.cuda.is_available():
             torch.cuda.empty_cache()  # Clear GPU cache
+            # Limit memory usage to 80% of GPU memory
+            torch.cuda.set_per_process_memory_fraction(0.8)
+            # Force garbage collection
+            import gc
+            gc.collect()
     
     # Configuration - Optimized for CPU training
     config = {
@@ -111,6 +116,15 @@ def main():
     
     print("🚀 Starting Joint Expression and Reconstruction Training")
     print(f"🖥️  Device: {device}")
+    
+    # Print GPU memory info
+    if device.type == "cuda":
+        print(f"💾 GPU Memory: {torch.cuda.get_device_name()}")
+        print(f"💾 Total Memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB")
+        print(f"💾 Allocated Memory: {torch.cuda.memory_allocated() / 1024**3:.1f} GB")
+        print(f"💾 Reserved Memory: {torch.cuda.memory_reserved() / 1024**3:.1f} GB")
+        print(f"💾 Free Memory: {(torch.cuda.get_device_properties(0).total_memory - torch.cuda.memory_reserved()) / 1024**3:.1f} GB")
+    
     print(f"📊 Training Dataset: {config['training']['train_data_dir']}")
     print(f"📊 Validation Dataset: {config['training']['val_data_dir']}")
     print(f"📈 Logs: {config['training']['log_dir']}")
