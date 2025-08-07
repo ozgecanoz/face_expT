@@ -619,12 +619,24 @@ def train_expression_and_reconstruction(
         
         progress_bar = tqdm(dataloader, desc=f"Epoch {epoch+1}/{num_epochs}")
         
+        print(f"💾 GPU Memory: {torch.cuda.get_device_name()}")
+        print(f"💾 Total Memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB")
+        print(f"💾 Allocated Memory: {torch.cuda.memory_allocated() / 1024**3:.1f} GB")
+        print(f"💾 Reserved Memory: {torch.cuda.memory_reserved() / 1024**3:.1f} GB")
+        print(f"💾 Free Memory: {(torch.cuda.get_device_properties(0).total_memory - torch.cuda.memory_reserved()) / 1024**3:.1f} GB")
+        
         for batch_idx, batch in enumerate(progress_bar):
             # Prepare data
             face_images, subject_ids, clip_lengths = prepare_expression_reconstruction_data(
                 batch, dinov2_tokenizer, device
             )
-            
+
+            print(f"💾 GPU Memory: {torch.cuda.get_device_name()}")
+            print(f"💾 Total Memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB")
+            print(f"💾 Allocated Memory: {torch.cuda.memory_allocated() / 1024**3:.1f} GB")
+            print(f"💾 Reserved Memory: {torch.cuda.memory_reserved() / 1024**3:.1f} GB")
+            print(f"💾 Free Memory: {(torch.cuda.get_device_properties(0).total_memory - torch.cuda.memory_reserved()) / 1024**3:.1f} GB")
+        
             # Forward pass through joint model
             all_expression_tokens, all_reconstructed_images = joint_model(face_images, subject_ids, dinov2_tokenizer, clip_lengths)
             
