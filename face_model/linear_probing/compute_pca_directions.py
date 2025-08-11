@@ -31,6 +31,46 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+def validate_dataset_image_size(dataset_path: str, expected_size: int = 518) -> bool:
+    """
+    Validate that the dataset contains images of the expected size
+    
+    Args:
+        dataset_path: Path to the dataset
+        expected_size: Expected image size (518 or 224)
+    
+    Returns:
+        is_valid: True if dataset images match expected size
+    """
+    logger.info(f"Validating dataset image size...")
+    
+    try:
+        # Load a small sample to check image dimensions
+        temp_dataset = FaceDataset(dataset_path, max_samples=10)
+        temp_dataloader = DataLoader(temp_dataset, batch_size=2, shuffle=False)
+        
+        for batch in temp_dataloader:
+            frames = batch['frames'][0]  # Get first clip
+            if frames.numel() > 0:
+                height, width = frames.shape[2], frames.shape[3]
+                logger.info(f"Sample image dimensions: {width}x{height}")
+                
+                if height == expected_size and width == expected_size:
+                    logger.info(f"✅ Dataset images match expected size: {expected_size}x{expected_size}")
+                    return True
+                else:
+                    logger.info(f"⚠️  Dataset images are {width}x{height}, expected {expected_size}x{expected_size}")
+                    logger.info(f"   Images will be automatically resized during processing")
+                    return False
+        
+        logger.warning("Could not determine image dimensions from dataset")
+        return False
+        
+    except Exception as e:
+        logger.warning(f"Could not validate dataset image size: {e}")
+        return False
+
+
 def collect_patch_features(
     dataset_path: str,
     max_samples: Optional[int] = None,
@@ -60,6 +100,9 @@ def collect_patch_features(
     logger.info(f"Image size: {image_size}x{image_size}")
     logger.info(f"Model: {model_name}")
     logger.info(f"Device: {device}")
+    
+    # Validate dataset image size first
+    dataset_has_correct_size = validate_dataset_image_size(dataset_path, image_size)
     
     # Load dataset
     dataset = FaceDataset(dataset_path, max_samples=max_samples)
@@ -124,16 +167,25 @@ def collect_patch_features(
     cpu_transfer_batch_size = 100 if is_gpu else 1  # Transfer to CPU every 100 features on GPU
     
     logger.info("Collecting patch features...")
+    logger.info(f"Processing strategy: {'GPU batch processing' if is_gpu else 'CPU processing'}")
+    if not dataset_has_correct_size:
+        logger.info("Note: Images will be automatically resized during processing")
+    
     for batch_idx, batch in enumerate(tqdm(dataloader, desc="Processing batches")):
-        # Process each clip in the batch
+        # Collect all frames from all clips in this batch
+        all_frames = []
+        all_subject_ids = []
+        all_clip_lengths = []
+        
         for clip_idx, (frames, subject_id) in enumerate(zip(batch['frames'], batch['subject_id'])):
-            # frames: (num_frames, 3, H, W) - may need resizing
+            # frames: (num_frames, 3, H, W) - entire clip
             num_frames = frames.shape[0]
             original_height, original_width = frames.shape[2], frames.shape[3]
             
-            # Check if resizing is needed
+            # Validate input image size - assume dataset has 518x518 but model may need 224x224
             if original_height != image_size or original_width != image_size:
-                logger.info(f"Resizing frames from {original_height}x{original_width} to {image_size}x{image_size}")
+                if batch_idx == 0:  # Only log once per batch
+                    logger.info(f"Resizing frames from {original_height}x{original_width} to {image_size}x{image_size}")
                 # Resize frames using torch.nn.functional.interpolate
                 import torch.nn.functional as F
                 frames_resized = F.interpolate(
@@ -144,70 +196,65 @@ def collect_patch_features(
                     antialias=True
                 )
                 frames = frames_resized
+            else:
+                logger.debug(f"Frames already correct size: {image_size}x{image_size}")
             
-            # Process each frame
-            for frame_idx in range(num_frames):
-                frame = frames[frame_idx:frame_idx+1]  # (1, 3, image_size, image_size)
+            all_frames.append(frames)
+            all_subject_ids.extend([subject_id] * num_frames)
+            all_clip_lengths.append(num_frames)
+        
+        # Process entire batch at once if we have frames
+        if all_frames:
+            try:
+                # Concatenate all frames into one large batch
+                combined_frames = torch.cat(all_frames, dim=0)  # (total_frames, 3, image_size, image_size)
                 
-                try:
-                    # Get DINOv2 patch tokens
-                    with torch.no_grad():
-                        patch_tokens, _ = tokenizer(frame)  # (1, num_patches, embed_dim)
+                # Move ENTIRE batch to GPU at once
+                if is_gpu:
+                    combined_frames = combined_frames.to(device)
+                    logger.debug(f"Batch {batch_idx}: Moved {combined_frames.shape[0]} frames to GPU")
+                
+                # Process ALL frames in one forward pass
+                with torch.no_grad():
+                    all_patch_tokens, _ = tokenizer(combined_frames)  # (total_frames, num_patches, embed_dim)
+                
+                # Now split back by clip and accumulate features
+                start_idx = 0
+                for clip_idx, clip_length in enumerate(all_clip_lengths):
+                    clip_tokens = all_patch_tokens[start_idx:start_idx + clip_length]  # (clip_length, num_patches, embed_dim)
+                    clip_subject_id = batch['subject_id'][clip_idx]
                     
                     # Accumulate features on GPU for batch transfer
                     if is_gpu:
-                        gpu_features.append(patch_tokens.squeeze(0))  # Keep on GPU
+                        gpu_features.append(clip_tokens)  # Keep on GPU
                     else:
                         # For CPU, transfer immediately
-                        patch_features = patch_tokens.squeeze(0).cpu().numpy()
-                        all_patch_features.append(patch_features)
+                        clip_features = clip_tokens.cpu().numpy()
+                        all_patch_features.append(clip_features)
                     
-                    # Store metadata for each patch
-                    for patch_idx in range(patch_tokens.shape[1]):
-                        metadata.append({
-                            'batch_idx': batch_idx,
-                            'clip_idx': clip_idx,
-                            'frame_idx': frame_idx,
-                            'patch_idx': patch_idx,
-                            'subject_id': subject_id,
-                            'total_patches_per_frame': patch_tokens.shape[1],
-                            'image_size': image_size,
-                            'model_name': model_name,
-                            'embed_dim': embed_dim,
-                            'original_size': f"{original_height}x{original_width}",
-                            'resized': original_height != image_size or original_width != image_size
-                        })
-                
-                except torch.cuda.OutOfMemoryError as e:
-                    if is_gpu:
-                        logger.warning(f"GPU OOM at batch {batch_idx}, clip {clip_idx}, frame {frame_idx}. Clearing cache and retrying...")
-                        torch.cuda.empty_cache()
-                        
-                        # Try to process with smaller batches or skip
-                        try:
-                            # Clear accumulated GPU features and transfer to CPU
-                            if gpu_features:
-                                batch_features = torch.cat(gpu_features, dim=0).cpu().numpy()
-                                all_patch_features.extend(batch_features)
-                                gpu_features = []
-                                torch.cuda.empty_cache()
-                            
-                            # Retry with the same frame
-                            with torch.no_grad():
-                                patch_tokens, _ = tokenizer(frame)
-                            
-                            gpu_features.append(patch_tokens.squeeze(0))
-                            logger.info("Successfully recovered from OOM")
-                            
-                        except torch.cuda.OutOfMemoryError:
-                            logger.error(f"Failed to recover from OOM, skipping frame {frame_idx} in clip {clip_idx}")
-                            continue
-                    else:
-                        raise e
+                    # Store metadata for each patch in this clip
+                    for frame_idx in range(clip_length):
+                        for patch_idx in range(clip_tokens.shape[1]):
+                            metadata.append({
+                                'batch_idx': batch_idx,
+                                'clip_idx': clip_idx,
+                                'frame_idx': frame_idx,
+                                'patch_idx': patch_idx,
+                                'subject_id': clip_subject_id,
+                                'total_patches_per_frame': clip_tokens.shape[1],
+                                'image_size': image_size,
+                                'model_name': model_name,
+                                'embed_dim': embed_dim,
+                                'original_size': f"{original_height}x{original_width}",
+                                'resized': original_height != image_size or original_width != image_size
+                            })
+                    
+                    start_idx += clip_length
                 
                 # Batch transfer to CPU for GPU processing
                 if is_gpu and len(gpu_features) >= cpu_transfer_batch_size:
                     try:
+                        # Concatenate all accumulated features
                         batch_features = torch.cat(gpu_features, dim=0).cpu().numpy()
                         all_patch_features.extend(batch_features)
                         gpu_features = []  # Clear GPU memory
@@ -224,6 +271,37 @@ def collect_patch_features(
                         for feature in gpu_features:
                             all_patch_features.append(feature.cpu().numpy())
                         gpu_features = []
+                
+            except torch.cuda.OutOfMemoryError as e:
+                if is_gpu:
+                    logger.warning(f"GPU OOM at batch {batch_idx}. Clearing cache and retrying...")
+                    torch.cuda.empty_cache()
+                    
+                    # Try to process with smaller batches or skip
+                    try:
+                        # Clear accumulated GPU features and transfer to CPU
+                        if gpu_features:
+                            batch_features = torch.cat(gpu_features, dim=0).cpu().numpy()
+                            all_patch_features.extend(batch_features)
+                            gpu_features = []
+                            torch.cuda.empty_cache()
+                        
+                        # Retry with the same batch
+                        combined_frames = torch.cat(all_frames, dim=0).to(device)
+                        with torch.no_grad():
+                            all_patch_tokens, _ = tokenizer(combined_frames)
+                        
+                        logger.info("Successfully recovered from OOM")
+                        
+                    except torch.cuda.OutOfMemoryError:
+                        logger.error(f"Failed to recover from OOM, skipping batch {batch_idx}")
+                        continue
+                else:
+                    raise e
+            
+            except Exception as e:
+                logger.error(f"Error processing batch {batch_idx}: {e}")
+                continue
         
         # Final transfer for this batch if using GPU
         if is_gpu and gpu_features:

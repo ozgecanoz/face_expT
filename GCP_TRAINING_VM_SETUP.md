@@ -134,7 +134,9 @@ python3 -m venv myenv
 source myenv/bin/activate
 
 # Install PyTorch (CPU version for CPU VMs, GPU version for GPU VMs)
-pip install torch torchvision torchaudio
+# dino v2 base required torch 2.1 and torch 2 required min cuda 12
+pip install torch==2.1.2 torchvision==0.16.2 --index-url https://download.pytorch.org/whl/cu121
+
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cu113
 python -c "import torch; print(f'CUDA: {torch.cuda.is_available()}, Version: {torch.version.cuda}')"
 
@@ -149,20 +151,28 @@ pip install google-cloud-storage google-auth
 ```bash
 # Create project directory
 mkdir -p /mnt/dataset-storage/face_model
-cd /mnt/dataset-storage/face_model
+cd /mnt/dataset-storage/face_model   ## or just stay in dataset-storage
 
 # Upload your code (from local machine)
-gcloud compute scp --recurse ./face_model/* face-training-vm:/mnt/dataset-storage/face_model/ --zone=us-central1-a
+#gcloud compute scp --recurse ./face_model/* face-training-vm:/mnt/dataset-storage/face_model/ --zone=us-central1-a
+# get it from git
+git clone git@github.com:ozgecanoz/dataset_utils.git dataset_utils
+
 ```
+### upload key to bucket from local to VM
+gcloud compute scp --recurse /Users/ozgewhiting/Documents/projects/dataset_utils/dataset-uploader-key.json trainer-a100-co-cuda12:/mnt/dataset-storage/ --zone=us-central1-a
+
+gcloud auth activate-service-account --key-file=/path/to/your/service-account-key.json
 
 ### **2. Download Datasets:**
 ```bash
 # Download CCv2 datasets from GCS
 gsutil -m cp -r gs://your-bucket/datasets/CCv2/* /mnt/dataset-storage/datasets/
+gsutil -m cp -r gs://face-training-datasets/CCA_train_db4_no_padding_keywords_offset_1.0/* /mnt/dataset-storage/dbs/CCA_train_db4_no_padding_keywords_offset_1.0/
 
 ## use with a service key:
-gcloud auth activate-service-account --key-file=/path/to/your/service-account-key.json
-gsutil -m cp -r gs://face-training-datasets/CCA_train_db2/* /mnt/dataset-storage/face_model/datasets/CCA_train_db2/
+
+gsutil -m cp -r gs://face-training-datasets/CCA_train_db2/* /mnt/dataset-storage/dbs/CCA_train_db2/
 
 # Or use your multithreaded download script
 python3 batch_download_to_gcs_multithreaded.py --dataset-config CCV2_dataset_urls.json --max-workers 4
