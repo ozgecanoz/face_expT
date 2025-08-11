@@ -18,6 +18,7 @@ import cv2
 from tqdm import tqdm
 import torch
 from torch.utils.data import DataLoader
+import datetime
 
 # Add the project root to the path for imports
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
@@ -325,184 +326,326 @@ class PCAProjectionSerializer:
         video_writer.release()
         logger.info(f"Side-by-side video saved to: {output_path}")
     
-    def serialize_dataset(self, dataset_path: str, output_path: str, max_samples: Optional[int] = None,
-                         batch_size: int = 4, num_workers: int = 0, create_videos: bool = True,
-                         video_output_dir: Optional[str] = None) -> None:
+    def serialize_dataset(self, dataset_path: str, output_dir: str, max_samples: Optional[int] = None,
+                         batch_size: int = 4, num_workers: int = 0, create_videos: bool = True) -> None:
         """
         Serialize PCA-projected features for entire dataset
         
         Args:
-            dataset_path: Path to input dataset
-            output_path: Path to output H5 file
+            dataset_path: Path to input dataset directory containing individual H5 files
+            output_dir: Directory to save individual H5 files and videos
             max_samples: Maximum number of samples to process
             batch_size: Batch size for processing
             num_workers: Number of data loader workers
             create_videos: Whether to create visualization videos
-            video_output_dir: Directory to save videos (if None, uses output_path directory)
         """
         logger.info(f"Starting dataset serialization...")
-        logger.info(f"Input dataset: {dataset_path}")
-        logger.info(f"Output H5 file: {output_path}")
+        logger.info(f"Input dataset directory: {dataset_path}")
+        logger.info(f"Output directory: {output_dir}")
         logger.info(f"Max samples: {max_samples if max_samples else 'All'}")
         logger.info(f"Batch size: {batch_size}")
         logger.info(f"Create videos: {create_videos}")
         
-        # Load dataset
-        dataset = FaceDataset(dataset_path, max_samples=max_samples)
-        dataloader = DataLoader(
-            dataset, 
-            batch_size=batch_size, 
-            shuffle=False,  # Keep order for reproducibility
-            num_workers=num_workers,
-            pin_memory=self.is_gpu,
-            persistent_workers=(num_workers > 0),
-            drop_last=False
-        )
+        # Check if dataset_path is a directory containing H5 files
+        if not os.path.isdir(dataset_path):
+            raise ValueError(f"Dataset path must be a directory: {dataset_path}")
         
-        logger.info(f"Dataset loaded: {len(dataset)} samples, {len(dataloader)} batches")
+        # Find all H5 files in the dataset directory
+        h5_files = []
+        for file in os.listdir(dataset_path):
+            if file.endswith('.h5'):
+                h5_files.append(file)
+        
+        if not h5_files:
+            raise ValueError(f"No H5 files found in dataset directory: {dataset_path}")
+        
+        # Sort files for consistent processing order
+        h5_files.sort()
+        
+        # Limit samples if specified
+        if max_samples:
+            h5_files = h5_files[:max_samples]
+        
+        logger.info(f"Found {len(h5_files)} H5 files to process")
         
         # Create output directory
-        output_dir = os.path.dirname(output_path)
         os.makedirs(output_dir, exist_ok=True)
         
-        # Create video output directory if needed
-        if create_videos:
-            if video_output_dir is None:
-                video_output_dir = os.path.join(output_dir, "visualization_videos")
-            os.makedirs(video_output_dir, exist_ok=True)
-            logger.info(f"Video output directory: {video_output_dir}")
+        # Process batches
+        total_clips = 0
+        total_frames = 0
         
-        # Open H5 file for writing
-        with h5py.File(output_path, 'w') as h5_file:
-            # Create datasets
-            features_group = h5_file.create_group('projected_features')
-            metadata_group = h5_file.create_group('metadata')
+        # Create PCA metadata file
+        pca_metadata_path = os.path.join(output_dir, "pca_metadata.json")
+        pca_metadata = {
+            'n_components': self.n_components,
+            'original_embed_dim': self.original_embed_dim,
+            'projected_dim': self.projected_dim,
+            'pca_explained_variance': self.pca_explained_variance.tolist(),
+            'pca_mean': self.pca_mean.tolist(),
+            'model_name': 'dinov2-base',
+            'input_image_size': 518,
+            'num_patches': 1369,
+            'input_dataset_directory': dataset_path,
+            'input_files_count': len(h5_files),
+            'created_at': str(datetime.datetime.now())
+        }
+        
+        with open(pca_metadata_path, 'w') as f:
+            json.dump(pca_metadata, f, indent=2)
+        
+        logger.info(f"PCA metadata saved to: {pca_metadata_path}")
+        
+        # Process H5 files in batches
+        for batch_idx in range(0, len(h5_files), batch_size):
+            batch_files = h5_files[batch_idx:batch_idx + batch_size]
+            logger.info(f"Processing batch {batch_idx // batch_size + 1}: {len(batch_files)} files")
             
-            # Store PCA metadata
-            pca_metadata = {
-                'n_components': self.n_components,
-                'original_embed_dim': self.original_embed_dim,
-                'projected_dim': self.projected_dim,
-                'pca_explained_variance': self.pca_explained_variance,
-                'pca_mean': self.pca_mean
-            }
-            
-            for key, value in pca_metadata.items():
-                if isinstance(value, np.ndarray):
-                    metadata_group.create_dataset(f'pca_{key}', data=value)
-                else:
-                    metadata_group.attrs[f'pca_{key}'] = value
-            
-            # Process batches
-            total_clips = 0
-            total_frames = 0
-            
-            for batch_idx, batch in enumerate(tqdm(dataloader, desc="Processing batches")):
-                # Process batch
-                projected_features_list, rgb_visualizations = self.process_batch(batch, batch_idx)
-                
-                if not projected_features_list:
-                    logger.warning(f"Skipping batch {batch_idx} due to processing errors")
+            for file_idx, h5_filename in enumerate(batch_files):
+                try:
+                    # Use the H5 filename as the base name (without .h5 extension)
+                    base_name = h5_filename[:-3] if h5_filename.endswith('.h5') else h5_filename
+                    clip_id = base_name
+                    
+                    logger.info(f"Processing {h5_filename} -> {clip_id}")
+                    
+                    # Load the H5 file to get frames
+                    h5_file_path = os.path.join(dataset_path, h5_filename)
+                    
+                    try:
+                        with h5py.File(h5_file_path, 'r') as h5_file:
+                            # Check what datasets are available
+                            available_datasets = list(h5_file.keys())
+                            logger.debug(f"Available datasets in {h5_filename}: {available_datasets}")
+                            
+                            # Look for frames dataset (common names: 'frames', 'face_frames', 'data')
+                            frames_dataset = None
+                            for dataset_name in ['frames', 'face_frames', 'data', 'face_data']:
+                                if dataset_name in h5_file:
+                                    frames_dataset = h5_file[dataset_name]
+                                    break
+                            
+                            if frames_dataset is None:
+                                logger.warning(f"No frames dataset found in {h5_filename}, skipping")
+                                continue
+                            
+                            # Get frames data
+                            frames = frames_dataset[:]  # Load all frames
+                            
+                            # Validate frame dimensions
+                            if len(frames.shape) != 4 or frames.shape[1] != 3:
+                                logger.warning(f"Invalid frame shape in {h5_filename}: {frames.shape}, expected (T, 3, H, W)")
+                                continue
+                            
+                            num_frames, channels, height, width = frames.shape
+                            logger.info(f"Loaded {num_frames} frames with shape {frames.shape} from {h5_filename}")
+                            
+                            # Check if resizing is needed
+                            if height != 518 or width != 518:
+                                logger.info(f"Resizing frames from {height}x{width} to 518x518")
+                                import torch.nn.functional as F
+                                frames_tensor = torch.from_numpy(frames).float()
+                                frames_resized = F.interpolate(
+                                    frames_tensor, 
+                                    size=(518, 518), 
+                                    mode='bilinear', 
+                                    align_corners=False,
+                                    antialias=True
+                                )
+                                frames = frames_resized.numpy()
+                            
+                            # Process frames to get DINOv2 features
+                            try:
+                                # Convert to tensor and move to device
+                                frames_tensor = torch.from_numpy(frames).float()
+                                if self.is_gpu:
+                                    frames_tensor = frames_tensor.to(self.device)
+                                
+                                # Extract DINOv2 features
+                                with torch.no_grad():
+                                    patch_tokens, _ = self.tokenizer(frames_tensor)  # (T, 1369, 768)
+                                
+                                # Process each frame
+                                projected_features_list = []
+                                rgb_visualizations = []
+                                
+                                for frame_idx in range(num_frames):
+                                    frame_tokens = patch_tokens[frame_idx]  # (1369, 768)
+                                    
+                                    # Move to CPU for numpy operations
+                                    frame_tokens_cpu = frame_tokens.cpu().numpy()
+                                    
+                                    # Project to PCA space
+                                    projected_features = self.project_features_to_pca(frame_tokens_cpu)  # (1369, 384)
+                                    projected_features_list.append(projected_features)
+                                    
+                                    # Create RGB visualization
+                                    rgb_viz = self.create_rgb_visualization(frame_tokens_cpu)  # (37, 37, 3)
+                                    rgb_visualizations.append(rgb_viz)
+                                
+                                # Stack features and visualizations
+                                projected_features = np.stack(projected_features_list, axis=0)  # (T, 1369, 384)
+                                rgb_viz = np.stack(rgb_visualizations, axis=0)  # (T, 37, 37, 3)
+                                
+                                # Create individual H5 file for this clip using original filename + _features
+                                clip_h5_path = os.path.join(output_dir, f"{base_name}_features.h5")
+                                
+                                try:
+                                    with h5py.File(clip_h5_path, 'w') as clip_h5:
+                                        # Save projected features
+                                        clip_h5.create_dataset(
+                                            'projected_features', 
+                                            data=projected_features,  # (T, 1369, 384)
+                                            compression='gzip', 
+                                            compression_opts=6
+                                        )
+                                        
+                                        # Save clip metadata
+                                        clip_metadata = {
+                                            'clip_id': clip_id,
+                                            'original_filename': h5_filename,
+                                            'num_frames': projected_features.shape[0],
+                                            'num_patches': projected_features.shape[1],
+                                            'projected_dim': projected_features.shape[2],
+                                            'original_shape': f"({projected_features.shape[0]}, {projected_features.shape[1]}, {projected_features.shape[2]})",
+                                            'input_dataset_directory': dataset_path,
+                                            'created_at': str(datetime.datetime.now())
+                                        }
+                                        
+                                        # Store metadata as attributes
+                                        for key, value in clip_metadata.items():
+                                            clip_h5.attrs[key] = value
+                                        
+                                        # Store PCA metadata reference
+                                        clip_h5.attrs['pca_metadata_file'] = os.path.basename(pca_metadata_path)
+                                        
+                                    logger.debug(f"Saved clip features to: {clip_h5_path}")
+                                    
+                                except Exception as e:
+                                    logger.error(f"Failed to save H5 file for {clip_id}: {e}")
+                                    continue
+                                
+                                # Create visualization video
+                                if create_videos:
+                                    try:
+                                        # Convert frames to HWC format for OpenCV
+                                        frames_hwc = frames.transpose(0, 2, 3, 1)  # (T, 518, 518, 3)
+                                        
+                                        # Create video path directly in output directory
+                                        video_filename = f"{base_name}_pca_visualization.mp4"
+                                        video_path = os.path.join(output_dir, video_filename)
+                                        
+                                        # Create side-by-side video
+                                        self.create_side_by_side_video(
+                                            frames_hwc, rgb_viz, video_path, fps=30
+                                        )
+                                        
+                                    except Exception as e:
+                                        logger.error(f"Failed to create video for {clip_id}: {e}")
+                                
+                                total_clips += 1
+                                total_frames += projected_features.shape[0]
+                                
+                                # GPU memory cleanup
+                                if self.is_gpu:
+                                    torch.cuda.empty_cache()
+                                
+                            except Exception as e:
+                                logger.error(f"Failed to process frames from {h5_filename}: {e}")
+                                continue
+                            
+                    except Exception as e:
+                        logger.error(f"Failed to load H5 file {h5_filename}: {e}")
+                        continue
+                    
+                except Exception as e:
+                    logger.error(f"Error processing file {h5_filename}: {e}")
                     continue
-                
-                # Save features and create videos
-                for clip_idx, (projected_features, rgb_viz) in enumerate(zip(projected_features_list, rgb_visualizations)):
-                    clip_id = f"clip_{total_clips:06d}"
-                    
-                    # Save projected features
-                    features_group.create_dataset(
-                        clip_id, 
-                        data=projected_features,  # (T, 1369, 384)
-                        compression='gzip', 
-                        compression_opts=6
-                    )
-                    
-                    # Save metadata
-                    clip_metadata = {
-                        'clip_id': clip_id,
-                        'num_frames': projected_features.shape[0],
-                        'num_patches': projected_features.shape[1],
-                        'projected_dim': projected_features.shape[2],
-                        'batch_idx': batch_idx,
-                        'clip_idx': clip_idx
-                    }
-                    
-                    for key, value in clip_metadata.items():
-                        metadata_group.attrs[f'{clip_id}_{key}'] = value
-                    
-                    # Create visualization video
-                    if create_videos:
-                        try:
-                            # Get original frames for this clip
-                            clip_frames = batch['frames'][clip_idx]  # (T, 3, 518, 518)
-                            
-                            # Convert to HWC format for OpenCV
-                            clip_frames_hwc = clip_frames.permute(0, 2, 3, 1).numpy()  # (T, 518, 518, 3)
-                            
-                            # Create video path
-                            video_filename = f"{clip_id}_pca_visualization.mp4"
-                            video_path = os.path.join(video_output_dir, video_filename)
-                            
-                            # Create side-by-side video
-                            self.create_side_by_side_video(
-                                clip_frames_hwc, rgb_viz, video_path, fps=30
-                            )
-                            
-                        except Exception as e:
-                            logger.error(f"Failed to create video for {clip_id}: {e}")
-                    
-                    total_clips += 1
-                    total_frames += projected_features.shape[0]
-                
-                # Log progress
-                if batch_idx % 10 == 0:
-                    logger.info(f"Processed {batch_idx + 1}/{len(dataloader)} batches")
-                    logger.info(f"Total clips: {total_clips}, Total frames: {total_frames}")
-                    if self.is_gpu:
-                        logger.info(f"GPU Memory: {torch.cuda.memory_allocated() / 1024**3:.1f} GB")
+            
+            # Log progress
+            logger.info(f"Completed batch {batch_idx // batch_size + 1}")
+            logger.info(f"Total clips processed: {total_clips}, Total frames: {total_frames}")
+            if self.is_gpu:
+                logger.info(f"GPU Memory: {torch.cuda.memory_allocated() / 1024**3:.1f} GB")
+        
+        # Create summary file
+        summary_path = os.path.join(output_dir, "serialization_summary.json")
+        summary = {
+            'total_clips': total_clips,
+            'total_frames': total_frames,
+            'input_dataset_directory': dataset_path,
+            'input_files_processed': len(h5_files),
+            'output_directory': output_dir,
+            'pca_metadata_file': os.path.basename(pca_metadata_path),
+            'batch_size': batch_size,
+            'max_samples': max_samples,
+            'device': str(self.device),
+            'created_at': str(datetime.datetime.now()),
+            'file_structure': {
+                'individual_h5_files': f"{total_clips} files with pattern: {clip_id.split('_')[0]}_features.h5",
+                'visualization_videos': f"{total_clips} files with pattern: {clip_id.split('_')[0]}_pca_visualization.mp4" if create_videos else "No videos created",
+                'pca_metadata': os.path.basename(pca_metadata_path),
+                'summary': os.path.basename(summary_path)
+            }
+        }
+        
+        with open(summary_path, 'w') as f:
+            json.dump(summary, f, indent=2)
         
         logger.info(f"Serialization completed!")
         logger.info(f"Total clips processed: {total_clips}")
         logger.info(f"Total frames processed: {total_frames}")
-        logger.info(f"Output saved to: {output_path}")
+        logger.info(f"Output directory: {output_dir}")
+        logger.info(f"Individual H5 files: {total_clips} files")
         if create_videos:
-            logger.info(f"Videos saved to: {video_output_dir}")
+            logger.info(f"Visualization videos: {total_clips} files")
+        logger.info(f"Summary file: {summary_path}")
+        logger.info(f"PCA metadata: {pca_metadata_path}")
 
 
 def main():
     """Main function"""
-    parser = argparse.ArgumentParser(description="Serialize PCA-projected DINOv2 features")
+    parser = argparse.ArgumentParser(description="Serialize PCA-projected DINOv2 features from face dataset directory")
     
     # Required arguments
     parser.add_argument("--dataset_path", type=str, required=True,
-                       help="Path to input face dataset")
+                       help="Path to input dataset directory containing individual H5 files (e.g., /path/to/CCA_train_db4_no_padding_keywords_offset_1.0/)")
     parser.add_argument("--pca_directions_path", type=str, required=True,
                        help="Path to PCA directions JSON file")
-    parser.add_argument("--output_path", type=str, required=True,
-                       help="Path to output H5 file")
+    parser.add_argument("--output_dir", type=str, required=True,
+                       help="Directory to save individual H5 files and videos")
     
     # Optional arguments
     parser.add_argument("--max_samples", type=int, default=None,
-                       help="Maximum number of samples to process")
+                       help="Maximum number of H5 files to process")
     parser.add_argument("--batch_size", type=int, default=4,
-                       help="Batch size for processing")
+                       help="Batch size for processing (number of H5 files per batch)")
     parser.add_argument("--num_workers", type=int, default=0,
-                       help="Number of data loader workers")
+                       help="Number of data loader workers (not used for H5 file processing)")
     parser.add_argument("--device", type=str, default="cuda",
                        help="Device to use (cuda/cpu)")
     parser.add_argument("--no_videos", action="store_true",
                        help="Skip video creation")
-    parser.add_argument("--video_output_dir", type=str, default=None,
-                       help="Directory to save videos (default: output_path/visualization_videos)")
     
     args = parser.parse_args()
     
     # Validate arguments
     if not os.path.exists(args.dataset_path):
-        raise ValueError(f"Dataset path does not exist: {args.dataset_path}")
+        raise ValueError(f"Dataset directory does not exist: {args.dataset_path}")
+    
+    if not os.path.isdir(args.dataset_path):
+        raise ValueError(f"Dataset path must be a directory: {args.dataset_path}")
     
     if not os.path.exists(args.pca_directions_path):
         raise ValueError(f"PCA directions path does not exist: {args.pca_directions_path}")
+    
+    # Check if directory contains H5 files
+    h5_files = [f for f in os.listdir(args.dataset_path) if f.endswith('.h5')]
+    if not h5_files:
+        raise ValueError(f"No H5 files found in dataset directory: {args.dataset_path}")
+    
+    logger.info(f"Found {len(h5_files)} H5 files in dataset directory")
+    logger.info(f"Sample files: {h5_files[:5]}...")
     
     # Create serializer
     serializer = PCAProjectionSerializer(args.pca_directions_path, args.device)
@@ -510,12 +653,11 @@ def main():
     # Serialize dataset
     serializer.serialize_dataset(
         dataset_path=args.dataset_path,
-        output_path=args.output_path,
+        output_dir=args.output_dir,
         max_samples=args.max_samples,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
-        create_videos=not args.no_videos,
-        video_output_dir=args.video_output_dir
+        create_videos=not args.no_videos
     )
 
 
