@@ -827,17 +827,37 @@ def main():
     
     args = parser.parse_args()
     
-    # Validate arguments
+    # Auto-detect device if requested
+    if args.device == "auto":
+        args.device = "cuda" if torch.cuda.is_available() else "cpu"
+        logger.info(f"Auto-detected device: {args.device}")
+    
+    # Validate arguments with better error messages
+    logger.info(f"Validating arguments...")
+    logger.info(f"Dataset path: {args.dataset_path}")
+    logger.info(f"Output path: {args.output_path}")
+    logger.info(f"Image size: {args.image_size}")
+    logger.info(f"Model name: {args.model_name}")
+    logger.info(f"Device: {args.device}")
+    logger.info(f"Batch size: {args.batch_size}")
+    logger.info(f"Max samples: {args.max_samples}")
+    
     if not os.path.exists(args.dataset_path):
-        raise ValueError(f"Dataset path does not exist: {args.dataset_path}")
+        error_msg = f"Dataset path does not exist: {args.dataset_path}"
+        logger.error(error_msg)
+        logger.error("Please provide a valid --dataset_path argument")
+        raise ValueError(error_msg)
     
     if args.image_size not in [224, 518]:
-        raise ValueError(f"Image size must be 224 or 518, got {args.image_size}")
+        error_msg = f"Image size must be 224 or 518, got {args.image_size}"
+        logger.error(error_msg)
+        raise ValueError(error_msg)
     
     # Create output directory
     output_dir = os.path.dirname(args.output_path)
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)
+        logger.info(f"Created output directory: {output_dir}")
     
     # Collect patch features incrementally to avoid memory issues
     logger.info("Collecting patch features incrementally...")
@@ -975,3 +995,12 @@ def main():
     
     logger.info(f"PCA directions saved to: {args.output_path}")
     logger.info("Processing completed successfully!") 
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as e:
+        logger.error(f"Script failed with error: {e}")
+        logger.error("Please check your arguments and dataset path")
+        raise 
