@@ -1,0 +1,523 @@
+#!/usr/bin/env python3
+"""
+Serialize PCA Projections for Face Dataset
+Processes face clips, extracts DINOv2 features, projects to 384 dimensions using PCA,
+and saves both projected features and visualization videos.
+"""
+
+import os
+import sys
+import json
+import logging
+import argparse
+from pathlib import Path
+from typing import Dict, List, Tuple, Optional
+import numpy as np
+import h5py
+import cv2
+from tqdm import tqdm
+import torch
+from torch.utils.data import DataLoader
+
+# Add the project root to the path for imports
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
+from data.dataset import FaceDataset
+from models.dinov2_tokenizer import DINOv2BaseTokenizer
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+
+class PCAProjectionSerializer:
+    """
+    Serializes PCA-projected DINOv2 features from face datasets
+    """
+    
+    def __init__(self, pca_directions_path: str, device: str = "cuda"):
+        """
+        Initialize the serializer with PCA directions
+        
+        Args:
+            pca_directions_path: Path to PCA directions JSON file
+            device: Device to use for processing
+        """
+        self.device = torch.device(device)
+        self.is_gpu = self.device.type == "cuda"
+        
+        # Load PCA directions
+        logger.info(f"Loading PCA directions from: {pca_directions_path}")
+        with open(pca_directions_path, 'r') as f:
+            pca_data = json.load(f)
+        
+        # Extract PCA components and metadata
+        self.pca_components = np.array(pca_data['pca_components'])  # (n_components, embed_dim)
+        self.pca_mean = np.array(pca_data['pca_mean'])  # (embed_dim,)
+        self.pca_explained_variance = np.array(pca_data['pca_explained_variance'])  # (n_components,)
+        
+        # Validate PCA data
+        self.n_components = self.pca_components.shape[0]
+        self.original_embed_dim = self.pca_components.shape[1]
+        self.projected_dim = 384  # Target dimension
+        
+        logger.info(f"PCA components: {self.pca_components.shape}")
+        logger.info(f"Original embed dim: {self.original_embed_dim}")
+        logger.info(f"Target projected dim: {self.projected_dim}")
+        logger.info(f"Explained variance: {self.pca_explained_variance[:10].sum():.3f} (top 10)")
+        
+        # Initialize DINOv2 base tokenizer
+        logger.info("Initializing DINOv2 base tokenizer...")
+        self.tokenizer = DINOv2BaseTokenizer(device=self.device)
+        
+        # Validate tokenizer configuration
+        actual_embed_dim = self.tokenizer.get_embed_dim()
+        if actual_embed_dim != self.original_embed_dim:
+            raise ValueError(f"PCA embed dim ({self.original_embed_dim}) doesn't match tokenizer ({actual_embed_dim})")
+        
+        # GPU memory optimization
+        if self.is_gpu:
+            torch.cuda.empty_cache()
+            logger.info(f"Initial GPU Memory: {torch.cuda.memory_allocated() / 1024**3:.1f} GB")
+    
+    def project_features_to_pca(self, features: np.ndarray, start_component: int = 0) -> np.ndarray:
+        """
+        Project features to PCA space
+        
+        Args:
+            features: (N, embed_dim) array of features
+            start_component: Starting component index for projection
+        
+        Returns:
+            projected_features: (N, projected_dim) array of projected features
+        """
+        # Center features using PCA mean
+        centered_features = features - self.pca_mean
+        
+        # Project to PCA space using top components
+        end_component = min(start_component + self.projected_dim, self.n_components)
+        components_to_use = self.pca_components[start_component:end_component]  # (projected_dim, embed_dim)
+        
+        # Project: (N, embed_dim) @ (embed_dim, projected_dim) = (N, projected_dim)
+        projected_features = centered_features @ components_to_use.T
+        
+        logger.debug(f"Projected features from {features.shape} to {projected_features.shape}")
+        return projected_features
+    
+    def create_rgb_visualization(self, features: np.ndarray, start_component: int = 0) -> np.ndarray:
+        """
+        Create RGB visualization using top 3 PCA components
+        
+        Args:
+            features: (N, embed_dim) array of features
+            start_component: Starting component index for visualization
+        
+        Returns:
+            rgb_image: (H, W, 3) RGB image
+        """
+        # Project to top 3 components for RGB visualization
+        rgb_projection = self.project_features_to_pca(features, start_component=start_component)[:, :3]
+        
+        # Normalize to 0-1 range
+        rgb_projection = (rgb_projection - rgb_projection.min()) / (rgb_projection.max() - rgb_projection.min() + 1e-8)
+        
+        # Reshape to grid (assuming 37x37 patches for 518x518 images)
+        grid_size = int(np.sqrt(features.shape[0]))
+        if grid_size * grid_size != features.shape[0]:
+            # If not perfect square, pad or truncate
+            grid_size = int(np.sqrt(features.shape[0]))
+            if grid_size * grid_size < features.shape[0]:
+                grid_size += 1
+        
+        # Pad or truncate to fit grid
+        target_size = grid_size * grid_size
+        if rgb_projection.shape[0] < target_size:
+            # Pad with zeros
+            padding = np.zeros((target_size - rgb_projection.shape[0], 3))
+            rgb_projection = np.vstack([rgb_projection, padding])
+        elif rgb_projection.shape[0] > target_size:
+            # Truncate
+            rgb_projection = rgb_projection[:target_size]
+        
+        # Reshape to grid
+        rgb_grid = rgb_projection.reshape(grid_size, grid_size, 3)
+        
+        # Scale to 0-255 and convert to uint8
+        rgb_image = (rgb_grid * 255).astype(np.uint8)
+        
+        return rgb_image
+    
+    def process_batch(self, batch: Dict, batch_idx: int) -> Tuple[List[np.ndarray], List[np.ndarray]]:
+        """
+        Process a batch of clips
+        
+        Args:
+            batch: Batch from dataloader
+            batch_idx: Batch index for logging
+        
+        Returns:
+            projected_features_list: List of projected features per clip
+            rgb_visualizations: List of RGB visualizations per clip
+        """
+        projected_features_list = []
+        rgb_visualizations = []
+        
+        try:
+            # Collect all frames from all clips in this batch
+            all_frames = []
+            all_clip_lengths = []
+            
+            for clip_idx, frames in enumerate(batch['frames']):
+                # frames: (num_frames, 3, 518, 518) - already correct size
+                num_frames = frames.shape[0]
+                all_frames.append(frames)
+                all_clip_lengths.append(num_frames)
+            
+            if all_frames:
+                # Concatenate all frames into one large batch
+                combined_frames = torch.cat(all_frames, dim=0)  # (total_frames, 3, 518, 518)
+                
+                # Move entire batch to GPU
+                if self.is_gpu:
+                    combined_frames = combined_frames.to(self.device)
+                    logger.debug(f"Batch {batch_idx}: Moved {combined_frames.shape[0]} frames to GPU")
+                
+                # Extract DINOv2 features for all frames
+                with torch.no_grad():
+                    all_patch_tokens, _ = self.tokenizer(combined_frames)  # (total_frames, 1369, 768)
+                
+                # Split back by clip and process each
+                start_idx = 0
+                for clip_idx, clip_length in enumerate(all_clip_lengths):
+                    clip_tokens = all_patch_tokens[start_idx:start_idx + clip_length]  # (clip_length, 1369, 768)
+                    
+                    # Process each frame in the clip
+                    clip_projected_features = []
+                    clip_rgb_visualizations = []
+                    
+                    for frame_idx in range(clip_length):
+                        frame_tokens = clip_tokens[frame_idx]  # (1369, 768)
+                        
+                        # Move to CPU for numpy operations
+                        frame_tokens_cpu = frame_tokens.cpu().numpy()
+                        
+                        # Project to PCA space
+                        projected_features = self.project_features_to_pca(frame_tokens_cpu)  # (1369, 384)
+                        clip_projected_features.append(projected_features)
+                        
+                        # Create RGB visualization
+                        rgb_viz = self.create_rgb_visualization(frame_tokens_cpu)  # (37, 37, 3)
+                        clip_rgb_visualizations.append(rgb_viz)
+                    
+                    # Stack features for this clip
+                    clip_projected_features = np.stack(clip_projected_features, axis=0)  # (clip_length, 1369, 384)
+                    projected_features_list.append(clip_projected_features)
+                    
+                    # Stack RGB visualizations for this clip
+                    clip_rgb_viz = np.stack(clip_rgb_visualizations, axis=0)  # (clip_length, 37, 37, 3)
+                    rgb_visualizations.append(clip_rgb_viz)
+                    
+                    start_idx += clip_length
+                
+                # GPU memory cleanup
+                if self.is_gpu:
+                    torch.cuda.empty_cache()
+                    
+        except torch.cuda.OutOfMemoryError as e:
+            if self.is_gpu:
+                logger.warning(f"GPU OOM at batch {batch_idx}. Clearing cache and retrying...")
+                torch.cuda.empty_cache()
+                
+                # Try to process with smaller batches or skip
+                try:
+                    # Process clips one by one to reduce memory usage
+                    for clip_idx, frames in enumerate(batch['frames']):
+                        clip_projected_features = []
+                        clip_rgb_visualizations = []
+                        
+                        for frame_idx in range(frames.shape[0]):
+                            frame = frames[frame_idx:frame_idx+1].to(self.device)  # (1, 3, 518, 518)
+                            
+                            with torch.no_grad():
+                                frame_tokens, _ = self.tokenizer(frame)  # (1, 1369, 768)
+                            
+                            frame_tokens_cpu = frame_tokens.squeeze(0).cpu().numpy()  # (1369, 768)
+                            
+                            # Project and visualize
+                            projected_features = self.project_features_to_pca(frame_tokens_cpu)
+                            rgb_viz = self.create_rgb_visualization(frame_tokens_cpu)
+                            
+                            clip_projected_features.append(projected_features)
+                            clip_rgb_visualizations.append(rgb_viz)
+                            
+                            # Clean up frame
+                            del frame, frame_tokens
+                            torch.cuda.empty_cache()
+                        
+                        # Stack for this clip
+                        clip_projected_features = np.stack(clip_projected_features, axis=0)
+                        clip_rgb_viz = np.stack(clip_rgb_visualizations, axis=0)
+                        
+                        projected_features_list.append(clip_projected_features)
+                        rgb_visualizations.append(clip_rgb_viz)
+                    
+                    logger.info("Successfully recovered from OOM with clip-by-clip processing")
+                    
+                except torch.cuda.OutOfMemoryError:
+                    logger.error(f"Failed to recover from OOM, skipping batch {batch_idx}")
+                    return [], []
+            
+            else:
+                raise e
+        
+        except Exception as e:
+            logger.error(f"Error processing batch {batch_idx}: {e}")
+            return [], []
+        
+        return projected_features_list, rgb_visualizations
+    
+    def create_side_by_side_video(self, original_frames: np.ndarray, rgb_visualizations: np.ndarray, 
+                                 output_path: str, fps: int = 30) -> None:
+        """
+        Create side-by-side video of original frames and RGB visualizations
+        
+        Args:
+            original_frames: (T, H, W, 3) original video frames
+            rgb_visualizations: (T, H, W, 3) RGB PCA visualizations
+            output_path: Path to save the video
+            fps: Frames per second
+        """
+        # Ensure frames are uint8
+        if original_frames.dtype != np.uint8:
+            original_frames = np.clip(original_frames, 0, 255).astype(np.uint8)
+        
+        if rgb_visualizations.dtype != np.uint8:
+            rgb_visualizations = np.clip(rgb_visualizations, 0, 255).astype(np.uint8)
+        
+        # Resize RGB visualizations to match original frame height
+        target_height = original_frames.shape[1]
+        target_width = original_frames.shape[2]
+        
+        resized_viz = []
+        for viz in rgb_visualizations:
+            resized = cv2.resize(viz, (target_width, target_height), interpolation=cv2.INTER_LINEAR)
+            resized_viz.append(resized)
+        
+        resized_viz = np.stack(resized_viz, axis=0)
+        
+        # Create side-by-side frames
+        side_by_side_frames = []
+        for orig_frame, viz_frame in zip(original_frames, resized_viz):
+            # Concatenate horizontally
+            combined_frame = np.hstack([orig_frame, viz_frame])
+            side_by_side_frames.append(combined_frame)
+        
+        side_by_side_frames = np.stack(side_by_side_frames, axis=0)
+        
+        # Write video
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        video_writer = cv2.VideoWriter(output_path, fourcc, fps, 
+                                     (side_by_side_frames.shape[2], side_by_side_frames.shape[1]))
+        
+        for frame in side_by_side_frames:
+            video_writer.write(frame)
+        
+        video_writer.release()
+        logger.info(f"Side-by-side video saved to: {output_path}")
+    
+    def serialize_dataset(self, dataset_path: str, output_path: str, max_samples: Optional[int] = None,
+                         batch_size: int = 4, num_workers: int = 0, create_videos: bool = True,
+                         video_output_dir: Optional[str] = None) -> None:
+        """
+        Serialize PCA-projected features for entire dataset
+        
+        Args:
+            dataset_path: Path to input dataset
+            output_path: Path to output H5 file
+            max_samples: Maximum number of samples to process
+            batch_size: Batch size for processing
+            num_workers: Number of data loader workers
+            create_videos: Whether to create visualization videos
+            video_output_dir: Directory to save videos (if None, uses output_path directory)
+        """
+        logger.info(f"Starting dataset serialization...")
+        logger.info(f"Input dataset: {dataset_path}")
+        logger.info(f"Output H5 file: {output_path}")
+        logger.info(f"Max samples: {max_samples if max_samples else 'All'}")
+        logger.info(f"Batch size: {batch_size}")
+        logger.info(f"Create videos: {create_videos}")
+        
+        # Load dataset
+        dataset = FaceDataset(dataset_path, max_samples=max_samples)
+        dataloader = DataLoader(
+            dataset, 
+            batch_size=batch_size, 
+            shuffle=False,  # Keep order for reproducibility
+            num_workers=num_workers,
+            pin_memory=self.is_gpu,
+            persistent_workers=(num_workers > 0),
+            drop_last=False
+        )
+        
+        logger.info(f"Dataset loaded: {len(dataset)} samples, {len(dataloader)} batches")
+        
+        # Create output directory
+        output_dir = os.path.dirname(output_path)
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Create video output directory if needed
+        if create_videos:
+            if video_output_dir is None:
+                video_output_dir = os.path.join(output_dir, "visualization_videos")
+            os.makedirs(video_output_dir, exist_ok=True)
+            logger.info(f"Video output directory: {video_output_dir}")
+        
+        # Open H5 file for writing
+        with h5py.File(output_path, 'w') as h5_file:
+            # Create datasets
+            features_group = h5_file.create_group('projected_features')
+            metadata_group = h5_file.create_group('metadata')
+            
+            # Store PCA metadata
+            pca_metadata = {
+                'n_components': self.n_components,
+                'original_embed_dim': self.original_embed_dim,
+                'projected_dim': self.projected_dim,
+                'pca_explained_variance': self.pca_explained_variance,
+                'pca_mean': self.pca_mean
+            }
+            
+            for key, value in pca_metadata.items():
+                if isinstance(value, np.ndarray):
+                    metadata_group.create_dataset(f'pca_{key}', data=value)
+                else:
+                    metadata_group.attrs[f'pca_{key}'] = value
+            
+            # Process batches
+            total_clips = 0
+            total_frames = 0
+            
+            for batch_idx, batch in enumerate(tqdm(dataloader, desc="Processing batches")):
+                # Process batch
+                projected_features_list, rgb_visualizations = self.process_batch(batch, batch_idx)
+                
+                if not projected_features_list:
+                    logger.warning(f"Skipping batch {batch_idx} due to processing errors")
+                    continue
+                
+                # Save features and create videos
+                for clip_idx, (projected_features, rgb_viz) in enumerate(zip(projected_features_list, rgb_visualizations)):
+                    clip_id = f"clip_{total_clips:06d}"
+                    
+                    # Save projected features
+                    features_group.create_dataset(
+                        clip_id, 
+                        data=projected_features,  # (T, 1369, 384)
+                        compression='gzip', 
+                        compression_opts=6
+                    )
+                    
+                    # Save metadata
+                    clip_metadata = {
+                        'clip_id': clip_id,
+                        'num_frames': projected_features.shape[0],
+                        'num_patches': projected_features.shape[1],
+                        'projected_dim': projected_features.shape[2],
+                        'batch_idx': batch_idx,
+                        'clip_idx': clip_idx
+                    }
+                    
+                    for key, value in clip_metadata.items():
+                        metadata_group.attrs[f'{clip_id}_{key}'] = value
+                    
+                    # Create visualization video
+                    if create_videos:
+                        try:
+                            # Get original frames for this clip
+                            clip_frames = batch['frames'][clip_idx]  # (T, 3, 518, 518)
+                            
+                            # Convert to HWC format for OpenCV
+                            clip_frames_hwc = clip_frames.permute(0, 2, 3, 1).numpy()  # (T, 518, 518, 3)
+                            
+                            # Create video path
+                            video_filename = f"{clip_id}_pca_visualization.mp4"
+                            video_path = os.path.join(video_output_dir, video_filename)
+                            
+                            # Create side-by-side video
+                            self.create_side_by_side_video(
+                                clip_frames_hwc, rgb_viz, video_path, fps=30
+                            )
+                            
+                        except Exception as e:
+                            logger.error(f"Failed to create video for {clip_id}: {e}")
+                    
+                    total_clips += 1
+                    total_frames += projected_features.shape[0]
+                
+                # Log progress
+                if batch_idx % 10 == 0:
+                    logger.info(f"Processed {batch_idx + 1}/{len(dataloader)} batches")
+                    logger.info(f"Total clips: {total_clips}, Total frames: {total_frames}")
+                    if self.is_gpu:
+                        logger.info(f"GPU Memory: {torch.cuda.memory_allocated() / 1024**3:.1f} GB")
+        
+        logger.info(f"Serialization completed!")
+        logger.info(f"Total clips processed: {total_clips}")
+        logger.info(f"Total frames processed: {total_frames}")
+        logger.info(f"Output saved to: {output_path}")
+        if create_videos:
+            logger.info(f"Videos saved to: {video_output_dir}")
+
+
+def main():
+    """Main function"""
+    parser = argparse.ArgumentParser(description="Serialize PCA-projected DINOv2 features")
+    
+    # Required arguments
+    parser.add_argument("--dataset_path", type=str, required=True,
+                       help="Path to input face dataset")
+    parser.add_argument("--pca_directions_path", type=str, required=True,
+                       help="Path to PCA directions JSON file")
+    parser.add_argument("--output_path", type=str, required=True,
+                       help="Path to output H5 file")
+    
+    # Optional arguments
+    parser.add_argument("--max_samples", type=int, default=None,
+                       help="Maximum number of samples to process")
+    parser.add_argument("--batch_size", type=int, default=4,
+                       help="Batch size for processing")
+    parser.add_argument("--num_workers", type=int, default=0,
+                       help="Number of data loader workers")
+    parser.add_argument("--device", type=str, default="cuda",
+                       help="Device to use (cuda/cpu)")
+    parser.add_argument("--no_videos", action="store_true",
+                       help="Skip video creation")
+    parser.add_argument("--video_output_dir", type=str, default=None,
+                       help="Directory to save videos (default: output_path/visualization_videos)")
+    
+    args = parser.parse_args()
+    
+    # Validate arguments
+    if not os.path.exists(args.dataset_path):
+        raise ValueError(f"Dataset path does not exist: {args.dataset_path}")
+    
+    if not os.path.exists(args.pca_directions_path):
+        raise ValueError(f"PCA directions path does not exist: {args.pca_directions_path}")
+    
+    # Create serializer
+    serializer = PCAProjectionSerializer(args.pca_directions_path, args.device)
+    
+    # Serialize dataset
+    serializer.serialize_dataset(
+        dataset_path=args.dataset_path,
+        output_path=args.output_path,
+        max_samples=args.max_samples,
+        batch_size=args.batch_size,
+        num_workers=args.num_workers,
+        create_videos=not args.no_videos,
+        video_output_dir=args.video_output_dir
+    )
+
+
+if __name__ == "__main__":
+    main() 

@@ -550,7 +550,7 @@ def main():
                        default="//mnt/dataset-storage/dbs/CCA_train_db4_keywords_offset_1.0_pca_dirs_base_1000.json", 
                        help="Path to save PCA results")
     parser.add_argument("--max_samples", type=int, 
-                       default=1000, 
+                       default=500, 
                        help="Maximum number of samples to process")
     parser.add_argument("--batch_size", type=int, default=16, 
                        help="Batch size for processing (auto-detect if None)")
