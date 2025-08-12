@@ -626,11 +626,18 @@ def extract_positional_embeddings(tokenizer, device):
     logger.info("Extracting positional embeddings from tokenizer...")
     
     try:
+        # Debug: let's see what type of tokenizer we have
+        logger.info(f"Tokenizer type: {type(tokenizer)}")
+        
         # Check if tokenizer has positional embeddings
         if hasattr(tokenizer, 'model') and hasattr(tokenizer.model, 'embeddings'):
+            logger.info("Found model.embeddings attribute")
+            
             # For Hugging Face models (DINOv2BaseTokenizer)
             if hasattr(tokenizer.model.embeddings, 'position_embeddings'):
-                pos_embeddings = tokenizer.model.embeddings.position_embeddings.weight
+                logger.info("Found position_embeddings attribute")
+                # position_embeddings is a Parameter object, access .data to get the tensor
+                pos_embeddings = tokenizer.model.embeddings.position_embeddings.data
                 logger.info(f"Extracted positional embeddings from Hugging Face model: {pos_embeddings.shape}")
             else:
                 raise RuntimeError("Hugging Face model doesn't have position_embeddings attribute")
@@ -661,6 +668,9 @@ def extract_positional_embeddings(tokenizer, device):
         
     except Exception as e:
         logger.error(f"Failed to extract positional embeddings: {e}")
+        logger.error(f"Exception type: {type(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise RuntimeError(f"Could not extract positional embeddings from tokenizer. This is required for the script to work. Error: {e}")
 
 
@@ -786,26 +796,26 @@ def main():
                        default='dinov2-base',
                        help="Model name to use ('dinov2-base' for Hugging Face model)")
     
-    ''' # for local laptop
+    # for local laptop
     parser.add_argument("--dataset_path", type=str, 
                        default="/Users/ozgewhiting/Documents/EQLabs/datasets_serial/CCA_train_db4_no_padding/CCA_train_db4_no_padding", 
                        help="Path to dataset directory")
     parser.add_argument("--output_path", type=str, 
-                       default="/Users/ozgewhiting/Documents/EQLabs/datasets_serial/CCA_train_db4_no_padding/pca_directions_dinov2_base.json", 
+                       default="/Users/ozgewhiting/Documents/EQLabs/datasets_serial/CCA_train_db4_no_padding/pca_directions_dinov2_base_384.json", 
                        help="Path to save PCA results")
     parser.add_argument("--max_samples", type=int, 
                        default=100, 
                        help="Maximum number of samples to process")
-    parser.add_argument("--batch_size", type=int, default=None, 
+    parser.add_argument("--batch_size", type=int, default=2, 
                        help="Batch size for processing (auto-detect if None)")
-    parser.add_argument("--device", type=str, default="auto", 
+    parser.add_argument("--device", type=str, default="cpu", 
                        help="Device to use (auto/cpu/cuda)")
-    parser.add_argument("--num_workers", type=int, default=None, 
+    parser.add_argument("--num_workers", type=int, default=4, 
                        help="Number of data loader workers (auto-detect if None)")
-    parser.add_argument("--n_components", type=int, default=10,
+    parser.add_argument("--n_components", type=int, default=384,
                        help="Number of PCA components to compute")
-    '''
     
+    '''
     # Cloud/remote defaults
     parser.add_argument("--dataset_path", type=str, 
                        default="/mnt/dataset-storage/dbs/CCA_train_db4_no_padding_keywords_offset_1.0", 
@@ -824,7 +834,7 @@ def main():
                        help="Number of data loader workers")
     parser.add_argument("--n_components", type=int, default=384,
                        help="Number of PCA components to compute")
-    
+    '''
     args = parser.parse_args()
     
     # Auto-detect device if requested

@@ -216,10 +216,28 @@ class DINOv2BaseTokenizer(nn.Module):
         # Extract only patch tokens (skip class token)
         patch_tokens = all_tokens[:, 1:, :]  # (B, num_patches, 768)
         
-        # For positional embeddings, we'll use the model's learned position embeddings
-        # Note: Hugging Face models handle positional embeddings internally
-        # We'll create a dummy positional embedding tensor for compatibility
-        pos_emb = torch.zeros_like(patch_tokens)  # (B, num_patches, 768)
+        # Extract learned positional embeddings from the model
+        # The model has learned positional embeddings that we can access
+        if hasattr(self.model, 'embeddings') and hasattr(self.model.embeddings, 'position_embeddings'):
+            # Get the learned positional embeddings (excluding class token position)
+            learned_pos_emb = self.model.embeddings.position_embeddings  # (num_patches+1, 768)
+            
+            # Handle different possible shapes
+            if len(learned_pos_emb.shape) == 2:
+                # (num_patches+1, 768) - standard case
+                # Skip the first position (class token) and take only patch positions
+                pos_emb = learned_pos_emb[1:, :].unsqueeze(0).expand(B, -1, -1)  # (B, num_patches, 768)
+            elif len(learned_pos_emb.shape) == 3:
+                # (1, num_patches+1, 768) - batch dimension included
+                # Skip the first position (class token) and take only patch positions
+                pos_emb = learned_pos_emb[0, 1:, :].unsqueeze(0).expand(B, -1, -1)  # (B, num_patches, 768)
+            else:
+                logger.warning(f"Unexpected positional embeddings shape: {learned_pos_emb.shape}, using dummy embeddings")
+                pos_emb = torch.zeros_like(patch_tokens)  # (B, num_patches, 768)
+        else:
+            # Fallback to dummy embeddings if learned ones not accessible
+            logger.warning("Could not access learned positional embeddings, using dummy embeddings")
+            pos_emb = torch.zeros_like(patch_tokens)  # (B, num_patches, 768)
         
         return patch_tokens, pos_emb
     
