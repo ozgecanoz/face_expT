@@ -480,14 +480,14 @@ class PCAProjectionSerializer:
                     
                     # Create video visualization
                     if self.create_videos and OPENCV_AVAILABLE:
-                        logger.info(f"🎬 Creating video for {clip_id}...")
+                        # logger.info(f"🎬 Creating video for {clip_id}...")
                         try:
                             # Create base path for video (same as H5 but without extension)
                             video_base_path = os.path.join(self.output_dataset_path, clip_id)
                             video_path = self.create_video_for_clip(clip_features, video_base_path)
                             
                             if video_path:
-                                logger.info(f"🎬 Video created for {clip_id}: {os.path.basename(video_path)}")
+                                # logger.info(f"🎬 Video created for {clip_id}: {os.path.basename(video_path)}")
                                 self.successful_videos += 1
                             else:
                                 logger.warning(f"⚠️ Failed to create video for {clip_id}")
@@ -676,7 +676,7 @@ class PCAProjectionSerializer:
         if fps is None:
             fps = self.video_fps
             
-        logger.info(f"Creating side-by-side video with {len(original_frames)} frames at {fps} FPS")
+        # logger.info(f"Creating side-by-side video with {len(original_frames)} frames at {fps} FPS")
         
         if len(original_frames) == 0:
             logger.warning("No frames to process for video creation")
@@ -704,8 +704,8 @@ class PCAProjectionSerializer:
         orig_height, orig_width = frames_np[0].shape[:2]
         pca_height, pca_width = pca_visualizations[0].shape[:2]
         
-        logger.info(f"Original frame shape: {frames_np[0].shape}, dtype: {frames_np[0].dtype}")
-        logger.info(f"PCA visualization shape: {pca_visualizations[0].shape}, dtype: {pca_visualizations[0].dtype}")
+        # logger.info(f"Original frame shape: {frames_np[0].shape}, dtype: {frames_np[0].dtype}")
+        # logger.info(f"PCA visualization shape: {pca_visualizations[0].shape}, dtype: {pca_visualizations[0].shape}")
         
         # Resize PCA visualization to match original frame height
         target_height = orig_height
@@ -716,9 +716,9 @@ class PCAProjectionSerializer:
         total_width = orig_width + target_width
         out = cv2.VideoWriter(output_path, fourcc, fps, (total_width, target_height))
         
-        logger.info(f"Video dimensions: {total_width}x{target_height}")
-        logger.info(f"Original frame: {orig_width}x{orig_height}")
-        logger.info(f"PCA visualization: {target_width}x{target_height}")
+        #logger.info(f"Video dimensions: {total_width}x{target_height}")
+        #logger.info(f"Original frame: {orig_width}x{orig_height}")
+        #logger.info(f"PCA visualization: {target_width}x{target_height}")
         
         # Process each frame
         for frame_idx, (orig_frame, pca_viz) in enumerate(zip(frames_np, pca_visualizations)):
@@ -736,12 +736,12 @@ class PCAProjectionSerializer:
             # Write frame
             out.write(combined_frame)
             
-            if frame_idx % 10 == 0:
-                logger.info(f"Processed frame {frame_idx}/{len(frames_np)}")
+            #if frame_idx % 10 == 0:
+            #    logger.info(f"Processed frame {frame_idx}/{len(frames_np)}")
         
         # Release video writer
         out.release()
-        logger.info(f"Video saved to: {output_path}")
+        # logger.info(f"Video saved to: {output_path}")
     
     def create_video_for_clip(self, clip_features: Dict, output_base_path: str):
         """
@@ -757,14 +757,14 @@ class PCAProjectionSerializer:
             
         try:
             # Debug: log available keys
-            logger.debug(f"Available keys in clip_features: {list(clip_features.keys())}")
+            # logger.debug(f"Available keys in clip_features: {list(clip_features.keys())}")
             
             # Extract data
             frames = clip_features['frames']  # (T, 3, H, W) tensor
             projected_features = clip_features['projected_features']  # (T, num_patches, projected_dim)
             
-            logger.debug(f"Frames shape: {frames.shape}, dtype: {frames.dtype}")
-            logger.debug(f"Projected features shape: {projected_features.shape}, dtype: {projected_features.dtype}")
+            # logger.debug(f"Frames shape: {frames.shape}, dtype: {frames.dtype}")
+            # logger.debug(f"Projected features shape: {projected_features.shape}, dtype: {projected_features.dtype}")
             
             # Validate data
             if frames is None or projected_features is None:
@@ -789,7 +789,7 @@ class PCAProjectionSerializer:
             # Create side-by-side video
             self.create_side_by_side_video(frames, projected_features, video_path)
             
-            logger.info(f"✅ Video created: {video_path}")
+            # logger.info(f"✅ Video created: {video_path}")
             return video_path
             
         except Exception as e:
@@ -891,6 +891,7 @@ def main():
     # Log video creation status
     if args.create_videos:
         logger.info(f"🎬 Video creation enabled: {args.video_fps} FPS")
+        logger.info("📹 Video creation progress will be logged at DEBUG level")
     else:
         logger.info("📹 Video creation disabled")
     
