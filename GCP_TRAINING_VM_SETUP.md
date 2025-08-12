@@ -1,5 +1,9 @@
 # Google Cloud VM Setup for Model Training
 
+# stop the instance from command line : much better:
+gcloud compute instances stop trainer-a100-co-cuda12 --zone us-central1-a --discard-local-ssd=false
+gcloud compute instances start trainer-a100-co-cuda12 --zone us-central1-a
+
 gcloud auth list
 # make sure to use right account: owhiting@eqlabsai.com
 # gcloud auth login if now, this brings up the chrome browser

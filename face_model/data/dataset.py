@@ -117,6 +117,153 @@ class FaceDataset(Dataset):
             }
 
 
+class FaceFeaturesDataset(Dataset):
+    """
+    Dataset for loading PCA-projected face features from HDF5 files
+    This dataset loads pre-computed DINOv2 features that have been projected to 384 dimensions
+    """
+    
+    def __init__(self, data_dir: str, max_samples: int = None, feature_key: str = 'projected_features'):
+        """
+        Args:
+            data_dir: Directory containing HDF5 files with PCA-projected features
+            max_samples: Maximum number of samples to load (for debugging)
+            feature_key: Key for features in H5 file (default: 'projected_features')
+        """
+        self.data_dir = data_dir
+        self.feature_key = feature_key
+        
+        # Find all HDF5 files (should end with _features.h5)
+        self.h5_files = glob.glob(os.path.join(data_dir, "*_features.h5"))
+        self.h5_files.sort()
+        
+        if max_samples:
+            self.h5_files = self.h5_files[:max_samples]
+        
+        logger.info(f"Found {len(self.h5_files)} feature HDF5 files in {data_dir}")
+        
+        # Group files by subject ID
+        self.subject_groups = self._group_by_subject()
+        logger.info(f"Grouped into {len(self.subject_groups)} subjects")
+        
+        # Create sample list
+        self.samples = self._create_sample_list()
+        logger.info(f"Created {len(self.samples)} samples")
+        
+        # Validate dataset structure
+        self._validate_dataset()
+    
+    def _group_by_subject(self) -> Dict[str, List[str]]:
+        """Group HDF5 files by subject ID"""
+        subject_groups = {}
+        
+        for h5_file in self.h5_files:
+            try:
+                with h5py.File(h5_file, 'r') as f:
+                    subject_id = f['metadata']['subject_id'][()].decode('utf-8')
+                    
+                    if subject_id not in subject_groups:
+                        subject_groups[subject_id] = []
+                    subject_groups[subject_id].append(h5_file)
+                    
+            except Exception as e:
+                logger.warning(f"Could not read subject ID from {h5_file}: {e}")
+                continue
+        
+        return subject_groups
+    
+    def _create_sample_list(self) -> List[Dict]:
+        """Create list of samples for training"""
+        samples = []
+        
+        for subject_id, files in self.subject_groups.items():
+            # For each subject, create samples from their clips
+            for file_path in files:
+                samples.append({
+                    'file_path': file_path,
+                    'subject_id': subject_id
+                })
+        
+        return samples
+    
+    def _validate_dataset(self):
+        """Validate that the dataset has the expected structure"""
+        if len(self.samples) == 0:
+            logger.warning("No samples found in dataset")
+            return
+        
+        # Check first sample to validate structure
+        try:
+            sample = self[0]
+            logger.info(f"Dataset validation successful:")
+            logger.info(f"  Feature shape: {sample['features'].shape}")
+            logger.info(f"  Subject ID: {sample['subject_id']}")
+            logger.info(f"  Feature key: {self.feature_key}")
+        except Exception as e:
+            logger.error(f"Dataset validation failed: {e}")
+            raise
+    
+    def __len__(self):
+        return len(self.samples)
+    
+    def __getitem__(self, idx):
+        """Load a single sample with PCA-projected features"""
+        sample = self.samples[idx]
+        
+        with h5py.File(sample['file_path'], 'r') as f:
+            # Load PCA-projected features
+            features = f['data'][self.feature_key][:]  # (30, 1369, 384)
+            
+            # Convert to tensor
+            features_tensor = torch.from_numpy(features).float()
+            
+            # Load metadata
+            subject_id = f['metadata']['subject_id'][()].decode('utf-8')
+            clip_id = f['metadata']['clip_id'][()].decode('utf-8')
+            
+            # Load additional metadata if available
+            metadata = {}
+            #for key in f['metadata'].keys():
+            #    if key not in ['subject_id', 'clip_id']:
+            #         try:
+            #             value = f['metadata'][key][()]
+            #             metadata[key] = value
+            #         except:
+            #             continue
+            
+            return {
+                'features': features_tensor,  # (30, 1369, 384) - PCA-projected features
+                'subject_id': subject_id,
+                'clip_id': clip_id,
+                'file_path': sample['file_path'],
+                'metadata': metadata
+            }
+    
+    def get_feature_dim(self) -> int:
+        """Get the feature dimension"""
+        if len(self.samples) == 0:
+            return 0
+        
+        with h5py.File(self.samples[0]['file_path'], 'r') as f:
+            return f['data'][self.feature_key].shape[-1]
+    
+    def get_num_patches(self) -> int:
+        """Get the number of patches per frame"""
+        if len(self.samples) == 0:
+            return 0
+        
+        with h5py.File(self.samples[0]['file_path'], 'r') as f:
+            return f['data'][self.feature_key].shape[1]
+    
+    def get_num_frames(self) -> int:
+        """Get the number of frames per clip"""
+        if len(self.samples) == 0:
+            return 0
+        
+        with h5py.File(self.samples[0]['file_path'], 'r') as f:
+            return f['data'][self.feature_key].shape[0]
+
+
 def create_face_dataloader(data_dir: str, batch_size: int = 2, max_samples: int = None, 
                           num_workers: int = 0, pin_memory: bool = False, 
                           persistent_workers: bool = False, drop_last: bool = False):
@@ -136,6 +283,41 @@ def create_face_dataloader(data_dir: str, batch_size: int = 2, max_samples: int 
         DataLoader
     """
     dataset = FaceDataset(data_dir, max_samples)
+    
+    dataloader = DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+        persistent_workers=persistent_workers,
+        drop_last=drop_last
+    )
+    
+    return dataloader
+
+
+def create_face_features_dataloader(data_dir: str, batch_size: int = 2, max_samples: int = None, 
+                                   num_workers: int = 0, pin_memory: bool = False, 
+                                   persistent_workers: bool = False, drop_last: bool = False,
+                                   feature_key: str = 'projected_features'):
+    """
+    Create a DataLoader for PCA-projected face features
+    
+    Args:
+        data_dir: Directory containing HDF5 files with PCA-projected features
+        batch_size: Batch size for training
+        max_samples: Maximum samples to load (for debugging)
+        num_workers: Number of worker processes for data loading
+        pin_memory: Whether to pin memory (use True for GPU training)
+        persistent_workers: Whether to keep workers alive between epochs
+        drop_last: Whether to drop the last incomplete batch
+        feature_key: Key for features in H5 file (default: 'projected_features')
+    
+    Returns:
+        DataLoader
+    """
+    dataset = FaceFeaturesDataset(data_dir, max_samples, feature_key)
     
     dataloader = DataLoader(
         dataset,
@@ -187,5 +369,52 @@ def test_dataset():
     print("✅ Dataset test passed!")
 
 
+def test_features_dataset():
+    """Test the FaceFeaturesDataset loader"""
+    import os
+    
+    # Test with a small dataset
+    data_dir = "/Users/ozgewhiting/Documents/EQLabs/datasets_serial/CCA_train_db4_no_padding/CCA_train_db4_no_padding_features_pca_384/"  # Adjust path as needed
+    
+    if not os.path.exists(data_dir):
+        print(f"Features data directory {data_dir} not found. Please update the path.")
+        return
+    
+    # Create dataset
+    dataset = FaceFeaturesDataset(data_dir, max_samples=5)
+    
+    if len(dataset) == 0:
+        print("No samples found in features dataset")
+        return
+    
+    # Test loading a sample
+    sample = dataset[0]
+    print(f"Sample keys: {sample.keys()}")
+    print(f"Features shape: {sample['features'].shape}")
+    print(f"Subject ID: {sample['subject_id']}")
+    print(f"Clip ID: {sample['clip_id']}")
+    print(f"File path: {sample['file_path']}")
+    print(f"Metadata keys: {list(sample['metadata'].keys())}")
+    
+    # Test dataset properties
+    print(f"Feature dimension: {dataset.get_feature_dim()}")
+    print(f"Number of patches: {dataset.get_num_patches()}")
+    print(f"Number of frames: {dataset.get_num_frames()}")
+    
+    # Test dataloader
+    dataloader = create_face_features_dataloader(data_dir, batch_size=2, max_samples=5)
+    
+    for batch_idx, batch in enumerate(dataloader):
+        print(f"Batch {batch_idx}:")
+        print(f"  Features shape: {batch['features'].shape}")
+        print(f"  Subject IDs: {batch['subject_id']}")
+        print(f"  Clip IDs: {batch['clip_id']}")
+        break
+    
+    print("✅ Features dataset test passed!")
+
+
 if __name__ == "__main__":
-    test_dataset() 
+    test_dataset()
+    print("\n" + "="*50 + "\n")
+    test_features_dataset() 

@@ -65,8 +65,7 @@ class PCAProjectionSerializer:
                  persistent_workers: bool = False,
                  projected_dim: int = 384,
                  create_videos: bool = True,
-                 video_fps: float = 30.0,
-                 save_frames: bool = False):
+                 video_fps: float = 30.0):
         """
         Initialize the PCA projection serializer
         
@@ -82,7 +81,6 @@ class PCAProjectionSerializer:
             projected_dim: Target dimension for PCA projection (default: 384)
             create_videos: Whether to create side-by-side videos (default: True)
             video_fps: FPS for output videos (default: 30.0)
-            save_frames: Whether to save original frames to H5 files (default: False)
         """
         self.input_dataset_path = input_dataset_path
         self.output_dataset_path = output_dataset_path
@@ -95,7 +93,6 @@ class PCAProjectionSerializer:
         self.projected_dim = projected_dim
         self.create_videos = create_videos
         self.video_fps = video_fps
-        self.save_frames = save_frames
         
         # Create output directory
         os.makedirs(output_dataset_path, exist_ok=True)
@@ -391,11 +388,11 @@ class PCAProjectionSerializer:
                 metadata_group = f.create_group('metadata')
                 
                 # Store feature data
-                if self.save_frames:
-                    data_group.create_dataset('frames', 
-                                            data=clip_features['frames'], 
-                                            compression='gzip', 
-                                            compression_opts=9)
+                # Always save frames for reconstruction loss comparison
+                data_group.create_dataset('frames', 
+                                        data=clip_features['frames'], 
+                                        compression='gzip', 
+                                        compression_opts=9)
                 # data_group.create_dataset('patch_tokens', 
                 #                         data=clip_features['patch_tokens'], 
                 #                         compression='gzip', 
@@ -592,7 +589,7 @@ class PCAProjectionSerializer:
                 'compression': 'gzip',
                 'compression_level': 9,
                 'features_per_clip': {
-                    'frames': f"(30, 3, {self.input_size}, {self.input_size})" if self.save_frames else "Not saved",
+                    'frames': f"(30, 3, {self.input_size}, {self.input_size})",
                     'patch_tokens': "Not saved (768-dim original features)",
                     'pos_embeddings': "Not saved (768-dim positional embeddings)",
                     'projected_features': f"(30, {self.num_patches}, {self.projected_dim})"
@@ -815,6 +812,8 @@ def main():
     parser.add_argument("--pca-directions", type=str, 
                        default="/Users/ozgewhiting/Documents/EQLabs/datasets_serial/CCA_train_db4_no_padding/pca_directions_dinov2_base_384.json",
                        help="Path to PCA directions JSON file from compute_pca_directions.py")
+    parser.add_argument("--max-samples", type=int, default=10,
+                       help="Maximum number of samples to process (for debugging)")
     '''
     parser.add_argument("--input-dataset", type=str, 
                        default="/mnt/dataset-storage/dbs/CCA_train_db4_no_padding_keywords_offset_1.0/",
@@ -825,16 +824,15 @@ def main():
     parser.add_argument("--pca-directions", type=str, 
                        default="/mnt/dataset-storage/dbs/pca_directions_dinov2_base_384.json",
                        help="Path to PCA directions JSON file from compute_pca_directions.py")
-
-    
-    # Optional arguments
     parser.add_argument("--max-samples", type=int, default=None,
                        help="Maximum number of samples to process (for debugging)")
-    parser.add_argument("--batch-size", type=int, default=8,
+    
+    # Optional arguments
+    parser.add_argument("--batch-size", type=int, default=16,
                        help="Batch size for processing")
     parser.add_argument("--device", type=str, default="auto",
                        help="Device to use (auto/cuda/cpu)")
-    parser.add_argument("--num-workers", type=int, default=4,
+    parser.add_argument("--num-workers", type=int, default=8,
                        help="Number of data loader workers")
     parser.add_argument("--pin-memory", action="store_true",
                        help="Pin memory for GPU processing")
@@ -846,8 +844,6 @@ def main():
                        help="Create side-by-side videos showing original frames and PCA visualizations")
     parser.add_argument("--no-videos", action="store_true", default=False,
                        help="Disable video creation (overrides --create-videos)")
-    parser.add_argument("--save-frames", action="store_true", default=False,
-                       help="Save original frames to H5 files (increases file size significantly)")
     parser.add_argument("--video-fps", type=float, default=30.0,
                        help="FPS for output videos (default: 30.0)")
     
@@ -884,8 +880,7 @@ def main():
         persistent_workers=args.persistent_workers,
         projected_dim=args.projected_dim,
         create_videos=args.create_videos,
-        video_fps=args.video_fps,
-        save_frames=args.save_frames
+        video_fps=args.video_fps
     )
     
     # Log video creation status
@@ -896,10 +891,7 @@ def main():
         logger.info("📹 Video creation disabled")
     
     # Log frames saving status
-    if args.save_frames:
-        logger.info("💾 Original frames will be saved to H5 files (increases file size)")
-    else:
-        logger.info("💾 Original frames will not be saved to H5 files (saves disk space)")
+    logger.info("💾 Original frames will be saved to H5 files (increases file size)")
     
     # Run serialization
     try:
