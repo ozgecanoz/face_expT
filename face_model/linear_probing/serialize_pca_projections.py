@@ -816,19 +816,19 @@ def main():
                        help="Maximum number of samples to process (for debugging)")
     '''
     parser.add_argument("--input-dataset", type=str, 
-                       default="/mnt/dataset-storage/dbs/CCA_train_db4_no_padding/",
+                       default="/home/jupyter/dbs/CCA_train_db4_no_padding_keywords_offset_1.0/",
                        help="Path to input dataset directory containing H5 files")
     parser.add_argument("--output-dataset", type=str, 
-                       default="/mnt/dataset-storage/dbs/CCA_train_db4_no_padding_features/",
+                       default="/home/jupyter/dbs/CCA_train_db4_no_padding_keywords_offset_1.0_features/",
                        help="Path to output dataset directory for feature H5 files")
     parser.add_argument("--pca-directions", type=str, 
-                       default="/mnt/dataset-storage/dbs/pca_directions_dinov2_base_384.json",
+                       default="/home/jupyter/dbs/pca_directions_dinov2_base_384.json",
                        help="Path to PCA directions JSON file from compute_pca_directions.py")
-    parser.add_argument("--max-samples", type=int, default=100,
+    parser.add_argument("--max-samples", type=int, default=None,
                        help="Maximum number of samples to process (for debugging)")
     
     # Optional arguments
-    parser.add_argument("--batch-size", type=int, default=16,
+    parser.add_argument("--batch-size", type=int, default=32,
                        help="Batch size for processing")
     parser.add_argument("--device", type=str, default="auto",
                        help="Device to use (auto/cuda/cpu)")
