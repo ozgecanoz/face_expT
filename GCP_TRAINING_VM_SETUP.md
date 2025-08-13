@@ -1,4 +1,5 @@
 # Google Cloud VM Setup for Model Training
+du -sh .  --> to see the size of the current directory, du -sh dir_name
 
 # stop the instance from command line : much better:
 gcloud compute instances stop trainer-a100-co-cuda12 --zone us-central1-a --discard-local-ssd=false

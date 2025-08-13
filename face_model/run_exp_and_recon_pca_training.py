@@ -70,9 +70,9 @@ def main():
     config = {
         'training': {
             'train_data_dir': "/Users/ozgewhiting/Documents/EQLabs/datasets_serial/CCA_train_db4_no_padding/CCA_train_db4_no_padding_features_pca_384/",
-            'max_train_samples': None,  # pass None to use all samples for full training
+            'max_train_samples': 5,  # pass None to use all samples for full training
             'val_data_dir': "/Users/ozgewhiting/Documents/EQLabs/datasets_serial/CCA_train_db4_no_padding/CCA_train_db4_no_padding_features_pca_384/",
-            'max_val_samples': None,   # Limit validation samples for testing
+            'max_val_samples': 5,   # Limit validation samples for testing
             'checkpoint_dir': "./checkpoints_pca",
             'expression_transformer_checkpoint_path': None,  # Set to path if you want to load expression transformer
             'expression_reconstruction_checkpoint_path': None,  # Set to path if you want to load expression reconstruction
@@ -81,10 +81,10 @@ def main():
             'learning_rate': 5e-5,
             'warmup_steps': 3000,  # Learning rate warmup steps
             'min_lr': 1e-6,  # Minimum learning rate after decay
-            'batch_size': 4,  # Smaller batch size for CPU training
-            'num_epochs': 3,
+            'batch_size': 1,  # Smaller batch size for CPU training
+            'num_epochs': 2,
             'save_every_step': 100,   # Save similarity plots and checkpoints every 100 steps
-            'num_workers': 2,  # Fewer workers for CPU training
+            'num_workers': 1,  # Fewer workers for CPU training
             'pin_memory': False,  # Disable for CPU training
             'persistent_workers': False,  # Disable for CPU training
             'drop_last': True,  # Consistent batch sizes

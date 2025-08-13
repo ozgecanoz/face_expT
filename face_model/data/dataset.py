@@ -197,6 +197,7 @@ class FaceFeaturesDataset(Dataset):
             sample = self[0]
             logger.info(f"Dataset validation successful:")
             logger.info(f"  Feature shape: {sample['features'].shape}")
+            logger.info(f"  Frames shape: {sample['frames'].shape}")
             logger.info(f"  Subject ID: {sample['subject_id']}")
             logger.info(f"  Feature key: {self.feature_key}")
         except Exception as e:
@@ -217,6 +218,10 @@ class FaceFeaturesDataset(Dataset):
             # Convert to tensor
             features_tensor = torch.from_numpy(features).float()
             
+            # Load original frames for reconstruction loss comparison
+            frames = f['data']['frames'][:]  # (30, 3, 518, 518)
+            frames_tensor = torch.from_numpy(frames).float()
+            
             # Load metadata
             subject_id = f['metadata']['subject_id'][()].decode('utf-8')
             clip_id = f['metadata']['clip_id'][()].decode('utf-8')
@@ -233,6 +238,7 @@ class FaceFeaturesDataset(Dataset):
             
             return {
                 'features': features_tensor,  # (30, 1369, 384) - PCA-projected features
+                'frames': frames_tensor,      # (30, 3, 518, 518) - Original frames for reconstruction loss
                 'subject_id': subject_id,
                 'clip_id': clip_id,
                 'file_path': sample['file_path'],
@@ -262,6 +268,15 @@ class FaceFeaturesDataset(Dataset):
         
         with h5py.File(self.samples[0]['file_path'], 'r') as f:
             return f['data'][self.feature_key].shape[0]
+    
+    def get_frame_dimensions(self) -> Tuple[int, int]:
+        """Get the frame dimensions (height, width)"""
+        if len(self.samples) == 0:
+            return (0, 0)
+        
+        with h5py.File(self.samples[0]['file_path'], 'r') as f:
+            frames = f['data']['frames']
+            return (frames.shape[2], frames.shape[3])  # (height, width)
 
 
 def create_face_dataloader(data_dir: str, batch_size: int = 2, max_samples: int = None, 
@@ -391,6 +406,7 @@ def test_features_dataset():
     sample = dataset[0]
     print(f"Sample keys: {sample.keys()}")
     print(f"Features shape: {sample['features'].shape}")
+    print(f"Frames shape: {sample['frames'].shape}")
     print(f"Subject ID: {sample['subject_id']}")
     print(f"Clip ID: {sample['clip_id']}")
     print(f"File path: {sample['file_path']}")

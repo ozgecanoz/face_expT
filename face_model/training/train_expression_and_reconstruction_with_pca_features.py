@@ -119,9 +119,8 @@ class JointExpressionReconstructionModelWithPCA(nn.Module):
             frame_features = pca_features[t:t+1]  # (1, 1369, 384)
             frame_subject_id = subject_ids[t:t+1]  # (1,)
             
-            # Create positional embeddings (learned delta embeddings from expression transformer)
-            # These are the delta positional embeddings that the model learns
-            frame_pos_embeddings = self.expression_transformer.delta_pos_embed.unsqueeze(0)  # (1, 1369, 384)
+            # Create zero positional embeddings since ExpressionTransformer adds its own delta embeddings
+            frame_pos_embeddings = torch.zeros_like(frame_features)  # (1, 1369, 384)
             
             # Get expression token
             expression_token = self.expression_transformer(
@@ -130,8 +129,8 @@ class JointExpressionReconstructionModelWithPCA(nn.Module):
             
             expression_tokens.append(expression_token)
             
-            # Store adjusted positional embeddings (original + delta)
-            adjusted_pos_embeddings.append(frame_pos_embeddings)
+            # Store adjusted positional embeddings (delta embeddings only, since input was zero)
+            adjusted_pos_embeddings.append(self.expression_transformer.delta_pos_embed)
         
         # Stack expression tokens and adjusted positional embeddings
         expression_tokens = torch.cat(expression_tokens, dim=0)  # (T, 1, 384)
