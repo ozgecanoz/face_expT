@@ -189,7 +189,7 @@ def test_checkpoint_saving_loading():
         print(f"   Checkpoint type: {checkpoint.get('checkpoint_type', 'N/A')}")
         
         # Test config loading
-        loaded_config = load_checkpoint_config(checkpoint_path)
+        checkpoint_data, loaded_config = load_checkpoint_config(checkpoint_path)
         print(f"✅ Config loaded successfully:")
         print(f"   Embed dim: {loaded_config.get('expression_model', {}).get('expr_embed_dim')}")
         print(f"   Num classes: {loaded_config.get('supervised_model', {}).get('num_classes')}")
@@ -296,7 +296,7 @@ def test_training_with_checkpoints():
             print(f"🔄 Testing loading of: {last_checkpoint}")
             
             checkpoint = torch.load(checkpoint_path, map_location='cpu')
-            loaded_config = load_checkpoint_config(checkpoint_path)
+            checkpoint_data, loaded_config = load_checkpoint_config(checkpoint_path)
             
             print(f"✅ Checkpoint loaded successfully:")
             print(f"   Epoch: {checkpoint['epoch']}")
@@ -305,13 +305,13 @@ def test_training_with_checkpoints():
             
             # Reconstruct model from checkpoint
             new_model = ExpTClassifierModel(
-                embed_dim=loaded_config['embed_dim'],
-                num_heads=loaded_config['num_heads'],
-                num_layers=loaded_config['num_layers'],
-                dropout=loaded_config['dropout'],
-                ff_dim=loaded_config['ff_dim'],
-                grid_size=loaded_config['grid_size'],
-                num_classes=loaded_config['num_classes']
+                embed_dim=loaded_config['expression_model']['expr_embed_dim'],
+                num_heads=loaded_config['expression_model']['expr_num_heads'],
+                num_layers=loaded_config['expression_model']['expr_num_layers'],
+                dropout=loaded_config['expression_model']['expr_dropout'],
+                ff_dim=loaded_config['expression_model']['expr_ff_dim'],
+                grid_size=loaded_config['expression_model']['expr_grid_size'],
+                num_classes=loaded_config['supervised_model']['num_classes']
             )
             
             new_model.load_state_dict(checkpoint['expression_transformer_state_dict'])

@@ -335,13 +335,13 @@ def train_expression_transformer_supervised(
             
             # Initialize model with checkpoint config
             model = ExpTClassifierModel(
-                embed_dim=checkpoint_config.get('embed_dim', embed_dim),
-                num_heads=checkpoint_config.get('num_heads', num_heads),
-                num_layers=checkpoint_config.get('num_layers', num_layers),
-                dropout=checkpoint_config.get('dropout', dropout),
-                ff_dim=checkpoint_config.get('ff_dim', ff_dim),
-                grid_size=checkpoint_config.get('grid_size', grid_size),
-                num_classes=checkpoint_config.get('num_classes', num_classes)  # Load from checkpoint config
+                embed_dim=checkpoint_config.get('expression_model', {}).get('expr_embed_dim', embed_dim),
+                num_heads=checkpoint_config.get('expression_model', {}).get('expr_num_heads', num_heads),
+                num_layers=checkpoint_config.get('expression_model', {}).get('expr_num_layers', num_layers),
+                dropout=checkpoint_config.get('expression_model', {}).get('expr_dropout', dropout),
+                ff_dim=checkpoint_config.get('expression_model', {}).get('expr_ff_dim', ff_dim),
+                grid_size=checkpoint_config.get('expression_model', {}).get('expr_grid_size', grid_size),
+                num_classes=checkpoint_config.get('supervised_model', {}).get('num_classes', num_classes)  # Load from checkpoint config
             ).to(device)
             
             # Load model weights
@@ -349,13 +349,13 @@ def train_expression_transformer_supervised(
             logger.info("✅ Expression transformer checkpoint loaded with matching config")
             
             # Update local variables to match checkpoint config
-            embed_dim = checkpoint_config.get('embed_dim', embed_dim)
-            num_heads = checkpoint_config.get('num_heads', num_heads)
-            num_layers = checkpoint_config.get('num_layers', num_layers)
-            dropout = checkpoint_config.get('dropout', dropout)
-            ff_dim = checkpoint_config.get('ff_dim', ff_dim)
-            grid_size = checkpoint_config.get('grid_size', grid_size)
-            num_classes = checkpoint_config.get('num_classes', num_classes)
+            embed_dim = checkpoint_config.get('expression_model', {}).get('expr_embed_dim', embed_dim)
+            num_heads = checkpoint_config.get('expression_model', {}).get('expr_num_heads', num_heads)
+            num_layers = checkpoint_config.get('expression_model', {}).get('expr_num_layers', num_layers)
+            dropout = checkpoint_config.get('expression_model', {}).get('expr_dropout', dropout)
+            ff_dim = checkpoint_config.get('expression_model', {}).get('expr_ff_dim', ff_dim)
+            grid_size = checkpoint_config.get('expression_model', {}).get('expr_grid_size', grid_size)
+            num_classes = checkpoint_config.get('supervised_model', {}).get('num_classes', num_classes)
             
             logger.info(f"Model config from checkpoint:")
             logger.info(f"  - embed_dim: {embed_dim}")
@@ -471,12 +471,12 @@ def train_expression_transformer_supervised(
                     
                     # Create config (use updated values from checkpoint if available)
                     config = create_comprehensive_config(
-                        embed_dim=embed_dim,
-                        num_heads=num_heads,
-                        num_layers=num_layers,
-                        dropout=dropout,
-                        ff_dim=ff_dim,
-                        grid_size=grid_size,
+                        expr_embed_dim=embed_dim,
+                        expr_num_heads=num_heads,
+                        expr_num_layers=num_layers,
+                        expr_dropout=dropout,
+                        expr_ff_dim=ff_dim,
+                        expr_grid_size=grid_size,
                         num_classes=num_classes,
                         learning_rate=learning_rate,
                         batch_size=batch_size,
@@ -514,12 +514,12 @@ def train_expression_transformer_supervised(
                     # Create config for epoch checkpoint if not already created
                     if 'config' not in locals():
                         config = create_comprehensive_config(
-                            embed_dim=embed_dim,
-                            num_heads=num_heads,
-                            num_layers=num_layers,
-                            dropout=dropout,
-                            ff_dim=ff_dim,
-                            grid_size=grid_size,
+                            expr_embed_dim=embed_dim,
+                            expr_num_heads=num_heads,
+                            expr_num_layers=num_layers,
+                            expr_dropout=dropout,
+                            expr_ff_dim=ff_dim,
+                            expr_grid_size=grid_size,
                             num_classes=num_classes,
                             learning_rate=learning_rate,
                             batch_size=batch_size,
