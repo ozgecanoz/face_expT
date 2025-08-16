@@ -39,7 +39,7 @@ def main():
                        help="Training batch size")
     parser.add_argument("--expression-transformer-checkpoint", type=str, default=None,
                        help="Path to expression transformer checkpoint to load")
-    parser.add_argument("--num-epochs", type=int, default=5,
+    parser.add_argument("--num-epochs", type=int, default=10,
                        help="Number of training epochs")
     parser.add_argument("--learning-rate", type=float, default=1e-4,
                        help="Learning rate")
@@ -48,7 +48,7 @@ def main():
     parser.add_argument("--min-lr", type=float, default=1e-6,
                        help="Minimum learning rate")
     
-    parser.add_argument("--save-every-step", type=int, default=500,
+    parser.add_argument("--save-every-step", type=int, default=100,
                        help="Save checkpoints every N steps")
     parser.add_argument("--device", type=str, default="auto",
                        help="Device to use (auto, cpu, cuda, cuda:0, etc.)")

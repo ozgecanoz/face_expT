@@ -254,21 +254,25 @@ def main():
     parser = argparse.ArgumentParser(description="Evaluate supervised expression transformer model")
     
     # Required arguments
-    parser.add_argument("--checkpoint-path", type=str, required=True,
+    parser.add_argument("--checkpoint-path", type=str, 
+    default="/home/jupyter/checkpoints/expression_transformer_checkpoint_supervised.pth",
                        help="Path to model checkpoint")
-    parser.add_argument("--dataset-path", type=str, required=True,
+    parser.add_argument("--dataset-path", type=str, 
+    default="/home/jupyter/dbs/AffectNet_518_test/",
                        help="Path to test dataset directory")
-    parser.add_argument("--pca-json-path", type=str, required=True,
+    parser.add_argument("--pca-json-path", type=str, 
+    default="/home/jupyter/dbs/combined_pca_directions.json",
                        help="Path to PCA projection JSON file")
     
     # Optional arguments
-    parser.add_argument("--output-path", type=str, default="evaluation_results.json",
+    parser.add_argument("--output-path", type=str, 
+    default="/home/jupyter/dbs/expt_supervised_eval_results.json",
                        help="Path to save evaluation results (default: evaluation_results.json)")
-    parser.add_argument("--batch-size", type=int, default=8,
+    parser.add_argument("--batch-size", type=int, default=16,
                        help="Evaluation batch size (default: 8)")
     parser.add_argument("--device", type=str, default="auto",
                        help="Device to use (auto/cpu/cuda)")
-    parser.add_argument("--num-workers", type=int, default=0,
+    parser.add_argument("--num-workers", type=int, default=8,
                        help="Number of data loader workers")
     parser.add_argument("--pin-memory", action="store_true",
                        help="Pin memory for faster GPU transfer")

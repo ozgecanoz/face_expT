@@ -459,8 +459,14 @@ def train_expression_transformer_supervised(
                 writer.add_scalar('Training/Step_Loss', loss.item(), current_training_step)
                 writer.add_scalar('Training/Learning_Rate', scheduler.get_last_lr()[0], current_training_step)
                 
+                # Debug: Log step progress
+                if current_training_step % 10 == 0:  # Log every 10 steps
+                    logger.info(f"📊 Step {current_training_step}: Loss={loss.item():.5f}, LR={scheduler.get_last_lr()[0]:.2e}")
+                    print(f"📊 Step {current_training_step}: Loss={loss.item():.5f}, LR={scheduler.get_last_lr()[0]:.2e}")
+                
                 # Save checkpoint every N steps
                 if current_training_step % save_every_step == 0:
+                    logger.info(f"🔄 Saving checkpoint at step {current_training_step}")
                     checkpoint_path = os.path.join(checkpoint_dir, f"expT_supervised_step_{current_training_step}.pt")
                     
                     # Create config (use updated values from checkpoint if available)
@@ -480,26 +486,58 @@ def train_expression_transformer_supervised(
                         pca_json_path=pca_json_path
                     )
                     
-                    save_checkpoint(
-                        model_state_dict=model.state_dict(),
-                        optimizer_state_dict=optimizer.state_dict(),
-                        scheduler_state_dict=scheduler.state_dict(),
-                        epoch=epoch + 1,
-                        avg_loss=loss.item(),
-                        total_steps=current_training_step,
-                        config=config,
-                        checkpoint_path=checkpoint_path,
-                        checkpoint_type="expression_transformer"
-                    )
+                    try:
+                        save_checkpoint(
+                            model_state_dict=model.state_dict(),
+                            optimizer_state_dict=optimizer.state_dict(),
+                            scheduler_state_dict=scheduler.state_dict(),
+                            epoch=epoch + 1,
+                            avg_loss=loss.item(),
+                            total_steps=current_training_step,
+                            config=config,
+                            checkpoint_path=checkpoint_path,
+                            checkpoint_type="expression_transformer"
+                        )
+                        
+                        logger.info(f"✅ Saved checkpoint: {checkpoint_path}")
+                        print(f"💾 Checkpoint saved: {checkpoint_path}")
+                        
+                    except Exception as e:
+                        logger.error(f"❌ Failed to save checkpoint: {e}")
+                        print(f"❌ Checkpoint save failed: {e}")
+                
+                # Also save a checkpoint every epoch for safety
+                if batch_idx == len(train_dataloader) - 1:  # Last batch of epoch
+                    logger.info(f"🔄 Saving epoch checkpoint at step {current_training_step}")
+                    epoch_checkpoint_path = os.path.join(checkpoint_dir, f"expT_supervised_epoch_{epoch+1}_step_{current_training_step}.pt")
                     
-                    logger.info(f"Saved checkpoint: {checkpoint_path}")
+                    try:
+                        save_checkpoint(
+                            model_state_dict=model.state_dict(),
+                            optimizer_state_dict=optimizer.state_dict(),
+                            scheduler_state_dict=scheduler.state_dict(),
+                            epoch=epoch + 1,
+                            avg_loss=epoch_loss / num_batches,
+                            total_steps=current_training_step,
+                            config=config,
+                            checkpoint_path=epoch_checkpoint_path,
+                            checkpoint_type="expression_transformer"
+                        )
+                        
+                        logger.info(f"✅ Saved epoch checkpoint: {epoch_checkpoint_path}")
+                        print(f"💾 Epoch checkpoint saved: {epoch_checkpoint_path}")
+                        
+                    except Exception as e:
+                        logger.error(f"❌ Failed to save epoch checkpoint: {e}")
+                        print(f"❌ Epoch checkpoint save failed: {e}")
                 
                 # Update progress bar
                 progress_bar.set_postfix({
                     'Loss': f'{loss.item():.5f}',
                     'Avg Loss': f'{epoch_loss / num_batches:.5f}',
                     'LR': f'{scheduler.get_last_lr()[0]:.2e}',
-                    'Step': f'{current_training_step}'
+                    'Step': f'{current_training_step}',
+                    'Next Checkpoint': f'Step {((current_training_step // save_every_step) + 1) * save_every_step}'
                 })
                 
             except Exception as e:
