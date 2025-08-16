@@ -191,17 +191,18 @@ def test_checkpoint_saving_loading():
         # Test config loading
         checkpoint_data, loaded_config = load_checkpoint_config(checkpoint_path)
         print(f"✅ Config loaded successfully:")
-        print(f"   Embed dim: {loaded_config.get('expression_model', {}).get('expr_embed_dim')}")
-        print(f"   Num classes: {loaded_config.get('supervised_model', {}).get('num_classes')}")
+        print(f"   Config structure: {list(loaded_config.keys())}")
+        print(f"   Expression model keys: {list(loaded_config.get('expression_model', {}).keys())}")
+        print(f"   Supervised model keys: {list(loaded_config.get('supervised_model', {}).keys())}")
         
         # Test model reconstruction from checkpoint
         new_model = ExpTClassifierModel(
-            embed_dim=loaded_config['expression_model']['expr_embed_dim'],
-            num_heads=loaded_config['expression_model']['expr_num_heads'],
-            num_layers=loaded_config['expression_model']['expr_num_layers'],
-            dropout=loaded_config['expression_model']['expr_dropout'],
-            ff_dim=loaded_config['expression_model']['expr_ff_dim'],
-            grid_size=loaded_config['expression_model']['expr_grid_size'],
+            embed_dim=loaded_config['expression_model']['embed_dim'],
+            num_heads=loaded_config['expression_model']['num_heads'],
+            num_layers=loaded_config['expression_model']['num_layers'],
+            dropout=loaded_config['expression_model']['dropout'],
+            ff_dim=loaded_config['expression_model']['ff_dim'],
+            grid_size=loaded_config['expression_model']['grid_size'],
             num_classes=loaded_config['supervised_model']['num_classes']
         )
         
@@ -212,7 +213,7 @@ def test_checkpoint_saving_loading():
         # Test forward pass with reconstructed model
         batch_size = 2
         num_patches = 1369
-        embed_dim = loaded_config['expression_model']['expr_embed_dim']
+        embed_dim = loaded_config['expression_model']['embed_dim']
         
         dummy_input = torch.randn(batch_size, num_patches, embed_dim)
         expression_tokens, logits = new_model(dummy_input)
@@ -305,12 +306,12 @@ def test_training_with_checkpoints():
             
             # Reconstruct model from checkpoint
             new_model = ExpTClassifierModel(
-                embed_dim=loaded_config['expression_model']['expr_embed_dim'],
-                num_heads=loaded_config['expression_model']['expr_num_heads'],
-                num_layers=loaded_config['expression_model']['expr_num_layers'],
-                dropout=loaded_config['expression_model']['expr_dropout'],
-                ff_dim=loaded_config['expression_model']['expr_ff_dim'],
-                grid_size=loaded_config['expression_model']['expr_grid_size'],
+                embed_dim=loaded_config['expression_model']['embed_dim'],
+                num_heads=loaded_config['expression_model']['num_heads'],
+                num_layers=loaded_config['expression_model']['num_layers'],
+                dropout=loaded_config['expression_model']['dropout'],
+                ff_dim=loaded_config['expression_model']['ff_dim'],
+                grid_size=loaded_config['expression_model']['grid_size'],
                 num_classes=loaded_config['supervised_model']['num_classes']
             )
             
