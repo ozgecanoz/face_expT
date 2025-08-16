@@ -17,7 +17,7 @@ def main():
     default="/home/jupyter/dbs/AffectNet_518_train/",
                        help="Path to AffectNet dataset directory")
     parser.add_argument("--pca-json-path", type=str, 
-    default="/home/jupyter/dbs/",
+    default="/home/jupyter/dbs/combined_pca_directions.json",
                        help="Path to PCA projection JSON file")
     parser.add_argument("--max-samples", type=int, default=None,
                        help="Maximum number of samples to use")
