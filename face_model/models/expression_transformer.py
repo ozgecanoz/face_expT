@@ -7,40 +7,80 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import logging
+import math
 
 logger = logging.getLogger(__name__)
+
+
+def create_2d_sinusoidal_positional_embeddings(grid_size, embed_dim):
+    """
+    Create fixed 2D sinusoidal positional embeddings for a grid.
+    
+    Args:
+        grid_size: Size of the grid (e.g., 37 for 37x37)
+        embed_dim: Embedding dimension
+    
+    Returns:
+        pos_embeddings: (grid_size * grid_size, embed_dim) - Fixed positional embeddings
+    """
+    pos_embeddings = torch.zeros(grid_size * grid_size, embed_dim)
+    
+    # Create 2D grid coordinates
+    y_pos = torch.arange(grid_size, dtype=torch.float32).unsqueeze(1).expand(grid_size, grid_size)
+    x_pos = torch.arange(grid_size, dtype=torch.float32).unsqueeze(0).expand(grid_size, grid_size)
+    
+    # Flatten coordinates
+    y_pos = y_pos.reshape(-1)  # (1369,)
+    x_pos = x_pos.reshape(-1)  # (1369,)
+    
+    # Create sinusoidal embeddings
+    for i in range(0, embed_dim, 2):
+        if i + 1 < embed_dim:
+            # Even dimensions: sin
+            pos_embeddings[:, i] = torch.sin(x_pos / (10000 ** (i / embed_dim)))
+            pos_embeddings[:, i + 1] = torch.sin(y_pos / (10000 ** ((i + 1) / embed_dim)))
+        else:
+            # Last dimension if odd
+            pos_embeddings[:, i] = torch.sin(x_pos / (10000 ** (i / embed_dim)))
+    
+    return pos_embeddings
 
 
 class ExpressionTransformer(nn.Module):
     """
     Component C: Expression Transformer
-    Input: 1 frame × 1,369 patch tokens (384-dim each) + Subject embedding (384-dim)
+    Input: 1 frame × 1,369 patch tokens (384-dim each)
     Output: 1 expression token (384-dim)
     
     Implements strict attention: Q is learnable and updated by transformer layers,
     while K,V context remains fixed and doesn't get updated.
+    
+    Uses fixed 2D sinusoidal positional embeddings (37x37 grid) + learnable delta embeddings.
+    Subject-invariant: learns to extract expression tokens without knowing subject identity.
     """
     
-    def __init__(self, embed_dim=384, num_heads=8, num_layers=2, dropout=0.1, max_subjects=3500, ff_dim=1536):
+    def __init__(self, embed_dim=384, num_heads=8, num_layers=2, dropout=0.1, ff_dim=1536, grid_size=37):
         super().__init__()
         self.embed_dim = embed_dim
         self.num_heads = num_heads
-        self.max_subjects = max_subjects
         self.num_layers = num_layers
         self.dropout = dropout
         self.num_heads = num_heads
         self.ff_dim = ff_dim
-        
-        # Learnable subject embeddings (replaces face ID model)
-        # Typical usage: 100-1000 subjects for academic datasets, 1000-10000 for commercial
-        self.subject_embeddings = nn.Embedding(max_subjects, embed_dim)
+        self.grid_size = grid_size
+        self.num_patches = grid_size * grid_size  # 1369 for 37x37
         
         # Expression query initialization (learnable)
         self.expression_query = nn.Parameter(torch.randn(1, 1, embed_dim) * 0.02)
 
-        # delta position embeddings (learnable) will be added to Dino's positional embeddings
-        self.delta_pos_embed = nn.Parameter(torch.zeros(1, 1369, embed_dim))
-        nn.init.trunc_normal_(self.delta_pos_embed, std=0.02)
+        # Fixed 2D sinusoidal positional embeddings (frozen)
+        pos_base = create_2d_sinusoidal_positional_embeddings(grid_size, embed_dim)
+        self.register_buffer('pos_base', pos_base)  # (1369, 384) - frozen
+        
+        # Learnable delta positional embeddings (small magnitude)
+        self.delta_pos_embed = nn.Parameter(torch.zeros(1, self.num_patches, embed_dim) * 0.001)
+        # Initialize very close to zero for stable training
+        nn.init.trunc_normal_(self.delta_pos_embed, std=0.001)
         
         # Transformer decoder stack (cross-attends to memory only)
         decoder_layer = nn.TransformerDecoderLayer(
@@ -60,35 +100,32 @@ class ExpressionTransformer(nn.Module):
         
         logger.info(f"Expression Transformer initialized with {num_layers} layers, {num_heads} heads")
         logger.info(f"Feed-forward dimension: {ff_dim}")
-        logger.info(f"Subject embeddings: {max_subjects} subjects, {embed_dim} dimensions")
+        logger.info(f"Grid size: {grid_size}x{grid_size} = {self.num_patches} patches")
+        logger.info(f"Positional embeddings: Fixed base + learnable delta (std=0.001)")
+        logger.info(f"Subject-invariant: No subject embeddings")
         
-    def forward(self, patch_tokens, pos_embeddings, subject_ids):
+    def forward(self, patch_tokens):
         """
         Args:
             patch_tokens: (B, 1369, 384) - 1 frame of patch tokens per batch
-            pos_embeddings: (B, 1369, 384) - Positional embeddings for patches
-            subject_ids: (B,) - Subject IDs for each sample in batch
         
         Returns:
             expression_token: (B, 1, 384) - Expression token
         """
         B, num_patches, embed_dim = patch_tokens.shape
-        
-        # Get subject embeddings for batch
-        subject_embeddings = self.subject_embeddings(subject_ids)  # (B, 384)
-        subject_embeddings = subject_embeddings.unsqueeze(1)  # (B, 1, 384)
+        assert num_patches == self.num_patches, f"Expected {self.num_patches} patches, got {num_patches}"
         
         # Initialize expression query for batch
         query = self.expression_query.expand(B, 1, embed_dim)
         
         # Prepare fixed K,V context (doesn't get updated)
-        # Add positional embeddings to patch tokens
-        #patch_tokens_with_pos = patch_tokens + pos_embeddings
+        # Combine fixed base positional embeddings with learnable delta
+        pos_embeddings = self.pos_base.unsqueeze(0).expand(B, -1, -1)  # (B, 1369, 384)
         patch_tokens_with_pos = patch_tokens + pos_embeddings + self.delta_pos_embed
         
-        # Combine subject_embeddings and patch_tokens for K, V
-        # subject_embeddings: (B, 1, 384), patch_tokens_with_pos: (B, 1369, 384)
-        kv_context = torch.cat([subject_embeddings, patch_tokens_with_pos], dim=1)  # (B, 1370, 384)
+        # Use patch tokens with positional embeddings as K, V context
+        # No subject embeddings - purely expression-based
+        kv_context = patch_tokens_with_pos  # (B, 1369, 384)
         
         # Cross-attend: decoder updates query based on memory
         decoded = self.decoder(tgt=query, memory=kv_context)  # (B, 1, D)
@@ -100,37 +137,31 @@ class ExpressionTransformer(nn.Module):
         
         return expression_token
     
-    def inference(self, patch_tokens, pos_embeddings, subject_ids):
+    def inference(self, patch_tokens):
         """
-        Inference method that returns both expression tokens and subject embeddings
+        Inference method that returns expression tokens
         
         Args:
             patch_tokens: (B, 1369, 384) - 1 frame of patch tokens per batch
-            pos_embeddings: (B, 1369, 384) - Positional embeddings for patches
-            subject_ids: (B,) - Subject IDs for each sample in batch
         
         Returns:
             expression_token: (B, 1, 384) - Expression token
-            subject_embeddings: (B, 1, 384) - Subject embeddings used
         """
         with torch.no_grad():
             B, num_patches, embed_dim = patch_tokens.shape
-            
-            # Get subject embeddings for batch
-            subject_embeddings = self.subject_embeddings(subject_ids)  # (B, 384)
-            subject_embeddings = subject_embeddings.unsqueeze(1)  # (B, 1, 384)
+            assert num_patches == self.num_patches, f"Expected {self.num_patches} patches, got {num_patches}"
             
             # Initialize expression query for batch
             query = self.expression_query.expand(B, 1, embed_dim)
             
             # Prepare fixed K,V context (doesn't get updated)
-            # Add positional embeddings to patch tokens
-            #patch_tokens_with_pos = patch_tokens + pos_embeddings
+            # Combine fixed base positional embeddings with learnable delta
+            pos_embeddings = self.pos_base.unsqueeze(0).expand(B, -1, -1)  # (B, 1369, 384)
             patch_tokens_with_pos = patch_tokens + pos_embeddings + self.delta_pos_embed
             
-            # Combine subject_embeddings and patch_tokens for K, V
-            # subject_embeddings: (B, 1, 384), patch_tokens_with_pos: (B, 1369, 384)
-            kv_context = torch.cat([subject_embeddings, patch_tokens_with_pos], dim=1)  # (B, 1370, 384)
+            # Use patch tokens with positional embeddings as K, V context
+            # No subject embeddings - purely expression-based
+            kv_context = patch_tokens_with_pos  # (B, 1369, 384)
             
             # Cross-attend: decoder updates query based on memory
             decoded = self.decoder(tgt=query, memory=kv_context)  # (B, 1, D)
@@ -142,7 +173,7 @@ class ExpressionTransformer(nn.Module):
             expression_token = self.layer_norm(expression_token)
             expression_token = F.normalize(expression_token, dim=-1)  # (B, 1, D)
             
-            return expression_token, subject_embeddings
+            return expression_token
 
 
 def test_expression_transformer():
@@ -150,7 +181,7 @@ def test_expression_transformer():
     print("🧪 Testing Expression Transformer...")
     
     # Create model
-    model = ExpressionTransformer(embed_dim=384, num_heads=4, num_layers=2, max_subjects=100)
+    model = ExpressionTransformer(embed_dim=384, num_heads=4, num_layers=2, grid_size=37)
     print("✅ Expression Transformer created successfully")
     
     # Test with dummy input
@@ -159,24 +190,26 @@ def test_expression_transformer():
     embed_dim = 384
     
     patch_tokens = torch.randn(batch_size, num_patches, embed_dim)
-    pos_embeddings = torch.randn(batch_size, num_patches, embed_dim)
-    subject_ids = torch.randint(0, model.max_subjects, (batch_size,))
     
     # Forward pass
     model.eval()  # Ensure model is in evaluation mode
-    expression_token_forward = model(patch_tokens, pos_embeddings, subject_ids)
+    expression_token_forward = model(patch_tokens)
     
     print(f"Patch tokens shape: {patch_tokens.shape}")
-    print(f"Positional embeddings shape: {pos_embeddings.shape}")
-    print(f"Subject IDs shape: {subject_ids.shape}")
     print(f"Expression token shape: {expression_token_forward.shape}")
     
     # Test inference method
-    expression_token_inference, subject_embeddings_inference = model.inference(patch_tokens, pos_embeddings, subject_ids)
-    print(f"Inference method result shapes: expression={expression_token_inference.shape}, subject_embeddings={subject_embeddings_inference.shape}")
+    expression_token_inference = model.inference(patch_tokens)
+    print(f"Inference method result shape: {expression_token_inference.shape}")
     
     # Test that forward and inference produce similar results (they should be identical)
     assert torch.allclose(expression_token_forward, expression_token_inference, atol=1e-6), "Forward and inference should produce identical results"
+    
+    # Test positional embeddings
+    print(f"Fixed pos_base shape: {model.pos_base.shape}")
+    print(f"Learnable delta_pos_embed shape: {model.delta_pos_embed.shape}")
+    print(f"pos_base magnitude: {model.pos_base.norm():.4f}")
+    print(f"delta_pos_embed magnitude: {model.delta_pos_embed.norm():.4f}")
     
     print("✅ Expression Transformer test passed!")
 

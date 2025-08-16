@@ -1,6 +1,9 @@
 # Google Cloud VM Setup for Model Training
 du -sh .  --> to see the size of the current directory, du -sh dir_name
 
+# for A100 don't forget to change ownership of the mounted disc after start up
+sudo chown $USER:$USER /home/jupyter
+
 # stop the instance from command line : much better:
 gcloud compute instances stop trainer-a100-co-cuda12 --zone us-central1-a --discard-local-ssd=false
 gcloud compute instances start trainer-a100-co-cuda12 --zone us-central1-a
@@ -93,8 +96,14 @@ sudo mkdir /mnt/dataset-storage
 sudo mount /dev/nvme0n2 /mnt/dataset-storage
 sudo chown $USER:$USER /mnt/dataset-storage
 
-# Make mount permanent
+# Make mount permanent --> this is not SAFE for local SSDs
 echo "/dev/nvme0n2 /mnt/dataset-storage ext4 defaults 0 2" | sudo tee -a /etc/fstab
+
+# Remove the old entry
+sudo sed -i '/\/dev\/nvme0n2/d' /etc/fstab
+
+# Add the safe version
+echo "/dev/nvme0n2 /mnt/dataset-storage ext4 defaults,noatime,nodiratime 0 0" | sudo tee -a /etc/fstab
 ```
 
 ### **3. Install Dependencies:**

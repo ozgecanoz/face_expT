@@ -2,8 +2,45 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
+import logging
 from typing import Optional, Tuple
 
+def orthogonal_rows_qr(num_rows: int, dim: int, *, device=None, dtype=None, seed: int = 0):
+    """Return (num_rows, dim) with orthonormal rows (when num_rows <= dim)."""
+    assert num_rows <= dim, "Cannot have more orthonormal rows than dim."
+    g = torch.Generator(device=device)
+    g.manual_seed(seed)
+    A = torch.randn(dim, num_rows, generator=g, device=device, dtype=dtype)   # (D, S)
+    # Q has orthonormal columns; shape (D, S)
+    Q, _ = torch.linalg.qr(A, mode="reduced")
+    return Q.t().contiguous()   # (S, D) with orthonormal rows
+
+def block_orthogonal_rows(num_rows: int, dim: int, *, device=None, dtype=None, seed: int = 0):
+    g = torch.Generator(device=device); g.manual_seed(seed)
+    blocks = []
+    remaining = num_rows
+    while remaining > 0:
+        m = min(dim, remaining)
+        A = torch.randn(dim, dim, generator=g, device=device, dtype=dtype)
+        Q, _ = torch.linalg.qr(A, mode="reduced")  # (D, D)
+        blocks.append(Q[:m, :])                    # take m rows
+        remaining -= m
+    M = torch.cat(blocks, dim=0)                   # (S, D)
+    # Optional: small random rotation to reduce inter-block alignment
+    R, _ = torch.linalg.qr(torch.randn(dim, dim, generator=g, device=device, dtype=dtype))
+    M = (M @ R).contiguous()
+    return M
+
+def create_subject_bases(max_subjects: int, embed_dim: int, *, seed: int = 0, device=None, dtype=None):
+    """
+    Returns (max_subjects, embed_dim) subject base embeddings.
+    If max_subjects <= embed_dim: orthonormal rows via QR.
+    Else: block-orthonormal rows (orthonormal within each block of size embed_dim).
+    """
+    if max_subjects <= embed_dim:
+        return orthogonal_rows_qr(max_subjects, embed_dim, device=device, dtype=dtype, seed=seed)
+    else:
+        return block_orthogonal_rows(max_subjects, embed_dim, device=device, dtype=dtype, seed=seed)
 
 # TransformerBlock removed - now using nn.TransformerDecoder for both cross and self attention
 
@@ -28,7 +65,8 @@ class ExpressionReconstructionModel(nn.Module):
                  num_self_attention_layers: int = 2,
                  num_heads: int = 8,
                  ff_dim: int = 1536,
-                 dropout: float = 0.1):
+                 dropout: float = 0.1,
+                 max_subjects: int = 3500):
         """
         Args:
             embed_dim: Embedding dimension (default: 384)
@@ -38,11 +76,27 @@ class ExpressionReconstructionModel(nn.Module):
             num_heads: Number of attention heads
             ff_dim: Feed-forward dimension
             dropout: Dropout rate
+            max_subjects: Maximum number of subjects for learnable subject embeddings
         """
         super().__init__()
         
         self.embed_dim = embed_dim
         self.num_patches = num_patches
+        self.max_subjects = max_subjects
+        self.num_cross_attention_layers = num_cross_attention_layers
+        self.num_self_attention_layers = num_self_attention_layers
+        self.num_heads = num_heads
+        self.ff_dim = ff_dim
+        self.dropout = dropout
+        
+        # Fixed orthogonal subject embeddings (frozen)
+        subject_base = create_subject_bases(max_subjects, embed_dim)
+        self.register_buffer('subject_base', subject_base)  # (max_subjects, embed_dim) - frozen
+        
+        # Learnable delta subject embeddings (small magnitude)
+        self.delta_subject_embed = nn.Parameter(torch.zeros(max_subjects, embed_dim) * 0.001)
+        # Initialize very close to zero for stable training
+        nn.init.trunc_normal_(self.delta_subject_embed, std=0.001)
         
         # Learnable patch embeddings (Q vectors)
         self.patch_embeddings = nn.Parameter(torch.randn(1, num_patches, embed_dim) * 0.02)
@@ -72,19 +126,31 @@ class ExpressionReconstructionModel(nn.Module):
         # CNN decoder (reusing OptimizedCNNDecoder)
         self.decoder = OptimizedCNNDecoder(embed_dim)
         
+        logger = logging.getLogger(__name__)
+        logger.info(f"Expression Reconstruction Model initialized with {num_cross_attention_layers} cross-attention layers, {num_self_attention_layers} self-attention layers")
+        logger.info(f"Feed-forward dimension: {ff_dim}")
+        logger.info(f"Subject embeddings: {max_subjects} subjects, {embed_dim} dimensions (orthogonal base + learnable delta)")
+        logger.info(f"Positional embeddings: {num_patches} patches, {embed_dim} dimensions")
+        
     def forward(self, 
-                subject_embedding: torch.Tensor,
+                subject_ids: torch.Tensor,
                 expression_token: torch.Tensor,
                 pos_embeddings: torch.Tensor) -> torch.Tensor:
         """
         Args:
-            subject_embedding: (B, 1, embed_dim) - subject identity embedding
-            expression_token: (B, 1, embed_dim) - expression token
-            pos_embeddings: (B, num_patches, embed_dim) - positional embeddings from DINOv2
+            subject_ids: (B,) - Subject IDs for each sample in batch
+            expression_token: (B, 1, embed_dim) - Expression token
+            pos_embeddings: (B, num_patches, embed_dim) - Positional embeddings
         Returns:
-            torch.Tensor: (B, 3, 518, 518) - reconstructed face image
+            torch.Tensor: (B, 3, 518, 518) - Reconstructed face image
         """
-        B = subject_embedding.shape[0]
+        B = subject_ids.shape[0]
+        
+        # Get subject embeddings: fixed base + learnable delta
+        subject_base_embeddings = self.subject_base[subject_ids]  # (B, embed_dim)
+        subject_delta_embeddings = self.delta_subject_embed[subject_ids]  # (B, embed_dim)
+        subject_embedding = subject_base_embeddings + subject_delta_embeddings  # (B, embed_dim)
+        subject_embedding = subject_embedding.unsqueeze(1)  # (B, 1, embed_dim)
         
         # Initialize patch embeddings with learnable vectors
         patch_vectors = self.patch_embeddings.expand(B, -1, -1)  # (B, num_patches, embed_dim)
@@ -113,6 +179,24 @@ class ExpressionReconstructionModel(nn.Module):
         reconstructed_image = self.decoder(spatial_features)
         
         return reconstructed_image
+    
+    def get_config(self) -> dict:
+        """
+        Get model configuration for checkpointing
+        
+        Returns:
+            dict: Model configuration parameters
+        """
+        return {
+            'embed_dim': self.embed_dim,
+            'num_patches': self.num_patches,
+            'num_cross_attention_layers': self.num_cross_attention_layers,
+            'num_self_attention_layers': self.num_self_attention_layers,
+            'num_heads': self.num_heads,
+            'ff_dim': self.ff_dim,
+            'dropout': self.dropout,
+            'max_subjects': self.max_subjects
+        }
 
 
 def create_expression_reconstruction_model(
@@ -122,7 +206,8 @@ def create_expression_reconstruction_model(
     num_self_attention_layers: int = 2,
     num_heads: int = 8,
     ff_dim: int = 1536,
-    dropout: float = 0.1
+    dropout: float = 0.1,
+    max_subjects: int = 3500
 ) -> ExpressionReconstructionModel:
     """Factory function to create expression reconstruction model"""
     
@@ -133,7 +218,8 @@ def create_expression_reconstruction_model(
         num_self_attention_layers=num_self_attention_layers,
         num_heads=num_heads,
         ff_dim=ff_dim,
-        dropout=dropout
+        dropout=dropout,
+        max_subjects=max_subjects
     )
 
 
@@ -151,26 +237,31 @@ def test_expression_reconstruction_model():
     print(f"✅ Model created successfully")
     print(f"   Embed dim: {model.embed_dim}")
     print(f"   Num patches: {model.num_patches}")
-    print(f"   Cross-attention layers: {len(model.cross_attention_layers)}")
-    print(f"   Self-attention layers: {len(model.self_attention_layers)}")
+    print(f"   Max subjects: {model.max_subjects}")
+    print(f"   Subject embeddings: Fixed orthogonal base + learnable delta")
+    print(f"   Cross-attention layers: {model.num_cross_attention_layers}")
+    print(f"   Self-attention layers: {model.num_self_attention_layers}")
+    print(f"   Num heads: {model.num_heads}")
+    print(f"   FF dim: {model.ff_dim}")
+    print(f"   Dropout: {model.dropout}")
     
     # Create dummy input
     batch_size = 2
     embed_dim = 384
     num_patches = 1369
     
-    subject_embedding = torch.randn(batch_size, 1, embed_dim)
+    subject_ids = torch.randint(0, model.max_subjects, (batch_size,))
     expression_token = torch.randn(batch_size, 1, embed_dim)
     pos_embeddings = torch.randn(batch_size, num_patches, embed_dim)
     
     print(f"✅ Input tensors created:")
-    print(f"   Subject embedding: {subject_embedding.shape}")
+    print(f"   Subject IDs: {subject_ids.shape}")
     print(f"   Expression token: {expression_token.shape}")
     print(f"   Positional embeddings: {pos_embeddings.shape}")
     
     # Forward pass
     with torch.no_grad():
-        reconstructed_image = model(subject_embedding, expression_token, pos_embeddings)
+        reconstructed_image = model(subject_ids, expression_token, pos_embeddings)
     
     print(f"✅ Forward pass successful:")
     print(f"   Output shape: {reconstructed_image.shape}")
@@ -187,12 +278,12 @@ def test_expression_reconstruction_model():
     
     batch_sizes = [1, 4, 8]
     for bs in batch_sizes:
-        subject_emb = torch.randn(bs, 1, embed_dim)
+        subject_ids = torch.randint(0, model.max_subjects, (bs,))
         expr_token = torch.randn(bs, 1, embed_dim)
         pos_emb = torch.randn(bs, num_patches, embed_dim)
         
         with torch.no_grad():
-            output = model(subject_emb, expr_token, pos_emb)
+            output = model(subject_ids, expr_token, pos_emb)
         
         expected_shape = (bs, 3, 518, 518)
         assert output.shape == expected_shape, f"Expected {expected_shape}, got {output.shape}"
@@ -211,10 +302,17 @@ def test_expression_reconstruction_model():
         print(f"   Testing config {i+1}: {config}")
         model_config = ExpressionReconstructionModel(**config)
         
-        with torch.no_grad():
-            output = model_config(subject_embedding, expression_token, pos_embeddings)
+        # Create new inputs for this specific model configuration
+        test_batch_size = 2  # Use consistent batch size for testing
+        test_subject_ids = torch.randint(0, model_config.max_subjects, (test_batch_size,))
+        test_expression_token = torch.randn(test_batch_size, 1, config.get('embed_dim', embed_dim))
+        test_pos_embeddings = torch.randn(test_batch_size, config.get('num_patches', num_patches), config.get('embed_dim', embed_dim))
         
-        assert output.shape == (batch_size, 3, 518, 518), f"Wrong output shape: {output.shape}"
+        with torch.no_grad():
+            output = model_config(test_subject_ids, test_expression_token, test_pos_embeddings)
+        
+        expected_shape = (test_batch_size, 3, 518, 518)
+        assert output.shape == expected_shape, f"Expected {expected_shape}, got {output.shape}"
         print(f"✅ Config {i+1} works correctly")
     
     # Test 4: Parameter count
@@ -226,45 +324,114 @@ def test_expression_reconstruction_model():
     print(f"   Total parameters: {total_params:,}")
     print(f"   Trainable parameters: {trainable_params:,}")
     print(f"   Learnable patch embeddings: {model.patch_embeddings.numel():,}")
+    print(f"   Learnable subject embeddings: {model.delta_subject_embed.numel():,}") # Updated to reflect new learnable delta
     
     # Test 5: Gradient flow
     print("\n📋 Test 5: Gradient flow")
     
     model.train()
-    subject_emb = torch.randn(1, 1, embed_dim, requires_grad=True)
+    subject_ids = torch.randint(0, model.max_subjects, (1,))
     expr_token = torch.randn(1, 1, embed_dim, requires_grad=True)
     pos_emb = torch.randn(1, num_patches, embed_dim)
     
-    output = model(subject_emb, expr_token, pos_emb)
+    output = model(subject_ids, expr_token, pos_emb)
     loss = output.mean()
     loss.backward()
     
-    assert subject_emb.grad is not None, "Gradients not flowing to subject embedding"
+    # Check if gradients are flowing to learnable parameters
+    assert model.delta_subject_embed.grad is not None, "Gradients not flowing to delta subject embeddings"
     assert expr_token.grad is not None, "Gradients not flowing to expression token"
     assert model.patch_embeddings.grad is not None, "Gradients not flowing to patch embeddings"
     
     print("✅ Gradient flow verified")
     
-    # Test 6: Model components
-    print("\n📋 Test 6: Model components")
+    # Test 6: Subject embedding properties
+    print("\n📋 Test 6: Subject embedding properties")
+    
+    # Test orthogonal properties of base embeddings
+    base_embeddings = model.subject_base  # (max_subjects, embed_dim)
+    print(f"   Base subject embeddings shape: {base_embeddings.shape}")
+    print(f"   Base embeddings magnitude: {base_embeddings.norm(dim=-1).mean():.4f}")
+    
+    # Test orthogonality (should be close to 0 for different subjects)
+    if base_embeddings.shape[0] > 1:
+        # Sample a subset of embeddings to avoid memory issues with large max_subjects
+        sample_size = min(100, base_embeddings.shape[0])
+        sample_indices = torch.randperm(base_embeddings.shape[0])[:sample_size]
+        sample_embeddings = base_embeddings[sample_indices]
+        
+        print(f"   Testing orthogonality on sample of {sample_size} embeddings")
+        
+        # Compute pairwise cosine similarities on sample
+        similarities = F.cosine_similarity(
+            sample_embeddings.unsqueeze(1), 
+            sample_embeddings.unsqueeze(0), 
+            dim=-1
+        )
+        # Remove diagonal (self-similarities = 1.0)
+        mask = ~torch.eye(sample_size, dtype=torch.bool)
+        cross_similarities = similarities[mask]
+        print(f"   Base embeddings cross-similarity mean: {cross_similarities.mean():.4f}")
+        print(f"   Base embeddings cross-similarity std: {cross_similarities.std():.4f}")
+        print(f"   Base embeddings max cross-similarity: {cross_similarities.max():.4f}")
+        
+        # Verify orthogonality is reasonable based on dimensions
+        # For large numbers of subjects with small embedding dimensions, 
+        # perfect orthogonality is not possible due to the Johnson-Lindenstrauss lemma
+        max_cross_sim = cross_similarities.abs().max()
+        
+        # More lenient threshold for large subject counts with small embedding dimensions
+        if model.max_subjects > embed_dim:
+            # When max_subjects > embed_dim, we use block-orthogonal embeddings
+            # Allow higher cross-similarity within reasonable bounds
+            threshold = min(0.3, 0.1 + 0.2 * (model.max_subjects / embed_dim))
+        else:
+            # When max_subjects <= embed_dim, we can have true orthogonality
+            threshold = 0.1
+            
+        print(f"   Orthogonality threshold: {threshold:.4f}")
+        print(f"   Max cross-similarity: {max_cross_sim:.4f}")
+        
+        assert max_cross_sim < threshold, f"Base embeddings not sufficiently orthogonal: max cross-similarity {max_cross_sim:.4f} >= threshold {threshold:.4f}"
+        print(f"✅ Orthogonality test passed (threshold: {threshold:.4f})")
+    
+    # Test delta embeddings
+    delta_embeddings = model.delta_subject_embed  # (max_subjects, embed_dim)
+    print(f"   Delta subject embeddings shape: {delta_embeddings.shape}")
+    print(f"   Delta embeddings magnitude: {delta_embeddings.norm(dim=-1).mean():.4f}")
+    
+    print("✅ Subject embedding properties verified")
+    
+    # Test 7: Configuration method
+    print("\n📋 Test 7: Configuration method")
+    
+    config = model.get_config()
+    print(f"   Configuration retrieved: {list(config.keys())}")
+    assert config['embed_dim'] == model.embed_dim, "Config embed_dim mismatch"
+    assert config['num_patches'] == model.num_patches, "Config num_patches mismatch"
+    assert config['max_subjects'] == model.max_subjects, "Config max_subjects mismatch"
+    assert config['num_cross_attention_layers'] == model.num_cross_attention_layers, "Config num_cross_attention_layers mismatch"
+    assert config['num_self_attention_layers'] == model.num_self_attention_layers, "Config num_self_attention_layers mismatch"
+    print("✅ Configuration method works correctly")
+    
+    # Test 8: Model components
+    print("\n📋 Test 8: Model components")
     
     # Test cross-attention block
-    cross_block = model.cross_attention_layers[0]
     query = torch.randn(1, num_patches, embed_dim)
     key_value = torch.randn(1, 2, embed_dim)
     
     with torch.no_grad():
-        cross_output = cross_block(query, key_value)
+        cross_output = model.cross_decoder(query, key_value)
     
     assert cross_output.shape == query.shape, f"Cross-attention output shape mismatch: {cross_output.shape}"
     print("✅ Cross-attention block works")
     
     # Test self-attention block
-    self_block = model.self_attention_layers[0]
     input_tensor = torch.randn(1, num_patches, embed_dim)
     
     with torch.no_grad():
-        self_output = self_block(input_tensor)
+        self_output = model.self_attention_encoder(input_tensor)
     
     assert self_output.shape == input_tensor.shape, f"Self-attention output shape mismatch: {self_output.shape}"
     print("✅ Self-attention block works")

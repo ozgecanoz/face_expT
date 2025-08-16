@@ -115,7 +115,7 @@ def extract_model_config(
     # Extract expression transformer parameters
     if 'expression_model' in config:
         expr_config = config['expression_model']
-        for param_name in ['embed_dim', 'num_heads', 'num_layers', 'dropout', 'max_subjects', 'ff_dim']:
+        for param_name in ['embed_dim', 'num_heads', 'num_layers', 'dropout', 'ff_dim', 'grid_size']:
             if param_name in expr_config:
                 extracted_params[f'expr_{param_name}'] = expr_config[param_name]
                 logger.info(f"Using expression transformer {param_name}: {expr_config[param_name]}")
@@ -134,10 +134,12 @@ def extract_model_config(
     # Extract expression reconstruction parameters
     if 'expression_reconstruction' in config:
         recon_config = config['expression_reconstruction']
-        for param_name in ['embed_dim', 'num_cross_attention_layers', 'num_self_attention_layers', 'num_heads', 'ff_dim', 'dropout']:
+        for param_name in ['embed_dim', 'num_cross_attention_layers', 'num_self_attention_layers', 'num_heads', 'ff_dim', 'dropout', 'max_subjects']:
             if param_name in recon_config:
                 extracted_params[f'recon_{param_name}'] = recon_config[param_name]
                 logger.info(f"Using expression reconstruction {param_name}: {recon_config[param_name]}")
+                # Note: max_subjects now controls both fixed base and learnable delta embeddings
+                # All parameters are now properly stored in model config for checkpointing
     
     # Extract loss function parameters
     if 'loss_function' in config:
@@ -163,8 +165,8 @@ def create_comprehensive_config(
     expr_num_heads: int,
     expr_num_layers: int,
     expr_dropout: float,
-    expr_max_subjects: int,
     expr_ff_dim: int,
+    expr_grid_size: int = 37,
     decoder_embed_dim: int = None,
     decoder_num_heads: int = None,
     decoder_num_layers: int = None,
@@ -185,6 +187,7 @@ def create_comprehensive_config(
     recon_num_heads: int = None,
     recon_ff_dim: int = None,
     recon_dropout: float = None,
+    recon_max_subjects: int = None,
     # Loss parameters (optional)
     lambda_reconstruction: float = None,
     # Scheduler parameters (optional)
@@ -217,8 +220,8 @@ def create_comprehensive_config(
             'num_heads': expr_num_heads,
             'num_layers': expr_num_layers,
             'dropout': expr_dropout,
-            'max_subjects': expr_max_subjects,
-            'ff_dim': expr_ff_dim
+            'ff_dim': expr_ff_dim,
+            'grid_size': expr_grid_size
         }
     }
     
@@ -240,7 +243,8 @@ def create_comprehensive_config(
             'num_self_attention_layers': recon_num_self_layers,
             'num_heads': recon_num_heads,
             'ff_dim': recon_ff_dim,
-            'dropout': recon_dropout
+            'dropout': recon_dropout,
+            'max_subjects': recon_max_subjects if recon_max_subjects is not None else 3500
         }
     
     # Add loss function config

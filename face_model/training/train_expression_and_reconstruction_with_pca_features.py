@@ -43,18 +43,18 @@ class JointExpressionReconstructionModelWithPCA(nn.Module):
     """
     
     def __init__(self, 
-                 expr_embed_dim=384, expr_num_heads=4, expr_num_layers=2, expr_dropout=0.1, expr_max_subjects=3500, expr_ff_dim=1536,
+                 expr_embed_dim=384, expr_num_heads=4, expr_num_layers=2, expr_dropout=0.1, expr_ff_dim=1536, expr_grid_size=37,
                  recon_embed_dim=384, recon_num_cross_layers=2, recon_num_self_layers=2, recon_num_heads=8, recon_ff_dim=1536, recon_dropout=0.1):
         super().__init__()
         
-        # Expression Transformer
+        # Expression Transformer (subject-invariant)
         self.expression_transformer = ExpressionTransformer(
             embed_dim=expr_embed_dim,
             num_heads=expr_num_heads,
             num_layers=expr_num_layers,
             dropout=expr_dropout,
-            max_subjects=expr_max_subjects,
-            ff_dim=expr_ff_dim
+            ff_dim=expr_ff_dim,
+            grid_size=expr_grid_size
         )
         
         # Expression Reconstruction Model
@@ -64,7 +64,8 @@ class JointExpressionReconstructionModelWithPCA(nn.Module):
             num_self_attention_layers=recon_num_self_layers,
             num_heads=recon_num_heads,
             ff_dim=recon_ff_dim,
-            dropout=recon_dropout
+            dropout=recon_dropout,
+            max_subjects=501  # Use same max_subjects as training config
         )
         
     def forward(self, pca_features, subject_ids, clip_lengths=None):
@@ -119,18 +120,18 @@ class JointExpressionReconstructionModelWithPCA(nn.Module):
             frame_features = pca_features[t:t+1]  # (1, 1369, 384)
             frame_subject_id = subject_ids[t:t+1]  # (1,)
             
-            # Create zero positional embeddings since ExpressionTransformer adds its own delta embeddings
-            frame_pos_embeddings = torch.zeros_like(frame_features)  # (1, 1369, 384)
+
             
             # Get expression token
             expression_token = self.expression_transformer(
-                frame_features, frame_pos_embeddings, frame_subject_id
+                frame_features
             )  # (1, 1, 384)
             
             expression_tokens.append(expression_token)
             
-            # Store adjusted positional embeddings (delta embeddings only, since input was zero)
-            adjusted_pos_embeddings.append(self.expression_transformer.delta_pos_embed)
+            # Store full positional embeddings (base + delta) for reconstruction
+            pos_embeddings = self.expression_transformer.pos_base.unsqueeze(0) + self.expression_transformer.delta_pos_embed
+            adjusted_pos_embeddings.append(pos_embeddings)
         
         # Stack expression tokens and adjusted positional embeddings
         expression_tokens = torch.cat(expression_tokens, dim=0)  # (T, 1, 384)
@@ -139,19 +140,18 @@ class JointExpressionReconstructionModelWithPCA(nn.Module):
         # Reconstruct images using Expression Reconstruction Model
         reconstructed_images = []
         for t in range(expression_tokens.shape[0]):
-            # Get subject embedding for this frame
-            subject_embedding = self.expression_transformer.subject_embeddings(subject_ids[t:t+1])  # (1, 384)
-            subject_embedding = subject_embedding.unsqueeze(1)  # (1, 1, 384)
-            
             # Get expression token for this frame
             expression_token = expression_tokens[t:t+1]  # (1, 1, 384)
             
             # Get adjusted positional embeddings for this frame
             frame_adjusted_pos_embeddings = adjusted_pos_embeddings[t:t+1]  # (1, 1369, 384)
             
-             # Reconstruct image using adjusted positional embeddings
+            # Get subject ID for this frame
+            frame_subject_id = subject_ids[t:t+1]  # (1,)
+            
+            # Reconstruct image using subject IDs and adjusted positional embeddings
             reconstructed_image = self.expression_reconstruction(
-                subject_embedding, expression_token, frame_adjusted_pos_embeddings
+                frame_subject_id, expression_token, frame_adjusted_pos_embeddings
             ) 
             
             reconstructed_images.append(reconstructed_image)
@@ -754,14 +754,15 @@ def train_expression_and_reconstruction_with_pca_features(
                     expr_num_heads=expr_num_heads,
                     expr_num_layers=expr_num_layers,
                     expr_dropout=expr_dropout,
-                    expr_max_subjects=expr_max_subjects,
                     expr_ff_dim=expr_ff_dim,
+                    expr_grid_size=37,
                     recon_embed_dim=recon_embed_dim,
                     recon_num_cross_layers=recon_num_cross_layers,
                     recon_num_self_layers=recon_num_self_layers,
                     recon_num_heads=recon_num_heads,
                     recon_ff_dim=recon_ff_dim,
                     recon_dropout=recon_dropout,
+                    recon_max_subjects=501,
                     lambda_reconstruction=initial_lambda_reconstruction,
                     lambda_temporal=initial_lambda_temporal,
                     lambda_diversity=initial_lambda_diversity,

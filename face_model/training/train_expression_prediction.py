@@ -46,19 +46,19 @@ class JointExpressionPredictionModel(nn.Module):
     """
     
     def __init__(self, 
-                 expr_embed_dim=384, expr_num_heads=4, expr_num_layers=2, expr_dropout=0.1, expr_max_subjects=3500, expr_ff_dim=1536,  # Added ff_dim
+                 expr_embed_dim=384, expr_num_heads=4, expr_num_layers=2, expr_dropout=0.1, expr_ff_dim=1536, expr_grid_size=37,
                  decoder_embed_dim=384, decoder_num_heads=4, decoder_num_layers=2, decoder_dropout=0.1,  # Changed from 8 to 4 heads
                  max_sequence_length=50):
         super().__init__()
         
-        # Component C: Expression Transformer (trainable) - now uses subject embeddings
+        # Component C: Expression Transformer (subject-invariant)
         self.expression_transformer = ExpressionTransformer(
             embed_dim=expr_embed_dim, 
             num_heads=expr_num_heads, 
             num_layers=expr_num_layers, 
             dropout=expr_dropout,
-            max_subjects=expr_max_subjects,  # Added max_subjects parameter
-            ff_dim=expr_ff_dim  # Added ff_dim parameter
+            ff_dim=expr_ff_dim,
+            grid_size=expr_grid_size
         )
         
         # Component D: Transformer Decoder (trainable)
@@ -71,7 +71,7 @@ class JointExpressionPredictionModel(nn.Module):
         )
         
         logger.info(f"Joint Expression Prediction Model initialized")
-        logger.info(f"  Expression Transformer: {expr_num_layers} layers, {expr_num_heads} heads, {expr_embed_dim} dim, {expr_max_subjects} subjects")
+        logger.info(f"  Expression Transformer: {expr_num_layers} layers, {expr_num_heads} heads, {expr_embed_dim} dim, {expr_grid_size}x{expr_grid_size} grid")
         logger.info(f"  Transformer Decoder: {decoder_num_layers} layers, {decoder_num_heads} heads, {decoder_embed_dim} dim")
         
     def forward(self, face_images, subject_ids, tokenizer, clip_lengths=None):
@@ -94,7 +94,7 @@ class JointExpressionPredictionModel(nn.Module):
         patch_tokens, pos_embeddings = tokenizer(face_images)  # (total_frames, 1369, 384), (total_frames, 1369, 384)
         
         # Component C: Extract expression tokens for all frames using subject embeddings
-        all_expression_tokens = self.expression_transformer(patch_tokens, pos_embeddings, subject_ids)  # (total_frames, 1, 384)
+        all_expression_tokens = self.expression_transformer(patch_tokens)  # (total_frames, 1, 384)
         
         # Component D: Predict next tokens for all clips using transformer decoder
         # Squeeze the middle dimension from (total_frames, 1, 384) to (total_frames, 384)
@@ -128,7 +128,7 @@ class JointExpressionPredictionModel(nn.Module):
         patch_tokens, pos_embeddings = tokenizer(face_images)  # (num_frames, 1369, 384), (num_frames, 1369, 384)
         
         # Component C: Extract expression tokens using subject embeddings
-        expression_tokens = self.expression_transformer(patch_tokens, pos_embeddings, subject_ids)  # (num_frames, 1, 384)
+        expression_tokens = self.expression_transformer(patch_tokens)  # (num_frames, 1, 384)
         
         # Component D: Predict next token
         predicted_next_token = self.transformer_decoder._forward_single_clip(expression_tokens)  # (1, 1, 384)
