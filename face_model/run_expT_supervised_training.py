@@ -35,7 +35,7 @@ def main():
     default="/home/jupyter/checkpoints/",
                        help="Directory to save checkpoints")
     
-    parser.add_argument("--batch-size", type=int, default=32,
+    parser.add_argument("--batch-size", type=int, default=16,
                        help="Training batch size")
     parser.add_argument("--expression-transformer-checkpoint", type=str, default=None,
                        help="Path to expression transformer checkpoint to load")
