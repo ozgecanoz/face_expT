@@ -23,8 +23,7 @@ import numpy as np
 import sys
 sys.path.append('.')
 
-from data.dataset import FaceDataset
-from models.expression_transformer import ExpressionTransformer
+from data.affectnet_dataset import AffectNetDataset
 from models.dinov2_tokenizer import DINOv2BaseTokenizer
 from utils.checkpoint_utils import save_checkpoint, create_comprehensive_config, load_checkpoint_config, extract_model_config
 
@@ -279,7 +278,7 @@ def train_expression_transformer_supervised(
     logger.info("✅ DINOv2 base tokenizer initialized")
     
     # Load datasets
-    train_dataset = FaceDataset(dataset_path, max_samples=max_samples)
+    train_dataset = AffectNetDataset(dataset_path, max_samples=max_samples)
     train_dataloader = DataLoader(
         train_dataset, 
         batch_size=batch_size, 
@@ -292,7 +291,7 @@ def train_expression_transformer_supervised(
     
     val_dataloader = None
     if val_dataset_path:
-        val_dataset = FaceDataset(val_dataset_path, max_samples=max_val_samples)
+        val_dataset = AffectNetDataset(val_dataset_path, max_samples=max_val_samples)
         val_dataloader = DataLoader(
             val_dataset, 
             batch_size=batch_size, 
