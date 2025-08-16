@@ -24,6 +24,7 @@ import sys
 sys.path.append('.')
 
 from data.affectnet_dataset import AffectNetDataset
+from models.expression_transformer import ExpressionTransformer
 from models.dinov2_tokenizer import DINOv2BaseTokenizer
 from utils.checkpoint_utils import save_checkpoint, create_comprehensive_config, load_checkpoint_config, extract_model_config
 

@@ -21,7 +21,7 @@ from sklearn.metrics import classification_report, confusion_matrix
 import sys
 sys.path.append('.')
 
-from data.dataset import FaceDataset
+from data.affectnet_dataset import AffectNetDataset
 from models.dinov2_tokenizer import DINOv2BaseTokenizer
 from utils.checkpoint_utils import load_checkpoint_config, extract_model_config
 from training.train_expT_supervised import ExpTClassifierModel, load_pca_projection, prepare_emotion_classification_data
@@ -350,7 +350,7 @@ def main():
         logger.info("✅ DINOv2 base tokenizer initialized")
         
         # Load test dataset
-        test_dataset = FaceDataset(args.dataset_path)
+        test_dataset = AffectNetDataset(args.dataset_path)
         test_dataloader = DataLoader(
             test_dataset, 
             batch_size=args.batch_size, 
