@@ -511,6 +511,24 @@ def train_expression_transformer_supervised(
                     logger.info(f"🔄 Saving epoch checkpoint at step {current_training_step}")
                     epoch_checkpoint_path = os.path.join(checkpoint_dir, f"expT_supervised_epoch_{epoch+1}_step_{current_training_step}.pt")
                     
+                    # Create config for epoch checkpoint if not already created
+                    if 'config' not in locals():
+                        config = create_comprehensive_config(
+                            embed_dim=embed_dim,
+                            num_heads=num_heads,
+                            num_layers=num_layers,
+                            dropout=dropout,
+                            ff_dim=ff_dim,
+                            grid_size=grid_size,
+                            num_classes=num_classes,
+                            learning_rate=learning_rate,
+                            batch_size=batch_size,
+                            num_epochs=num_epochs,
+                            warmup_steps=warmup_steps,
+                            min_lr=min_lr,
+                            pca_json_path=pca_json_path
+                        )
+                    
                     try:
                         save_checkpoint(
                             model_state_dict=model.state_dict(),
