@@ -67,8 +67,8 @@ def create_dummy_pca_json(temp_dir):
     
     # Create dummy PCA data
     pca_data = {
-        "components": np.random.randn(768, 384).tolist(),  # 768 -> 384 projection
-        "mean": np.random.randn(768).tolist(),
+        "pca_components": np.random.randn(384, 768).tolist(),  # 384 -> 768 projection (correct orientation)
+        "pca_mean": np.random.randn(768).tolist(),
         "explained_variance_ratio": np.random.rand(384).tolist(),
         "n_components": 384,
         "n_features": 768
@@ -96,10 +96,10 @@ def test_model_creation():
         )
         
         print(f"✅ Model created successfully:")
-        print(f"   Embed dim: {model.embed_dim}")
-        print(f"   Num heads: {model.num_heads}")
-        print(f"   Num layers: {model.num_layers}")
-        print(f"   Num classes: {model.num_classes}")
+        print(f"   Embed dim: {model.expression_transformer.embed_dim}")
+        print(f"   Num heads: {model.expression_transformer.num_heads}")
+        print(f"   Num layers: {model.expression_transformer.num_layers}")
+        print(f"   Num classes: {model.classifier[0].out_features}")
         
         # Test forward pass
         batch_size = 2
@@ -150,12 +150,12 @@ def test_checkpoint_saving_loading():
         from utils.checkpoint_utils import save_checkpoint, create_comprehensive_config
         
         config = create_comprehensive_config(
-            embed_dim=384,
-            num_heads=4,
-            num_layers=2,
-            dropout=0.1,
-            ff_dim=1536,
-            grid_size=37,
+            expr_embed_dim=384,
+            expr_num_heads=4,
+            expr_num_layers=2,
+            expr_dropout=0.1,
+            expr_ff_dim=1536,
+            expr_grid_size=37,
             num_classes=8,
             learning_rate=1e-4,
             batch_size=16,
@@ -186,23 +186,23 @@ def test_checkpoint_saving_loading():
         print(f"   Epoch: {checkpoint['epoch']}")
         print(f"   Total steps: {checkpoint['total_steps']}")
         print(f"   Avg loss: {checkpoint['avg_loss']}")
-        print(f"   Checkpoint type: {checkpoint['checkpoint_type']}")
+        print(f"   Checkpoint type: {checkpoint.get('checkpoint_type', 'N/A')}")
         
         # Test config loading
         loaded_config = load_checkpoint_config(checkpoint_path)
         print(f"✅ Config loaded successfully:")
-        print(f"   Embed dim: {loaded_config.get('embed_dim')}")
-        print(f"   Num classes: {loaded_config.get('num_classes')}")
+        print(f"   Embed dim: {loaded_config.get('expression_model', {}).get('expr_embed_dim')}")
+        print(f"   Num classes: {loaded_config.get('supervised_model', {}).get('num_classes')}")
         
         # Test model reconstruction from checkpoint
         new_model = ExpTClassifierModel(
-            embed_dim=loaded_config['embed_dim'],
-            num_heads=loaded_config['num_heads'],
-            num_layers=loaded_config['num_layers'],
-            dropout=loaded_config['dropout'],
-            ff_dim=loaded_config['ff_dim'],
-            grid_size=loaded_config['grid_size'],
-            num_classes=loaded_config['num_classes']
+            embed_dim=loaded_config['expression_model']['expr_embed_dim'],
+            num_heads=loaded_config['expression_model']['expr_num_heads'],
+            num_layers=loaded_config['expression_model']['expr_num_layers'],
+            dropout=loaded_config['expression_model']['expr_dropout'],
+            ff_dim=loaded_config['expression_model']['expr_ff_dim'],
+            grid_size=loaded_config['expression_model']['expr_grid_size'],
+            num_classes=loaded_config['supervised_model']['num_classes']
         )
         
         new_model.load_state_dict(checkpoint['expression_transformer_state_dict'])
@@ -212,7 +212,7 @@ def test_checkpoint_saving_loading():
         # Test forward pass with reconstructed model
         batch_size = 2
         num_patches = 1369
-        embed_dim = loaded_config['embed_dim']
+        embed_dim = loaded_config['expression_model']['expr_embed_dim']
         
         dummy_input = torch.randn(batch_size, num_patches, embed_dim)
         expression_tokens, logits = new_model(dummy_input)
@@ -259,7 +259,7 @@ def test_training_with_checkpoints():
             batch_size=2,  # Small batch size
             num_epochs=2,  # Only 2 epochs
             max_samples=3,  # Only 3 samples
-            device="cpu",  # Use CPU for testing
+            device=torch.device("cpu"),  # Use CPU for testing
             num_workers=0,  # No workers for testing
             pin_memory=False,
             persistent_workers=False,
