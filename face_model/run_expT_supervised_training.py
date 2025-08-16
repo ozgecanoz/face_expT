@@ -13,33 +13,46 @@ def main():
     parser = argparse.ArgumentParser(description="Train Expression Transformer for supervised emotion classification")
     
     # Required arguments
-    parser.add_argument("--dataset-path", type=str, required=True,
+    parser.add_argument("--dataset-path", type=str, 
+    default="/home/jupyter/dbs/AffectNet_518_train/",
                        help="Path to AffectNet dataset directory")
-    parser.add_argument("--pca-json-path", type=str, required=True,
+    parser.add_argument("--pca-json-path", type=str, 
+    default="/home/jupyter/dbs/",
                        help="Path to PCA projection JSON file")
-    
-    # Optional arguments
-    parser.add_argument("--expression-transformer-checkpoint", type=str, default=None,
-                       help="Path to expression transformer checkpoint to load")
-    parser.add_argument("--checkpoint-dir", type=str, default="checkpoints",
-                       help="Directory to save checkpoints")
-    parser.add_argument("--save-every-step", type=int, default=500,
-                       help="Save checkpoints every N steps")
-    parser.add_argument("--batch-size", type=int, default=8,
-                       help="Training batch size")
-    parser.add_argument("--num-epochs", type=int, default=10,
-                       help="Number of training epochs")
-    parser.add_argument("--learning-rate", type=float, default=1e-4,
-                       help="Learning rate")
     parser.add_argument("--max-samples", type=int, default=None,
                        help="Maximum number of samples to use")
-    parser.add_argument("--val-dataset-path", type=str, default=None,
+
+    parser.add_argument("--val-dataset-path", type=str, 
+    default="/home/jupyter/dbs/AffectNet_518_valid/",
                        help="Path to validation dataset")
     parser.add_argument("--max-val-samples", type=int, default=None,
                        help="Maximum number of validation samples")
+
+    parser.add_argument("--log-dir", type=str, 
+    default="/home/jupyter/logs/",
+                       help="Directory for TensorBoard logs")
+    parser.add_argument("--checkpoint-dir", type=str, 
+    default="/home/jupyter/checkpoints/",
+                       help="Directory to save checkpoints")
+    
+    parser.add_argument("--batch-size", type=int, default=32,
+                       help="Training batch size")
+    parser.add_argument("--expression-transformer-checkpoint", type=str, default=None,
+                       help="Path to expression transformer checkpoint to load")
+    parser.add_argument("--num-epochs", type=int, default=5,
+                       help="Number of training epochs")
+    parser.add_argument("--learning-rate", type=float, default=1e-4,
+                       help="Learning rate")
+    parser.add_argument("--warmup-steps", type=int, default=1000,
+                       help="Number of warmup steps for scheduler")
+    parser.add_argument("--min-lr", type=float, default=1e-6,
+                       help="Minimum learning rate")
+    
+    parser.add_argument("--save-every-step", type=int, default=500,
+                       help="Save checkpoints every N steps")
     parser.add_argument("--device", type=str, default="auto",
                        help="Device to use (auto, cpu, cuda, cuda:0, etc.)")
-    parser.add_argument("--num-workers", type=int, default=0,
+    parser.add_argument("--num-workers", type=int, default=8,
                        help="Number of data loader workers")
     parser.add_argument("--pin-memory", action="store_true",
                        help="Pin memory for faster GPU transfer")
@@ -47,17 +60,13 @@ def main():
                        help="Use persistent workers")
     parser.add_argument("--drop-last", action="store_true", default=True,
                        help="Drop last incomplete batch")
-    parser.add_argument("--warmup-steps", type=int, default=1000,
-                       help="Number of warmup steps for scheduler")
-    parser.add_argument("--min-lr", type=float, default=1e-6,
-                       help="Minimum learning rate")
     
     # Architecture parameters
     parser.add_argument("--embed-dim", type=int, default=384,
                        help="Expression transformer embedding dimension")
     parser.add_argument("--num-heads", type=int, default=4,
                        help="Expression transformer number of heads")
-    parser.add_argument("--num-layers", type=int, default=2,
+    parser.add_argument("--num-layers", type=int, default=4,
                        help="Expression transformer number of layers")
     parser.add_argument("--dropout", type=float, default=0.1,
                        help="Expression transformer dropout")
@@ -68,9 +77,9 @@ def main():
     parser.add_argument("--num-classes", type=int, default=8,
                        help="Number of emotion classes")
     
-    # Logging
-    parser.add_argument("--log-dir", type=str, default=None,
-                       help="Directory for TensorBoard logs")
+    # Memory management
+    parser.add_argument("--max-memory-fraction", type=float, default=0.7,
+                       help="Maximum GPU memory fraction to use (0.0-1.0, default: 0.9)")
     
     args = parser.parse_args()
     
@@ -107,6 +116,7 @@ def main():
     print(f"Batch Size: {args.batch_size}")
     print(f"Epochs: {args.num_epochs}")
     print(f"Learning Rate: {args.learning_rate}")
+    print(f"Max Memory Fraction: {args.max_memory_fraction}")
     
     if args.expression_transformer_checkpoint:
         print(f"Checkpoint: {args.expression_transformer_checkpoint}")
@@ -148,7 +158,8 @@ def main():
             ff_dim=args.ff_dim,
             grid_size=args.grid_size,
             num_classes=args.num_classes,
-            log_dir=args.log_dir
+            log_dir=args.log_dir,
+            max_memory_fraction=args.max_memory_fraction
         )
         
         print("🎉 Training completed successfully!")

@@ -203,13 +203,56 @@ def create_comprehensive_config(
     # Reconstruction scheduler parameters (optional)
     initial_lambda_reconstruction: float = None,
     warmup_lambda_reconstruction: float = None,
-    final_lambda_reconstruction: float = None
+    final_lambda_reconstruction: float = None,
+    # Supervised model parameters (optional)
+    num_classes: int = None,
+    pca_json_path: str = None
 ) -> Dict[str, Any]:
     """
     Create a comprehensive configuration dictionary for checkpoint saving
     
     Args:
-        All model and training parameters
+        expr_embed_dim: Expression transformer embedding dimension
+        expr_num_heads: Expression transformer number of heads
+        expr_num_layers: Expression transformer number of layers
+        expr_dropout: Expression transformer dropout
+        expr_ff_dim: Expression transformer feed-forward dimension
+        expr_grid_size: Expression transformer grid size
+        decoder_embed_dim: Decoder embedding dimension (optional)
+        decoder_num_heads: Decoder number of heads (optional)
+        decoder_num_layers: Decoder number of layers (optional)
+        decoder_dropout: Decoder dropout (optional)
+        max_sequence_length: Maximum sequence length (optional)
+        lambda_prediction: Prediction loss weight (optional)
+        lambda_temporal: Temporal loss weight (optional)
+        lambda_diversity: Diversity loss weight (optional)
+        learning_rate: Learning rate (optional)
+        batch_size: Batch size (optional)
+        num_epochs: Number of epochs (optional)
+        warmup_steps: Warmup steps (optional)
+        min_lr: Minimum learning rate (optional)
+        recon_embed_dim: Reconstruction model embedding dimension (optional)
+        recon_num_cross_layers: Reconstruction cross-attention layers (optional)
+        recon_num_self_layers: Reconstruction self-attention layers (optional)
+        recon_num_heads: Reconstruction number of heads (optional)
+        recon_ff_dim: Reconstruction feed-forward dimension (optional)
+        recon_dropout: Reconstruction dropout (optional)
+        recon_max_subjects: Reconstruction max subjects (optional)
+        lambda_reconstruction: Reconstruction loss weight (optional)
+        initial_lambda_prediction: Initial prediction loss weight (optional)
+        warmup_lambda_prediction: Warmup prediction loss weight (optional)
+        final_lambda_prediction: Final prediction loss weight (optional)
+        initial_lambda_temporal: Initial temporal loss weight (optional)
+        warmup_lambda_temporal: Warmup temporal loss weight (optional)
+        final_lambda_temporal: Final temporal loss weight (optional)
+        initial_lambda_diversity: Initial diversity loss weight (optional)
+        warmup_lambda_diversity: Warmup diversity loss weight (optional)
+        final_lambda_diversity: Final diversity loss weight (optional)
+        initial_lambda_reconstruction: Initial reconstruction loss weight (optional)
+        warmup_lambda_reconstruction: Warmup reconstruction loss weight (optional)
+        final_lambda_reconstruction: Final reconstruction loss weight (optional)
+        num_classes: Number of classes for supervised model (optional)
+        pca_json_path: Path to PCA projection JSON (optional)
         
     Returns:
         Comprehensive configuration dictionary
@@ -245,6 +288,13 @@ def create_comprehensive_config(
             'ff_dim': recon_ff_dim,
             'dropout': recon_dropout,
             'max_subjects': recon_max_subjects if recon_max_subjects is not None else 3500
+        }
+    
+    # Add supervised model config if provided
+    if num_classes is not None:
+        config['supervised_model'] = {
+            'num_classes': num_classes,
+            'pca_json_path': pca_json_path
         }
     
     # Add loss function config

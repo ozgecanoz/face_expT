@@ -222,7 +222,9 @@ def train_expression_transformer_supervised(
     ff_dim=1536,
     grid_size=37,
     num_classes=8,
-    log_dir=None
+    log_dir=None,
+    # Memory management
+    max_memory_fraction=0.9
 ):
     """
     Train the expression transformer for supervised emotion classification
@@ -254,13 +256,20 @@ def train_expression_transformer_supervised(
         grid_size: Grid size for positional embeddings
         num_classes: Number of emotion classes
         log_dir: Directory for TensorBoard logs
+        max_memory_fraction: Maximum GPU memory fraction to use (0.0-1.0, default: 0.9)
     """
     logger.info(f"Starting supervised expression transformer training on device: {device}")
     
     # CUDA memory optimization settings
     if device.type == "cuda":
+        # Set memory fraction limit
+        torch.cuda.set_per_process_memory_fraction(max_memory_fraction)
+        logger.info(f"GPU Memory fraction limit set to: {max_memory_fraction}")
+        
+        # Clear cache
         torch.cuda.empty_cache()
-        logger.info(f"GPU Memory: {torch.cuda.memory_allocated() / 1024**3:.1f} GB")
+        logger.info(f"Initial GPU Memory: {torch.cuda.memory_allocated() / 1024**3:.1f} GB")
+        logger.info(f"GPU Memory Reserved: {torch.cuda.memory_reserved() / 1024**3:.1f} GB")
     
     # Load PCA projection
     pca_components, pca_mean = load_pca_projection(pca_json_path)
@@ -326,11 +335,11 @@ def train_expression_transformer_supervised(
                 dropout=checkpoint_config.get('dropout', dropout),
                 ff_dim=checkpoint_config.get('ff_dim', ff_dim),
                 grid_size=checkpoint_config.get('grid_size', grid_size),
-                num_classes=num_classes  # Keep num_classes from arguments
+                num_classes=checkpoint_config.get('num_classes', num_classes)  # Load from checkpoint config
             ).to(device)
             
             # Load model weights
-            model.expression_transformer.load_state_dict(checkpoint['model_state_dict'])
+            model.load_state_dict(checkpoint['expression_transformer_state_dict'])
             logger.info("✅ Expression transformer checkpoint loaded with matching config")
             
             # Update local variables to match checkpoint config
@@ -340,6 +349,7 @@ def train_expression_transformer_supervised(
             dropout = checkpoint_config.get('dropout', dropout)
             ff_dim = checkpoint_config.get('ff_dim', ff_dim)
             grid_size = checkpoint_config.get('grid_size', grid_size)
+            num_classes = checkpoint_config.get('num_classes', num_classes)
             
             logger.info(f"Model config from checkpoint:")
             logger.info(f"  - embed_dim: {embed_dim}")
@@ -348,6 +358,7 @@ def train_expression_transformer_supervised(
             logger.info(f"  - dropout: {dropout}")
             logger.info(f"  - ff_dim: {ff_dim}")
             logger.info(f"  - grid_size: {grid_size}")
+            logger.info(f"  - num_classes: {num_classes}")
             
         else:
             logger.warning("⚠️  No config found in checkpoint, using provided arguments")
@@ -363,8 +374,9 @@ def train_expression_transformer_supervised(
             ).to(device)
             
             # Load model weights
-            model.expression_transformer.load_state_dict(checkpoint['model_state_dict'])
+            model.load_state_dict(checkpoint['expression_transformer_state_dict'])
             logger.info("✅ Expression transformer checkpoint loaded")
+            logger.info(f"⚠️  Note: num_classes not in checkpoint, using provided value: {num_classes}")
     else:
         # Initialize model with provided arguments (no checkpoint)
         logger.info("No checkpoint provided, initializing model with provided arguments")
@@ -447,7 +459,6 @@ def train_expression_transformer_supervised(
                     
                     # Create config (use updated values from checkpoint if available)
                     config = create_comprehensive_config(
-                        model_type="expression_transformer_supervised",
                         embed_dim=embed_dim,
                         num_heads=num_heads,
                         num_layers=num_layers,
@@ -472,7 +483,7 @@ def train_expression_transformer_supervised(
                         total_steps=current_training_step,
                         config=config,
                         checkpoint_path=checkpoint_path,
-                        checkpoint_type="expression_transformer_supervised"
+                        checkpoint_type="expression_transformer"
                     )
                     
                     logger.info(f"Saved checkpoint: {checkpoint_path}")
