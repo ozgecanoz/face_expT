@@ -160,6 +160,9 @@ def prepare_emotion_classification_data(batch, dinov2_tokenizer, pca_components,
     clip_lengths = []
     
     for clip_idx, (clip_frames, clip_emotions) in enumerate(zip(frames, emotion_class_ids)):
+        # Move frames to device before processing
+        clip_frames = clip_frames.to(device)
+        
         # Get DINOv2 patch tokens
         patch_tokens, _ = dinov2_tokenizer(clip_frames)  # (T, 1369, 768)
         
@@ -190,6 +193,9 @@ def prepare_emotion_classification_data(batch, dinov2_tokenizer, pca_components,
     # Concatenate all clips
     face_images = torch.cat(all_face_images, dim=0)  # (total_frames, 1369, 384)
     emotion_targets = torch.cat(all_emotion_targets, dim=0)  # (total_frames,)
+    
+    # Move emotion targets to device
+    emotion_targets = emotion_targets.to(device)
     
     return face_images, emotion_targets, clip_lengths
 
