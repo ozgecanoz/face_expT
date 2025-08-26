@@ -346,14 +346,25 @@ def train_expression_reconstruction(
         checkpoint_config = checkpoint['config']
         logger.info("✅ Found config in checkpoint, initializing ExpressionTransformer accordingly")
         
-        # Initialize ExpressionTransformer with checkpoint config
+        # Update local variables to match checkpoint config BEFORE initializing the model
+        embed_dim = checkpoint_config.get('expression_model', {}).get('expr_embed_dim', embed_dim)
+        num_heads = checkpoint_config.get('expression_model', {}).get('expr_num_heads', num_heads)
+        ff_dim = checkpoint_config.get('expression_model', {}).get('expr_ff_dim', ff_dim)
+        
+        # Log the actual values being used
+        logger.info(f"Using checkpoint config values:")
+        logger.info(f"  - embed_dim: {embed_dim}")
+        logger.info(f"  - num_heads: {num_heads}")
+        logger.info(f"  - ff_dim: {ff_dim}")
+        
+        # Initialize ExpressionTransformer with updated config values
         expression_transformer = ExpressionTransformer(
-            embed_dim=checkpoint_config.get('expression_model', {}).get('expr_embed_dim', embed_dim),
-            num_heads=checkpoint_config.get('expression_model', {}).get('expr_num_heads', num_heads),
-            num_layers=checkpoint_config.get('expression_model', {}).get('expr_num_layers', 2),
-            dropout=checkpoint_config.get('expression_model', {}).get('expr_dropout', dropout),
-            ff_dim=checkpoint_config.get('expression_model', {}).get('expr_ff_dim', ff_dim),
-            grid_size=checkpoint_config.get('expression_model', {}).get('expr_grid_size', 37)
+            embed_dim=embed_dim,
+            num_heads=num_heads,
+            num_layers=2,
+            dropout=dropout,
+            ff_dim=ff_dim,
+            grid_size=37
         ).to(device)
         
         # Load model weights - handle both standalone and supervised model checkpoints
