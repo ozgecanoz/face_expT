@@ -42,6 +42,9 @@ def main():
                        help="Minimum learning rate")
     parser.add_argument("--lambda-identity", type=float, default=0.5,
                        help="Weight for identity loss (ArcFace-based)")
+    parser.add_argument("--arcface-model-path", type=str, 
+                        default="/mnt/dataset-storage/models/arcface.onnx",
+                       help="Path to ArcFace ONNX model file")
 
     # Validation arguments
     parser.add_argument("--val-dataset-path", type=str, 
@@ -111,6 +114,10 @@ def main():
         print(f"❌ Error: ExpressionTransformer checkpoint not found: {args.expression_transformer_checkpoint}")
         return
     
+    if not os.path.exists(args.arcface_model_path):
+        print(f"❌ Error: ArcFace model not found: {args.arcface_model_path}")
+        return
+    
     print("🚀 Starting Expression Reconstruction Training")
     print("=" * 60)
     print(f"Dataset: {args.dataset_path}")
@@ -127,6 +134,7 @@ def main():
     print(f"Num Heads: {args.num_heads}")
     print(f"Max Subjects: {args.max_subjects}")
     print(f"Identity Loss Weight: {args.lambda_identity}")
+    print(f"ArcFace Model: {args.arcface_model_path}")
     
     if args.val_dataset_path:
         print(f"Validation Dataset: {args.val_dataset_path}")
@@ -163,7 +171,8 @@ def main():
             max_subjects=args.max_subjects,
             log_dir=args.log_dir,
             max_memory_fraction=args.max_memory_fraction,
-            lambda_identity=args.lambda_identity
+            lambda_identity=args.lambda_identity,
+            arcface_model_path=args.arcface_model_path
         )
         
         print("🎉 Training completed successfully!")

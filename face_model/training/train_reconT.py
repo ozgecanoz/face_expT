@@ -275,7 +275,8 @@ def train_expression_reconstruction(
     log_dir: str = None,
     # Memory management
     max_memory_fraction: float = 0.9,
-    lambda_identity: float = 0.1
+    lambda_identity: float = 0.1,
+    arcface_model_path: str = "/path/to/arcface.onnx"
 ):
     """
     Train the expression reconstruction model using frozen expression transformer
@@ -308,6 +309,8 @@ def train_expression_reconstruction(
         max_subjects: Maximum number of subjects
         log_dir: Directory for TensorBoard logs
         max_memory_fraction: Maximum GPU memory fraction to use
+        lambda_identity: Weight for identity loss
+        arcface_model_path: Path to ArcFace ONNX model file
     """
     logger.info("Starting expression reconstruction training")
     logger.info(f"Device: {device}")
@@ -327,7 +330,8 @@ def train_expression_reconstruction(
     
     # Initialize ArcFace tokenizer for identity loss
     logger.info("Initializing ArcFace tokenizer...")
-    arcface_tokenizer = ArcFaceTokenizer(device=device)
+    # ArcFaceTokenizer doesn't need device parameter - ONNX runtime handles it
+    arcface_tokenizer = ArcFaceTokenizer(model_path=arcface_model_path)
     logger.info("✅ ArcFace tokenizer initialized")
     
     # Load frozen ExpressionTransformer from checkpoint
