@@ -97,3 +97,8 @@ gcp_config.json
 *.pth
 *.pt
 cloud_checkpoints/
+
+# GCP Documentation and Setup Files
+GCP_*.md
+GCP_*.txt
+GCP_*.sh
