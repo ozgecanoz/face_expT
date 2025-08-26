@@ -338,6 +338,9 @@ def train_expression_reconstruction(
     logger.info(f"Loading frozen ExpressionTransformer from: {expression_transformer_checkpoint_path}")
     checkpoint = torch.load(expression_transformer_checkpoint_path, map_location=device)
     
+    # Debug: Log checkpoint keys
+    logger.info(f"Checkpoint keys: {list(checkpoint.keys())}")
+    
     # Extract config from checkpoint
     if 'config' in checkpoint:
         checkpoint_config = checkpoint['config']
@@ -353,9 +356,29 @@ def train_expression_reconstruction(
             grid_size=checkpoint_config.get('expression_model', {}).get('expr_grid_size', 37)
         ).to(device)
         
-        # Load model weights
-        expression_transformer.load_state_dict(checkpoint['expression_transformer_state_dict'])
-        logger.info("✅ ExpressionTransformer checkpoint loaded with matching config")
+        # Load model weights - handle both standalone and supervised model checkpoints
+        if 'expression_transformer_state_dict' in checkpoint:
+            # Standalone ExpressionTransformer checkpoint
+            expression_transformer.load_state_dict(checkpoint['expression_transformer_state_dict'])
+            logger.info("✅ ExpressionTransformer checkpoint loaded with matching config")
+        elif 'model_state_dict' in checkpoint:
+            # Supervised model checkpoint - extract ExpressionTransformer part
+            model_state_dict = checkpoint['model_state_dict']
+            # Filter keys to only include ExpressionTransformer parameters
+            expr_state_dict = {}
+            for key, value in model_state_dict.items():
+                if key.startswith('expression_transformer.'):
+                    # Remove the 'expression_transformer.' prefix
+                    new_key = key[len('expression_transformer.'):]
+                    expr_state_dict[new_key] = value
+            
+            if expr_state_dict:
+                expression_transformer.load_state_dict(expr_state_dict)
+                logger.info("✅ ExpressionTransformer extracted from supervised model checkpoint")
+            else:
+                raise ValueError("No ExpressionTransformer parameters found in supervised model checkpoint")
+        else:
+            raise ValueError("Checkpoint must contain either 'expression_transformer_state_dict' or 'model_state_dict'")
         
         # Update local variables to match checkpoint config
         embed_dim = checkpoint_config.get('expression_model', {}).get('expr_embed_dim', embed_dim)
@@ -379,9 +402,29 @@ def train_expression_reconstruction(
             grid_size=37
         ).to(device)
         
-        # Load model weights
-        expression_transformer.load_state_dict(checkpoint['expression_transformer_state_dict'])
-        logger.info("✅ ExpressionTransformer checkpoint loaded")
+        # Load model weights - handle both standalone and supervised model checkpoints
+        if 'expression_transformer_state_dict' in checkpoint:
+            # Standalone ExpressionTransformer checkpoint
+            expression_transformer.load_state_dict(checkpoint['expression_transformer_state_dict'])
+            logger.info("✅ ExpressionTransformer checkpoint loaded")
+        elif 'model_state_dict' in checkpoint:
+            # Supervised model checkpoint - extract ExpressionTransformer part
+            model_state_dict = checkpoint['model_state_dict']
+            # Filter keys to only include ExpressionTransformer parameters
+            expr_state_dict = {}
+            for key, value in model_state_dict.items():
+                if key.startswith('expression_transformer.'):
+                    # Remove the 'expression_transformer.' prefix
+                    new_key = key[len('expression_transformer.'):]
+                    expr_state_dict[new_key] = value
+            
+            if expr_state_dict:
+                expression_transformer.load_state_dict(expr_state_dict)
+                logger.info("✅ ExpressionTransformer extracted from supervised model checkpoint")
+            else:
+                raise ValueError("No ExpressionTransformer parameters found in supervised model checkpoint")
+        else:
+            raise ValueError("Checkpoint must contain either 'expression_transformer_state_dict' or 'model_state_dict'")
     
     # Freeze the ExpressionTransformer
     expression_transformer.requires_grad = False
