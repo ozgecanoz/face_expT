@@ -361,21 +361,33 @@ def train_expression_reconstruction(
             # Check if the keys have the 'expression_transformer.' prefix
             expr_state_dict = checkpoint['expression_transformer_state_dict']
             if any(key.startswith('expression_transformer.') for key in expr_state_dict.keys()):
-                # Keys have prefix - remove it
+                # Keys have prefix - remove it and filter to only ExpressionTransformer keys
                 clean_state_dict = {}
                 for key, value in expr_state_dict.items():
                     if key.startswith('expression_transformer.'):
                         new_key = key[len('expression_transformer.'):]
-                        clean_state_dict[new_key] = value
-                    else:
+                        # Only include keys that belong to ExpressionTransformer (exclude classifier, etc.)
+                        if not new_key.startswith('classifier.') and not new_key.startswith('decoder.layers.2') and not new_key.startswith('decoder.layers.3'):
+                            clean_state_dict[new_key] = value
+                
+                if clean_state_dict:
+                    expression_transformer.load_state_dict(clean_state_dict)
+                    logger.info("✅ ExpressionTransformer checkpoint loaded with matching config (removed prefix and filtered)")
+                else:
+                    raise ValueError("No valid ExpressionTransformer parameters found after filtering")
+            else:
+                # Keys are clean - filter to only ExpressionTransformer keys
+                clean_state_dict = {}
+                for key, value in expr_state_dict.items():
+                    # Only include keys that belong to ExpressionTransformer (exclude classifier, etc.)
+                    if not key.startswith('classifier.') and not key.startswith('decoder.layers.2') and not key.startswith('decoder.layers.3'):
                         clean_state_dict[key] = value
                 
-                expression_transformer.load_state_dict(clean_state_dict)
-                logger.info("✅ ExpressionTransformer checkpoint loaded with matching config (removed prefix)")
-            else:
-                # Keys are clean - load directly
-                expression_transformer.load_state_dict(expr_state_dict)
-                logger.info("✅ ExpressionTransformer checkpoint loaded with matching config")
+                if clean_state_dict:
+                    expression_transformer.load_state_dict(clean_state_dict)
+                    logger.info("✅ ExpressionTransformer checkpoint loaded with matching config (filtered)")
+                else:
+                    raise ValueError("No valid ExpressionTransformer parameters found after filtering")
         elif 'model_state_dict' in checkpoint:
             # This is a supervised model checkpoint - extract ExpressionTransformer part
             model_state_dict = checkpoint['model_state_dict']
@@ -400,6 +412,12 @@ def train_expression_reconstruction(
         num_heads = checkpoint_config.get('expression_model', {}).get('expr_num_heads', num_heads)
         ff_dim = checkpoint_config.get('expression_model', {}).get('expr_ff_dim', ff_dim)
         
+        # Log the actual values being used
+        logger.info(f"Using checkpoint config values:")
+        logger.info(f"  - embed_dim: {embed_dim}")
+        logger.info(f"  - num_heads: {num_heads}")
+        logger.info(f"  - ff_dim: {ff_dim}")
+        
         logger.info(f"ExpressionTransformer config from checkpoint:")
         logger.info(f"  - embed_dim: {embed_dim}")
         logger.info(f"  - num_heads: {num_heads}")
@@ -422,21 +440,33 @@ def train_expression_reconstruction(
             # Check if the keys have the 'expression_transformer.' prefix
             expr_state_dict = checkpoint['expression_transformer_state_dict']
             if any(key.startswith('expression_transformer.') for key in expr_state_dict.keys()):
-                # Keys have prefix - remove it
+                # Keys have prefix - remove it and filter to only ExpressionTransformer keys
                 clean_state_dict = {}
                 for key, value in expr_state_dict.items():
                     if key.startswith('expression_transformer.'):
                         new_key = key[len('expression_transformer.'):]
-                        clean_state_dict[new_key] = value
-                    else:
+                        # Only include keys that belong to ExpressionTransformer (exclude classifier, etc.)
+                        if not new_key.startswith('classifier.') and not new_key.startswith('decoder.layers.2') and not new_key.startswith('decoder.layers.3'):
+                            clean_state_dict[new_key] = value
+                
+                if clean_state_dict:
+                    expression_transformer.load_state_dict(clean_state_dict)
+                    logger.info("✅ ExpressionTransformer checkpoint loaded (removed prefix and filtered)")
+                else:
+                    raise ValueError("No valid ExpressionTransformer parameters found after filtering")
+            else:
+                # Keys are clean - filter to only ExpressionTransformer keys
+                clean_state_dict = {}
+                for key, value in expr_state_dict.items():
+                    # Only include keys that belong to ExpressionTransformer (exclude classifier, etc.)
+                    if not key.startswith('classifier.') and not key.startswith('decoder.layers.2') and not key.startswith('decoder.layers.3'):
                         clean_state_dict[key] = value
                 
-                expression_transformer.load_state_dict(clean_state_dict)
-                logger.info("✅ ExpressionTransformer checkpoint loaded (removed prefix)")
-            else:
-                # Keys are clean - load directly
-                expression_transformer.load_state_dict(expr_state_dict)
-                logger.info("✅ ExpressionTransformer checkpoint loaded")
+                if clean_state_dict:
+                    expression_transformer.load_state_dict(clean_state_dict)
+                    logger.info("✅ ExpressionTransformer checkpoint loaded (filtered)")
+                else:
+                    raise ValueError("No valid ExpressionTransformer parameters found after filtering")
         elif 'model_state_dict' in checkpoint:
             # This is a supervised model checkpoint - extract ExpressionTransformer part
             model_state_dict = checkpoint['model_state_dict']
@@ -446,13 +476,15 @@ def train_expression_reconstruction(
                 if key.startswith('expression_transformer.'):
                     # Remove the 'expression_transformer.' prefix
                     new_key = key[len('expression_transformer.'):]
-                    expr_state_dict[new_key] = value
+                    # Only include keys that belong to ExpressionTransformer (exclude classifier, etc.)
+                    if not new_key.startswith('classifier.') and not new_key.startswith('decoder.layers.2') and not new_key.startswith('decoder.layers.3'):
+                        expr_state_dict[new_key] = value
             
             if expr_state_dict:
                 expression_transformer.load_state_dict(expr_state_dict)
-                logger.info("✅ ExpressionTransformer extracted from supervised model checkpoint")
+                logger.info("✅ ExpressionTransformer extracted from supervised model checkpoint (filtered)")
             else:
-                raise ValueError("No ExpressionTransformer parameters found in supervised model checkpoint")
+                raise ValueError("No valid ExpressionTransformer parameters found in supervised model checkpoint")
         else:
             raise ValueError("Checkpoint must contain either 'expression_transformer_state_dict' or 'model_state_dict'")
     
