@@ -358,11 +358,11 @@ def train_expression_reconstruction(
         
         # Load model weights - handle both standalone and supervised model checkpoints
         if 'expression_transformer_state_dict' in checkpoint:
-            # Standalone ExpressionTransformer checkpoint
+            # This is a standalone ExpressionTransformer checkpoint
             expression_transformer.load_state_dict(checkpoint['expression_transformer_state_dict'])
             logger.info("✅ ExpressionTransformer checkpoint loaded with matching config")
         elif 'model_state_dict' in checkpoint:
-            # Supervised model checkpoint - extract ExpressionTransformer part
+            # This is a supervised model checkpoint - extract ExpressionTransformer part
             model_state_dict = checkpoint['model_state_dict']
             # Filter keys to only include ExpressionTransformer parameters
             expr_state_dict = {}
@@ -404,11 +404,11 @@ def train_expression_reconstruction(
         
         # Load model weights - handle both standalone and supervised model checkpoints
         if 'expression_transformer_state_dict' in checkpoint:
-            # Standalone ExpressionTransformer checkpoint
+            # This is a standalone ExpressionTransformer checkpoint
             expression_transformer.load_state_dict(checkpoint['expression_transformer_state_dict'])
             logger.info("✅ ExpressionTransformer checkpoint loaded")
         elif 'model_state_dict' in checkpoint:
-            # Supervised model checkpoint - extract ExpressionTransformer part
+            # This is a supervised model checkpoint - extract ExpressionTransformer part
             model_state_dict = checkpoint['model_state_dict']
             # Filter keys to only include ExpressionTransformer parameters
             expr_state_dict = {}
