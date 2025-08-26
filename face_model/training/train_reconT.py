@@ -358,9 +358,24 @@ def train_expression_reconstruction(
         
         # Load model weights - handle both standalone and supervised model checkpoints
         if 'expression_transformer_state_dict' in checkpoint:
-            # This is a standalone ExpressionTransformer checkpoint
-            expression_transformer.load_state_dict(checkpoint['expression_transformer_state_dict'])
-            logger.info("✅ ExpressionTransformer checkpoint loaded with matching config")
+            # Check if the keys have the 'expression_transformer.' prefix
+            expr_state_dict = checkpoint['expression_transformer_state_dict']
+            if any(key.startswith('expression_transformer.') for key in expr_state_dict.keys()):
+                # Keys have prefix - remove it
+                clean_state_dict = {}
+                for key, value in expr_state_dict.items():
+                    if key.startswith('expression_transformer.'):
+                        new_key = key[len('expression_transformer.'):]
+                        clean_state_dict[new_key] = value
+                    else:
+                        clean_state_dict[key] = value
+                
+                expression_transformer.load_state_dict(clean_state_dict)
+                logger.info("✅ ExpressionTransformer checkpoint loaded with matching config (removed prefix)")
+            else:
+                # Keys are clean - load directly
+                expression_transformer.load_state_dict(expr_state_dict)
+                logger.info("✅ ExpressionTransformer checkpoint loaded with matching config")
         elif 'model_state_dict' in checkpoint:
             # This is a supervised model checkpoint - extract ExpressionTransformer part
             model_state_dict = checkpoint['model_state_dict']
@@ -404,9 +419,24 @@ def train_expression_reconstruction(
         
         # Load model weights - handle both standalone and supervised model checkpoints
         if 'expression_transformer_state_dict' in checkpoint:
-            # This is a standalone ExpressionTransformer checkpoint
-            expression_transformer.load_state_dict(checkpoint['expression_transformer_state_dict'])
-            logger.info("✅ ExpressionTransformer checkpoint loaded")
+            # Check if the keys have the 'expression_transformer.' prefix
+            expr_state_dict = checkpoint['expression_transformer_state_dict']
+            if any(key.startswith('expression_transformer.') for key in expr_state_dict.keys()):
+                # Keys have prefix - remove it
+                clean_state_dict = {}
+                for key, value in expr_state_dict.items():
+                    if key.startswith('expression_transformer.'):
+                        new_key = key[len('expression_transformer.'):]
+                        clean_state_dict[new_key] = value
+                    else:
+                        clean_state_dict[key] = value
+                
+                expression_transformer.load_state_dict(clean_state_dict)
+                logger.info("✅ ExpressionTransformer checkpoint loaded (removed prefix)")
+            else:
+                # Keys are clean - load directly
+                expression_transformer.load_state_dict(expr_state_dict)
+                logger.info("✅ ExpressionTransformer checkpoint loaded")
         elif 'model_state_dict' in checkpoint:
             # This is a supervised model checkpoint - extract ExpressionTransformer part
             model_state_dict = checkpoint['model_state_dict']
