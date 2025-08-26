@@ -43,7 +43,7 @@ def main():
     parser.add_argument("--lambda-identity", type=float, default=0.5,
                        help="Weight for identity loss (ArcFace-based)")
     parser.add_argument("--arcface-model-path", type=str, 
-                        default="/mnt/dataset-storage/models/arcface.onnx",
+                        default="/mnt/dataset-storage/checkpoints/arc.onnx",
                        help="Path to ArcFace ONNX model file")
 
     # Validation arguments
