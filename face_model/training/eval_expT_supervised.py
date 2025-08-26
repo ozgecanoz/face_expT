@@ -255,21 +255,25 @@ def main():
     
     # Required arguments
     parser.add_argument("--checkpoint-path", type=str, 
-    default="/home/jupyter/checkpoints/expression_transformer_checkpoint_supervised.pth",
+    #default="/home/jupyter/checkpoints/expression_transformer_checkpoint_supervised.pth",
+    default="/Users/ozgewhiting/Documents/projects/cloud_checkpoints/expT_supervised_epoch_10_step_280.pt",
                        help="Path to model checkpoint")
     parser.add_argument("--dataset-path", type=str, 
-    default="/home/jupyter/dbs/AffectNet_518_test/",
+    #default="/home/jupyter/dbs/AffectNet_518_test/",
+    default="/Users/ozgewhiting/Documents/EQLabs/datasets_serial/AffectNet_518_test/",
                        help="Path to test dataset directory")
     parser.add_argument("--pca-json-path", type=str, 
-    default="/home/jupyter/dbs/combined_pca_directions.json",
+    #default="/home/jupyter/dbs/combined_pca_directions.json",
+    default="/Users/ozgewhiting/Documents/projects/combined_pca_directions.json",
                        help="Path to PCA projection JSON file")
-    
-    # Optional arguments
     parser.add_argument("--output-path", type=str, 
-    default="/home/jupyter/dbs/expt_supervised_eval_results.json",
+    #default="/home/jupyter/dbs/expt_supervised_eval_results.json",
+    default="/Users/ozgewhiting/Documents/projects/expt_supervised_eval_results.json",
                        help="Path to save evaluation results (default: evaluation_results.json)")
-    parser.add_argument("--batch-size", type=int, default=16,
+    parser.add_argument("--batch-size", type=int, default=4,
                        help="Evaluation batch size (default: 8)")
+   
+   
     parser.add_argument("--device", type=str, default="auto",
                        help="Device to use (auto/cpu/cuda)")
     parser.add_argument("--num-workers", type=int, default=8,
@@ -325,26 +329,54 @@ def main():
             config = checkpoint['config']
             logger.info("✅ Found config in checkpoint")
             
-            # Initialize model with checkpoint config
-            model = ExpTClassifierModel(
-                embed_dim=config.get('embed_dim', 384),
-                num_heads=config.get('num_heads', 4),
-                num_layers=config.get('num_layers', 2),
-                dropout=config.get('dropout', 0.1),
-                ff_dim=config.get('ff_dim', 1536),
-                grid_size=config.get('grid_size', 37),
-                num_classes=config.get('num_classes', 8)
-            ).to(device)
-            
-            num_classes = config.get('num_classes', 8)
+            # Handle nested config structure from supervised training
+            if 'supervised_model' in config:
+                # This is a supervised training checkpoint
+                supervised_config = config['supervised_model']
+                expression_config = config.get('expression_model', {})
+                
+                # Initialize model with checkpoint config
+                model = ExpTClassifierModel(
+                    embed_dim=expression_config.get('embed_dim', 384),
+                    num_heads=expression_config.get('num_heads', 4),
+                    num_layers=expression_config.get('num_layers', 2),
+                    dropout=expression_config.get('dropout', 0.1),
+                    ff_dim=expression_config.get('ff_dim', 1536),
+                    grid_size=expression_config.get('grid_size', 37),
+                    num_classes=supervised_config.get('num_classes', 8)
+                ).to(device)
+                
+                num_classes = supervised_config.get('num_classes', 8)
+                logger.info(f"✅ Loaded supervised model config: {num_classes} classes")
+            else:
+                # This is a regular checkpoint
+                model = ExpTClassifierModel(
+                    embed_dim=config.get('embed_dim', 384),
+                    num_heads=config.get('num_heads', 4),
+                    num_layers=config.get('num_layers', 2),
+                    dropout=config.get('dropout', 0.1),
+                    ff_dim=config.get('ff_dim', 1536),
+                    grid_size=config.get('grid_size', 37),
+                    num_classes=config.get('num_classes', 8)
+                ).to(device)
+                
+                num_classes = config.get('num_classes', 8)
+                logger.info(f"✅ Loaded regular model config: {num_classes} classes")
         else:
             logger.warning("⚠️  No config found in checkpoint, using default values")
             model = ExpTClassifierModel().to(device)
             num_classes = 8
         
-        # Load model weights
-        model.load_state_dict(checkpoint['model_state_dict'])
-        logger.info("✅ Model loaded successfully")
+        # Load model weights - handle both checkpoint formats
+        if 'model_state_dict' in checkpoint:
+            model.load_state_dict(checkpoint['model_state_dict'])
+            logger.info("✅ Model loaded successfully from 'model_state_dict'")
+        elif 'expression_transformer_state_dict' in checkpoint:
+            # This is a supervised training checkpoint
+            model.load_state_dict(checkpoint['expression_transformer_state_dict'])
+            logger.info("✅ Model loaded successfully from 'expression_transformer_state_dict'")
+        else:
+            raise KeyError("No valid state dict found in checkpoint. Expected 'model_state_dict' or 'expression_transformer_state_dict'")
         
         # Load PCA projection
         pca_components, pca_mean = load_pca_projection(args.pca_json_path)

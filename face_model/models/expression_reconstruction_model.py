@@ -42,17 +42,14 @@ def create_subject_bases(max_subjects: int, embed_dim: int, *, seed: int = 0, de
     else:
         return block_orthogonal_rows(max_subjects, embed_dim, device=device, dtype=dtype, seed=seed)
 
-# TransformerBlock removed - now using nn.TransformerDecoder for both cross and self attention
-
-
-# CrossAttentionBlock removed - now using nn.TransformerDecoder with fixed memory
-
-
 # Import the OptimizedCNNDecoder from the existing face reconstruction model
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from face_reconstruction_model import OptimizedCNNDecoder
+
+# Import the positional embedding function from expression transformer
+from expression_transformer import create_2d_sinusoidal_positional_embeddings
 
 
 class ExpressionReconstructionModel(nn.Module):
@@ -101,6 +98,16 @@ class ExpressionReconstructionModel(nn.Module):
         # Learnable patch embeddings (Q vectors)
         self.patch_embeddings = nn.Parameter(torch.randn(1, num_patches, embed_dim) * 0.02)
         
+        # Fixed 2D sinusoidal positional embeddings (frozen)
+        pos_base = create_2d_sinusoidal_positional_embeddings(int(math.sqrt(num_patches)), embed_dim)
+        self.register_buffer('pos_base', pos_base)  # (1369, 384) - frozen
+        
+        # Learnable delta positional embeddings (small magnitude)
+        # This allows the model to fine-tune spatial relationships between patches
+        self.delta_pos_embed = nn.Parameter(torch.zeros(1, num_patches, embed_dim) * 0.001)
+        # Initialize very close to zero for stable training
+        nn.init.trunc_normal_(self.delta_pos_embed, std=0.001)
+        
         # Cross-attention decoder layers (patches attend to subject + expression)
         # Using TransformerDecoderLayer for cross-attention with fixed memory
         cross_decoder_layer = nn.TransformerDecoderLayer(
@@ -130,17 +137,15 @@ class ExpressionReconstructionModel(nn.Module):
         logger.info(f"Expression Reconstruction Model initialized with {num_cross_attention_layers} cross-attention layers, {num_self_attention_layers} self-attention layers")
         logger.info(f"Feed-forward dimension: {ff_dim}")
         logger.info(f"Subject embeddings: {max_subjects} subjects, {embed_dim} dimensions (orthogonal base + learnable delta)")
-        logger.info(f"Positional embeddings: {num_patches} patches, {embed_dim} dimensions")
+        logger.info(f"Positional embeddings: {num_patches} patches, {embed_dim} dimensions (input + learnable delta)")
         
     def forward(self, 
                 subject_ids: torch.Tensor,
-                expression_token: torch.Tensor,
-                pos_embeddings: torch.Tensor) -> torch.Tensor:
+                expression_token: torch.Tensor) -> torch.Tensor:
         """
         Args:
             subject_ids: (B,) - Subject IDs for each sample in batch
             expression_token: (B, 1, embed_dim) - Expression token
-            pos_embeddings: (B, num_patches, embed_dim) - Positional embeddings
         Returns:
             torch.Tensor: (B, 3, 518, 518) - Reconstructed face image
         """
@@ -155,8 +160,8 @@ class ExpressionReconstructionModel(nn.Module):
         # Initialize patch embeddings with learnable vectors
         patch_vectors = self.patch_embeddings.expand(B, -1, -1)  # (B, num_patches, embed_dim)
         
-        # Add positional embeddings
-        patch_vectors = patch_vectors + pos_embeddings
+        # Add positional embeddings: fixed base + learnable delta
+        patch_vectors = patch_vectors + self.pos_base.unsqueeze(0).expand(B, -1, -1) + self.delta_pos_embed.expand(B, -1, -1)
         
         # Combine subject and expression tokens for fixed memory (K,V context)
         identity_expression = torch.cat([subject_embedding, expression_token], dim=1)  # (B, 2, embed_dim)

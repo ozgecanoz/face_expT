@@ -275,11 +275,15 @@ sudo mount /dev/sdb /mnt/dataset-storage
 sudo chown $USER:$USER /mnt/dataset-storage
 
 # 2. Setup SSH key for GitHub
-ssh-keygen -t ed25519 -C "your-email@example.com" -f ~/.ssh/github_key
+ssh-keygen -t ed25519 -C "ozgecanozcanli@gmail.com" -f ~/.ssh/github_key
 eval "$(ssh-agent -s)"
 ssh-add ~/.ssh/github_key
 cat ~/.ssh/github_key.pub
 # Copy this output and add to GitHub SSH keys
+
+echo 'eval "$(ssh-agent -s)"' >> ~/.bashrc
+echo 'ssh-add ~/.ssh/github_key' >> ~/.bashrc
+source ~/.bashrc
 
 # 3. Test GitHub connection
 ssh -T git@github.com

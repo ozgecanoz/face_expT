@@ -139,13 +139,14 @@ class ExpressionTransformer(nn.Module):
     
     def inference(self, patch_tokens):
         """
-        Inference method that returns expression tokens
+        Inference method that returns expression tokens and final positional embeddings
         
         Args:
             patch_tokens: (B, 1369, 384) - 1 frame of patch tokens per batch
         
         Returns:
             expression_token: (B, 1, 384) - Expression token
+            final_pos_embeddings: (B, 1369, 384) - Final positional embeddings (base + learned delta)
         """
         with torch.no_grad():
             B, num_patches, embed_dim = patch_tokens.shape
@@ -157,7 +158,8 @@ class ExpressionTransformer(nn.Module):
             # Prepare fixed K,V context (doesn't get updated)
             # Combine fixed base positional embeddings with learnable delta
             pos_embeddings = self.pos_base.unsqueeze(0).expand(B, -1, -1)  # (B, 1369, 384)
-            patch_tokens_with_pos = patch_tokens + pos_embeddings + self.delta_pos_embed
+            final_pos_embeddings = pos_embeddings + self.delta_pos_embed  # (B, 1369, 384)
+            patch_tokens_with_pos = patch_tokens + final_pos_embeddings
             
             # Use patch tokens with positional embeddings as K, V context
             # No subject embeddings - purely expression-based
@@ -173,7 +175,7 @@ class ExpressionTransformer(nn.Module):
             expression_token = self.layer_norm(expression_token)
             expression_token = F.normalize(expression_token, dim=-1)  # (B, 1, D)
             
-            return expression_token
+            return expression_token, final_pos_embeddings
 
 
 def test_expression_transformer():
@@ -199,8 +201,9 @@ def test_expression_transformer():
     print(f"Expression token shape: {expression_token_forward.shape}")
     
     # Test inference method
-    expression_token_inference = model.inference(patch_tokens)
+    expression_token_inference, final_pos_embeddings = model.inference(patch_tokens)
     print(f"Inference method result shape: {expression_token_inference.shape}")
+    print(f"Final positional embeddings shape: {final_pos_embeddings.shape}")
     
     # Test that forward and inference produce similar results (they should be identical)
     assert torch.allclose(expression_token_forward, expression_token_inference, atol=1e-6), "Forward and inference should produce identical results"
