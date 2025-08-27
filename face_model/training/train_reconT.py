@@ -346,6 +346,11 @@ def train_expression_reconstruction(
         checkpoint_config = checkpoint['config']
         logger.info("✅ Found config in checkpoint, initializing ExpressionTransformer accordingly")
         
+        # Debug: Log the full checkpoint config structure
+        logger.info(f"Full checkpoint config: {checkpoint_config}")
+        if 'expression_model' in checkpoint_config:
+            logger.info(f"Expression model config: {checkpoint_config['expression_model']}")
+        
         # Update local variables to match checkpoint config BEFORE initializing the model
         embed_dim = checkpoint_config.get('expression_model', {}).get('expr_embed_dim', embed_dim)
         num_heads = checkpoint_config.get('expression_model', {}).get('expr_num_heads', num_heads)
@@ -356,6 +361,28 @@ def train_expression_reconstruction(
         logger.info(f"  - embed_dim: {embed_dim}")
         logger.info(f"  - num_heads: {num_heads}")
         logger.info(f"  - ff_dim: {ff_dim}")
+        
+        # CRITICAL FIX: Infer the actual ff_dim from the state dict weights
+        # The config might be wrong, but the weights tell us the real architecture
+        if 'expression_transformer_state_dict' in checkpoint:
+            expr_state_dict = checkpoint['expression_transformer_state_dict']
+            # Look for linear1.weight in decoder layers to infer ff_dim
+            for key, value in expr_state_dict.items():
+                if 'decoder.layers.0.linear1.weight' in key:
+                    # Remove prefix if present to get clean key
+                    clean_key = key
+                    if key.startswith('expression_transformer.'):
+                        clean_key = key[len('expression_transformer.'):]
+                    
+                    actual_ff_dim = value.shape[0]
+                    logger.info(f"🔍 Found decoder.layers.0.linear1.weight with shape: {value.shape}")
+                    logger.info(f"🔍 Inferred actual ff_dim: {actual_ff_dim}")
+                    
+                    if actual_ff_dim != ff_dim:
+                        logger.warning(f"⚠️  Config says ff_dim={ff_dim}, but weights show ff_dim={actual_ff_dim}")
+                        logger.warning(f"   Using actual weight dimensions: ff_dim={actual_ff_dim}")
+                        ff_dim = actual_ff_dim
+                    break
         
         # Initialize ExpressionTransformer with updated config values
         expression_transformer = ExpressionTransformer(

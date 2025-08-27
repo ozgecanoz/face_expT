@@ -344,9 +344,17 @@ def train_expression_transformer_supervised(
                 num_classes=checkpoint_config.get('supervised_model', {}).get('num_classes', num_classes)  # Load from checkpoint config
             ).to(device)
             
-            # Load model weights
-            model.load_state_dict(checkpoint['expression_transformer_state_dict'])
-            logger.info("✅ Expression transformer checkpoint loaded with matching config")
+            # Load model weights - handle both supervised and standalone checkpoints
+            if 'model_state_dict' in checkpoint:
+                # This is a supervised model checkpoint
+                model.load_state_dict(checkpoint['model_state_dict'])
+                logger.info("✅ Supervised model checkpoint loaded with matching config")
+            elif 'expression_transformer_state_dict' in checkpoint:
+                # This is a standalone ExpressionTransformer checkpoint
+                model.load_state_dict(checkpoint['expression_transformer_state_dict'])
+                logger.info("✅ Expression transformer checkpoint loaded with matching config")
+            else:
+                raise ValueError("Checkpoint must contain either 'model_state_dict' or 'expression_transformer_state_dict'")
             
             # Update local variables to match checkpoint config
             embed_dim = checkpoint_config.get('expression_model', {}).get('expr_embed_dim', embed_dim)
