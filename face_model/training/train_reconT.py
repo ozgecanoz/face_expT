@@ -418,17 +418,7 @@ def train_expression_reconstruction(
         else:
             raise ValueError("Checkpoint must contain either 'expression_transformer_state_dict' or 'model_state_dict'")
         
-        # Update local variables to match checkpoint config
-        embed_dim = checkpoint_config.get('expression_model', {}).get('expr_embed_dim', embed_dim)
-        num_heads = checkpoint_config.get('expression_model', {}).get('expr_num_heads', num_heads)
-        ff_dim = checkpoint_config.get('expression_model', {}).get('expr_ff_dim', ff_dim)
-        
-        # Log the actual values being used
-        logger.info(f"Using checkpoint config values:")
-        logger.info(f"  - embed_dim: {embed_dim}")
-        logger.info(f"  - num_heads: {num_heads}")
-        logger.info(f"  - ff_dim: {ff_dim}")
-        
+        # Log the final ExpressionTransformer configuration
         logger.info(f"ExpressionTransformer config from checkpoint:")
         logger.info(f"  - embed_dim: {embed_dim}")
         logger.info(f"  - num_heads: {num_heads}")
