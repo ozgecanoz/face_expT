@@ -84,7 +84,7 @@ def main():
     # Logging and memory
     parser.add_argument("--log-dir", type=str, default="/home/jupyter/logs",
                        help="Directory for TensorBoard logs")
-    parser.add_argument("--max-memory-fraction", type=float, default=0.6,
+    parser.add_argument("--max-memory-fraction", type=float, default=0.8,
                        help="Maximum GPU memory fraction to use (0.0-1.0, default: 0.9)")
     
     args = parser.parse_args()
