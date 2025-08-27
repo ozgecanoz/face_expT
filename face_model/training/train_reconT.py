@@ -522,6 +522,15 @@ def train_expression_reconstruction(
     
     # Initialize ExpressionReconstructionModel
     logger.info("Initializing ExpressionReconstructionModel...")
+    logger.info(f"Using parameters for ExpressionReconstructionModel:")
+    logger.info(f"  - embed_dim: {embed_dim}")
+    logger.info(f"  - num_cross_attention_layers: {num_cross_attention_layers}")
+    logger.info(f"  - num_self_attention_layers: {num_self_attention_layers}")
+    logger.info(f"  - num_heads: {num_heads}")
+    logger.info(f"  - ff_dim: {ff_dim}")
+    logger.info(f"  - dropout: {dropout}")
+    logger.info(f"  - max_subjects: {max_subjects}")
+    
     reconstruction_model = ExpressionReconstructionModel(
         embed_dim=embed_dim,
         num_cross_attention_layers=num_cross_attention_layers,

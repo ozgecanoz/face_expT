@@ -132,6 +132,7 @@ def main():
     print(f"Cross-Attention Layers: {args.num_cross_attention_layers}")
     print(f"Self-Attention Layers: {args.num_self_attention_layers}")
     print(f"Num Heads: {args.num_heads}")
+    print(f"FF Dim: {args.ff_dim}")
     print(f"Max Subjects: {args.max_subjects}")
     print(f"Identity Loss Weight: {args.lambda_identity}")
     print(f"ArcFace Model: {args.arcface_model_path}")
