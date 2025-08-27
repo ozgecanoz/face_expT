@@ -387,13 +387,31 @@ def train_expression_transformer_supervised(
                 num_classes=num_classes
             ).to(device)
             
-            # Load model weights
-            model.load_state_dict(checkpoint['expression_transformer_state_dict'])
-            logger.info("✅ Expression transformer checkpoint loaded")
+            # Load model weights - handle both supervised and standalone checkpoints
+            if 'model_state_dict' in checkpoint:
+                # This is a supervised model checkpoint
+                model.load_state_dict(checkpoint['model_state_dict'])
+                logger.info("✅ Supervised model checkpoint loaded")
+            elif 'expression_transformer_state_dict' in checkpoint:
+                # This is a standalone ExpressionTransformer checkpoint
+                model.load_state_dict(checkpoint['expression_transformer_state_dict'])
+                logger.info("✅ Expression transformer checkpoint loaded")
+            else:
+                raise ValueError("Checkpoint must contain either 'model_state_dict' or 'expression_transformer_state_dict'")
+            
             logger.info(f"⚠️  Note: num_classes not in checkpoint, using provided value: {num_classes}")
     else:
         # Initialize model with provided arguments (no checkpoint)
         logger.info("No checkpoint provided, initializing model with provided arguments")
+        logger.info(f"Using provided architecture parameters:")
+        logger.info(f"  - embed_dim: {embed_dim}")
+        logger.info(f"  - num_heads: {num_heads}")
+        logger.info(f"  - num_layers: {num_layers}")
+        logger.info(f"  - dropout: {dropout}")
+        logger.info(f"  - ff_dim: {ff_dim}")
+        logger.info(f"  - grid_size: {grid_size}")
+        logger.info(f"  - num_classes: {num_classes}")
+        
         model = ExpTClassifierModel(
             embed_dim=embed_dim,
             num_heads=num_heads,

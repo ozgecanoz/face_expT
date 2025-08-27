@@ -82,7 +82,7 @@ def main():
                        help="Drop last incomplete batch")
     
     # Logging and memory
-    parser.add_argument("--log-dir", type=str, default="/mnt/dataset-storage/logs",
+    parser.add_argument("--log-dir", type=str, default="/home/jupyter/logs",
                        help="Directory for TensorBoard logs")
     parser.add_argument("--max-memory-fraction", type=float, default=0.7,
                        help="Maximum GPU memory fraction to use (0.0-1.0, default: 0.9)")
