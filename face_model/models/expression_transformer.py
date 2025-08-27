@@ -65,7 +65,6 @@ class ExpressionTransformer(nn.Module):
         self.num_heads = num_heads
         self.num_layers = num_layers
         self.dropout = dropout
-        self.num_heads = num_heads
         self.ff_dim = ff_dim
         self.grid_size = grid_size
         self.num_patches = grid_size * grid_size  # 1369 for 37x37
@@ -176,6 +175,23 @@ class ExpressionTransformer(nn.Module):
             expression_token = F.normalize(expression_token, dim=-1)  # (B, 1, D)
             
             return expression_token, final_pos_embeddings
+    
+    def get_config(self):
+        """
+        Get the configuration parameters of the ExpressionTransformer
+        
+        Returns:
+            dict: Configuration dictionary containing model parameters
+        """
+        return {
+            'embed_dim': self.embed_dim,
+            'num_heads': self.num_heads,
+            'num_layers': self.num_layers,
+            'dropout': self.dropout,
+            'ff_dim': self.ff_dim,
+            'grid_size': self.grid_size,
+            'num_patches': self.num_patches
+        }
 
 
 def test_expression_transformer():
