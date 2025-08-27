@@ -16,7 +16,7 @@ def main():
     parser.add_argument("--dataset-path", type=str, 
                         default="/home/jupyter/dbs/CCA_train_db4_no_padding_keywords_offset_1.0/",
                        help="Path to CCA dataset directory")
-    parser.add_argument("--max-samples", type=int, default=100, help="Maximum number of samples to use")
+    parser.add_argument("--max-samples", type=int, default=None, help="Maximum number of samples to use")
     parser.add_argument("--pca-json-path", type=str, 
                         default="/home/jupyter/dbs/combined_pca_directions.json",
                        help="Path to PCA projection JSON file")
@@ -28,19 +28,19 @@ def main():
     parser.add_argument("--checkpoint-dir", type=str, 
                         default="/home/jupyter/checkpoints/",
                        help="Directory to save checkpoints")
-    parser.add_argument("--save-every-step", type=int, default=2,
+    parser.add_argument("--save-every-step", type=int, default=200,
                        help="Save checkpoints every N steps")
     parser.add_argument("--batch-size", type=int, default=4,
                        help="Training batch size")
-    parser.add_argument("--num-epochs", type=int, default=2,
+    parser.add_argument("--num-epochs", type=int, default=10,
                        help="Number of training epochs")
     parser.add_argument("--learning-rate", type=float, default=1e-4,
                        help="Learning rate")
-    parser.add_argument("--warmup-steps", type=int, default=500,
+    parser.add_argument("--warmup-steps", type=int, default=1000,
                        help="Number of warmup steps for scheduler")
     parser.add_argument("--min-lr", type=float, default=1e-5,
                        help="Minimum learning rate")
-    parser.add_argument("--lambda-identity", type=float, default=0.5,
+    parser.add_argument("--lambda-identity", type=float, default=0.8,
                        help="Weight for identity loss (ArcFace-based)")
     parser.add_argument("--arcface-model-path", type=str, 
                         default="/home/jupyter/checkpoints/arc.onnx",
@@ -50,7 +50,7 @@ def main():
     parser.add_argument("--val-dataset-path", type=str, 
                         default="/home/jupyter/dbs/CCA_train_db4_no_padding/",
                        help="Path to validation dataset")
-    parser.add_argument("--max-val-samples", type=int, default=100,
+    parser.add_argument("--max-val-samples", type=int, default=500,
                        help="Maximum number of validation samples")
     
     # Architecture parameters

@@ -529,6 +529,15 @@ def train_expression_reconstruction(
     expression_transformer.requires_grad = False
     logger.info("🔒 ExpressionTransformer frozen (no gradients)")
     
+    # Log ExpressionTransformer config for checkpoint saving
+    expr_config = expression_transformer.get_config()
+    logger.info(f"ExpressionTransformer config for checkpoints:")
+    logger.info(f"  - embed_dim: {expr_config['embed_dim']}")
+    logger.info(f"  - num_heads: {expr_config['num_heads']}")
+    logger.info(f"  - num_layers: {expr_config['num_layers']}")
+    logger.info(f"  - dropout: {expr_config['dropout']}")
+    logger.info(f"  - ff_dim: {expr_config['ff_dim']}")
+    
     # Initialize ExpressionReconstructionModel
     logger.info("Initializing ExpressionReconstructionModel...")
     logger.info(f"Using parameters for ExpressionReconstructionModel:")
@@ -699,17 +708,24 @@ def train_expression_reconstruction(
                 if current_training_step % save_every_step == 0:
                     checkpoint_path = os.path.join(checkpoint_dir, f"reconT_step_{current_training_step}.pt")
                     
-                    # Create config using reconstruction model's get_config method
-                    model_config = reconstruction_model.get_config()
+                    # Create config using both models' get_config methods
+                    expr_config = expression_transformer.get_config()
+                    recon_config = reconstruction_model.get_config()
                     config = create_comprehensive_config(
+                        # Expression transformer parameters (from frozen model's config)
+                        expr_embed_dim=expr_config['embed_dim'],
+                        expr_num_heads=expr_config['num_heads'],
+                        expr_num_layers=expr_config['num_layers'],
+                        expr_dropout=expr_config['dropout'],
+                        expr_ff_dim=expr_config['ff_dim'],
                         # Reconstruction model parameters
-                        recon_embed_dim=model_config['embed_dim'],
-                        recon_num_cross_layers=model_config['num_cross_attention_layers'],
-                        recon_num_self_layers=model_config['num_self_attention_layers'],
-                        recon_num_heads=model_config['num_heads'],
-                        recon_ff_dim=model_config['ff_dim'],
-                        recon_dropout=model_config['dropout'],
-                        recon_max_subjects=model_config['max_subjects'],
+                        recon_embed_dim=recon_config['embed_dim'],
+                        recon_num_cross_layers=recon_config['num_cross_attention_layers'],
+                        recon_num_self_layers=recon_config['num_self_attention_layers'],
+                        recon_num_heads=recon_config['num_heads'],
+                        recon_ff_dim=recon_config['ff_dim'],
+                        recon_dropout=recon_config['dropout'],
+                        recon_max_subjects=recon_config['max_subjects'],
                         # Training parameters
                         learning_rate=learning_rate,
                         batch_size=batch_size,
@@ -746,16 +762,23 @@ def train_expression_reconstruction(
                     
                     # Create config for epoch checkpoint if not already created
                     if 'config' not in locals():
-                        model_config = reconstruction_model.get_config()
+                        expr_config = expression_transformer.get_config()
+                        recon_config = reconstruction_model.get_config()
                         config = create_comprehensive_config(
+                            # Expression transformer parameters (from frozen model's config)
+                            expr_embed_dim=expr_config['embed_dim'],
+                            expr_num_heads=expr_config['num_heads'],
+                            expr_num_layers=expr_config['num_layers'],
+                            expr_dropout=expr_config['dropout'],
+                            expr_ff_dim=expr_config['ff_dim'],
                             # Reconstruction model parameters
-                            recon_embed_dim=model_config['embed_dim'],
-                            recon_num_cross_layers=model_config['num_cross_attention_layers'],
-                            recon_num_self_layers=model_config['num_self_attention_layers'],
-                            recon_num_heads=model_config['num_heads'],
-                            recon_ff_dim=model_config['ff_dim'],
-                            recon_dropout=model_config['dropout'],
-                            recon_max_subjects=model_config['max_subjects'],
+                            recon_embed_dim=recon_config['embed_dim'],
+                            recon_num_cross_layers=recon_config['num_cross_attention_layers'],
+                            recon_num_self_layers=recon_config['num_self_attention_layers'],
+                            recon_num_heads=recon_config['num_heads'],
+                            recon_ff_dim=recon_config['ff_dim'],
+                            recon_dropout=recon_config['dropout'],
+                            recon_max_subjects=recon_config['max_subjects'],
                             # Training parameters
                             learning_rate=learning_rate,
                             batch_size=batch_size,
