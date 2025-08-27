@@ -319,6 +319,15 @@ def train_expression_reconstruction(
     if device.type == "cuda" and max_memory_fraction < 1.0:
         torch.cuda.set_per_process_memory_fraction(max_memory_fraction)
         logger.info(f"Set GPU memory fraction to {max_memory_fraction}")
+        
+        # Set PyTorch CUDA allocator config for better memory management
+        if 'PYTORCH_CUDA_ALLOC_CONF' not in os.environ:
+            os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
+            logger.info("Set PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True")
+        
+        # Clear cache before starting
+        torch.cuda.empty_cache()
+        logger.info("Cleared CUDA cache")
     
     # Load PCA projection
     pca_components, pca_mean = load_pca_projection(pca_json_path)
@@ -668,6 +677,10 @@ def train_expression_reconstruction(
                 
                 # Update learning rate
                 scheduler.step()
+                
+                # Memory management
+                if device.type == "cuda":
+                    torch.cuda.empty_cache()
                 
                 # Update metrics
                 epoch_loss += total_loss.item()

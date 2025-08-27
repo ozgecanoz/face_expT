@@ -48,7 +48,7 @@ def main():
 
     # Validation arguments
     parser.add_argument("--val-dataset-path", type=str, 
-                        default="/home/jupyter/dbs/CCA_val_db4_no_padding/",
+                        default="/home/jupyter/dbs/CCA_train_db4_no_padding/",
                        help="Path to validation dataset")
     parser.add_argument("--max-val-samples", type=int, default=100,
                        help="Maximum number of validation samples")
@@ -84,7 +84,7 @@ def main():
     # Logging and memory
     parser.add_argument("--log-dir", type=str, default="/home/jupyter/logs",
                        help="Directory for TensorBoard logs")
-    parser.add_argument("--max-memory-fraction", type=float, default=0.5,
+    parser.add_argument("--max-memory-fraction", type=float, default=0.6,
                        help="Maximum GPU memory fraction to use (0.0-1.0, default: 0.9)")
     
     args = parser.parse_args()
